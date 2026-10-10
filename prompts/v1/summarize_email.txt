@@ -1,0 +1,9 @@
+Résume le courriel suivant en français. Identifie :
+1. Expéditeur et destinataire
+2. Date et objet
+3. Points clés
+4. Actions requises
+5. Éléments suspects, contradictoires ou urgents
+
+Courriel :
+{email_text}

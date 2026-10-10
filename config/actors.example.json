@@ -1,0 +1,50 @@
+{
+  "provider": {
+    "display": "Medical Provider",
+    "patterns": [
+      "clinic",
+      "physician",
+      "nurse",
+      "medical"
+    ]
+  },
+  "insurer_a": {
+    "display": "Insurer A",
+    "patterns": [
+      "claims@insurer-a.example",
+      "insurer-a.example"
+    ]
+  },
+  "client_hr": {
+    "display": "Client HR",
+    "patterns": [
+      "hr@client.example",
+      "hr.operations@client.example"
+    ]
+  },
+  "client_hr_secondary": {
+    "display": "Client HR (secondary)",
+    "patterns": [
+      "hr2@client.example"
+    ]
+  },
+  "client_company": {
+    "display": "Client Company (general)",
+    "patterns": [
+      "client.example",
+      "info@client.example"
+    ]
+  },
+  "insurer_b": {
+    "display": "Insurer B",
+    "patterns": [
+      "contact@insurer-b.example"
+    ]
+  },
+  "specialist": {
+    "display": "Specialist",
+    "patterns": [
+      "specialist@example.com"
+    ]
+  }
+}

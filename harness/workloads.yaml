@@ -1,0 +1,36 @@
+# Workload definitions for the BlackStar vs Baseline audit.
+#
+# Fields:
+#   name       stable identifier (used by --workloads on the CLI)
+#   command    list of argv elements; {here} expands to harness/scripts/
+#   warmup_s   seconds to sleep after starting before sampling begins
+#   duration_s default runtime if the CLI does not override
+#   primary    if true, this workload's PIDs are treated as "main" tasks
+#              for the purposes of per-main CPU/RSS attribution and procbg
+#   dcs        placeholder for the real DCS workload once available
+
+workloads:
+  - name: ai_train
+    command: ["{python}", "{here}/matrix_mul.py", "--seconds", "20"]
+    warmup_s: 2
+    duration_s: 20
+    primary: true
+
+  - name: cpu_burn
+    command: ["{python}", "{here}/cpu_burner.py", "--seconds", "20", "--workers", "4"]
+    warmup_s: 1
+    duration_s: 20
+    primary: true
+
+  - name: disk_write
+    command: ["{python}", "{here}/disk_writer.py", "--seconds", "20", "--mb-per-sec", "50"]
+    warmup_s: 1
+    duration_s: 20
+    primary: false
+
+  - name: dcs
+    # Placeholder. The real DCS command will replace this when available.
+    command: ["{python}", "{here}/cpu_burner.py", "--seconds", "20", "--workers", "2"]
+    warmup_s: 1
+    duration_s: 20
+    primary: true

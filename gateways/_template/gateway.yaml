@@ -1,0 +1,75 @@
+# ANCHORUM gateway — schema_version 1.1
+#
+# Copy this directory to gateways/<your-vertical>/ and fill in each field.
+# Every field marked REQUIRED must be present or the loader rejects the file.
+#
+# Fields that reference paths are resolved under this gateway's directory.
+# Paths escaping the gateway (via ../) are rejected.
+#
+# See README.md in this directory for the full schema and constraints.
+
+schema_version: "1.1"                    # REQUIRED. Exact string.
+
+identity:
+  name: template                         # REQUIRED. Matches directory name.
+  version: "0.0.1-draft"                 # REQUIRED. semver; tier A forbids "draft"
+  jurisdiction: CA-QC                    # REQUIRED. ISO 3166-2 or similar.
+  tier: C                                # REQUIRED. One of A, B, C.
+  description: >                         # Optional. Short human description.
+    Template gateway. Replace with your vertical's purpose.
+
+routes:                                  # REQUIRED (1.1). Non-empty list.
+  # Every route a rule may emit must appear here. HOLD_UNCLASSIFIED is
+  # auto-registered by the runtime; do not list it here.
+  - QUARANTINE_REVIEW
+  - HOLD_FOR_HR
+  - CUSTOMS_REVIEW
+
+documents:                               # REQUIRED. Non-empty list.
+  - id: example_document                 # snake_case, unique within gateway
+    label: "Example Document"            # Human label
+    match:
+      filename_glob: "*example*"      # fnmatch pattern (fnmatchcase)
+      mime_types: [application/pdf]      # Optional; default is ["*/*"]
+    required_fields:                     # Field names the extractor must produce
+      - example_field_1
+      - example_field_2
+    extractor: pdf_text                  # Named extractor (registry TBD)
+    retention_days: 2555                 # Must be >= 1
+
+actors:                                  # REQUIRED.
+  path: actors.json                      # Relative to this directory
+  required_roles: [example_role]         # Optional but recommended
+
+policy:                                  # REQUIRED.
+  path: policy.cel                       # CEL rule-block file
+  citations_path: regulations.json       # Citation library
+  decision_log: true                     # Reserved; not yet wired
+
+risk:                                    # REQUIRED.
+  path: risk_patterns.json
+
+evals:                                   # REQUIRED.
+  golden_dir: evals/golden/              # Must exist and be inside gateway dir
+  thresholds:                            # REQUIRED. Must include _global.
+    _global:                             # Floor applied to each per-type metric
+      precision: 0.90
+      recall: 0.85
+      field_completeness: 0.95
+      field_precision: 0.95
+    # Per-type overrides (optional):
+    # example_document:
+    #   precision: 0.95
+
+legal:                                   # REQUIRED (1.1). All four keys.
+  privacy_jurisdictions: [QC, CA]
+  retention_days_default: 2555           # Must be >= 1
+  consent_required: false                # Boolean
+  phi_handling: false                    # Boolean. Never inferred from vertical.
+
+# integrations:                          # Optional. External service stubs.
+#   - id: example_lookup
+#     kind: http
+#     endpoint: "https://example.gov/api/v1/lookup"
+#     auth: api_key
+#     live: false                        # Stub until credential provisioned

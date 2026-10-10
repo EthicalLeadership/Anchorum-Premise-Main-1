@@ -1,0 +1,32 @@
+:root {
+  color-scheme: light;
+
+  /* COUNSEL is supplied by the host application; system colors keep previews legible. */
+  --tp-bg: var(--counsel-bg, Canvas);
+  --tp-fg: var(--counsel-fg, CanvasText);
+  --tp-line: var(--counsel-line, GrayText);
+  --tp-muted: var(--counsel-muted, GrayText);
+  --tp-acc: var(--counsel-accent, LinkText);
+  --tp-mono: var(--counsel-mono, ui-monospace, monospace);
+
+  --state-ok: var(--counsel-green-700, CanvasText);
+  --state-ok-bg: var(--counsel-green-050, Canvas);
+  --state-warn: var(--counsel-amber-700, CanvasText);
+  --state-warn-bg: var(--counsel-amber-050, Canvas);
+  --state-fail: var(--counsel-red-700, CanvasText);
+  --state-fail-bg: var(--counsel-red-050, Canvas);
+  --state-hold: var(--counsel-red-800, CanvasText);
+  --state-hold-bg: var(--counsel-red-100, Canvas);
+  --state-idle: var(--counsel-muted, GrayText);
+  --state-idle-bg: var(--counsel-bg-subtle, Canvas);
+
+  --focus-ring: var(--counsel-accent, Highlight);
+  --focus-width: 2px;
+  --focus-offset: 2px;
+
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-6: 1.5rem;
+}

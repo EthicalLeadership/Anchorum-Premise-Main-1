@@ -1,0 +1,31 @@
+title = "ANCHORUM staging allowlist"
+[extend]
+useDefault = true
+
+[allowlist]
+description = "docs, tests, fixtures, vendor, public OAuth client IDs"
+paths = [
+  "(?i)\\\\.md$",
+  "(?i)\\\\.rst$",
+  "(?i)/docs?/",
+  "(?i)/website/",
+  "(?i)/references?/",
+  "(?i)/test(s)?/",
+  "(?i)\\\\.test\\\\.",
+  "(?i)\\\\.spec\\\\.",
+  "(?i)/vendor/",
+  "(?i)/third_party/",
+  "(?i)/node_modules/",
+  "(?i)/knowledge_commons/ingested/",
+  "(?i)/evidence_snapshot/",
+  "(?i)/fixtures?/",
+  "(?i)package-lock\\\\.json$",
+  "(?i)yarn\\\\.lock$",
+]
+regexes = [
+  "(?i)(_OAUTH_CLIENT_ID|OAUTH_CLIENT_ID|COPILOT_OAUTH_CLIENT_ID|CLIENT_ID)\\\\s*[:=]\\\\s*[\\"\x27][^\\"\x27]+[\\"\x27]",
+  "private_key:\\\\s*[A-Za-z_]+PrivateKey",
+  "session_key\\\\s*=\\\\s*\\\\w+",
+  "(?i)(VOICE_ID|VAPI_DEFAULT_VOICE_ID)\\\\s*[:=]\\\\s*[\\"\x27][A-Za-z0-9]{16,}[\\"\x27]",
+  "(?i)(Bearer|Basic)\\\\s+(YOUR_|MY_|xxx|example|placeholder|token_here)",
+]

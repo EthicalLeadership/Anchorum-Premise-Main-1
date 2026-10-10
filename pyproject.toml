@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dossier-pipeline-v1-1"
+version = "2026.05.03"
+description = "DOSSIER-PIPELINE pipeline and enforcement package"
+requires-python = ">=3.10"
+dependencies = [
+  "SQLAlchemy>=2.0",
+  "PyJWT>=2.8",
+]
+
+[project.scripts]
+dossier-ci = "ci.run:main"
+
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+  "dossier_pipeline*",
+  "dossier_enforcement*",
+  "ci*",
+  "ccsp*",
+  "evals*",
+  "factory*",
+  "harness*",
+  "scripts*",
+]

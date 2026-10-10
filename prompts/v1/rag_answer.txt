@@ -1,0 +1,6 @@
+Contexte documentaire :
+{context}
+
+Question : {question}
+
+Réponds en français en te basant uniquement sur le contexte ci-dessus. Pour chaque fait, cite la source exacte au format [source: nom_du_fichier, page X, lines Y-Z]. Si le contexte ne permet pas de répondre, dis-le clairement.

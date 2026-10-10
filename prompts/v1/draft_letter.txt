@@ -1,0 +1,16 @@
+Contexte documentaire :
+{context}
+
+Rédige une lettre formelle en français.
+
+Destinataire : {target}
+Objet / finalité : {purpose}
+
+La lettre doit :
+- Être professionnelle, factuelle et ferme.
+- Citer les documents pertinents au format [source: nom_du_fichier, page X, lines Y-Z].
+- Poser des questions précises ou exiger des documents spécifiques.
+- Inclure un délai de réponse raisonnable.
+- Terminer par une réserve de droits.
+
+N’inclus pas de signature finale ; laisse un espace pour signature.

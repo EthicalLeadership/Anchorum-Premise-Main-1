@@ -1,0 +1,25 @@
+// policy-version: 0.0.1
+
+// === rule: example_rule ===
+'example_field_1' in fields && fields.example_field_1 == "trigger"
+  ? {
+      "route": "QUARANTINE_REVIEW",
+      "reason": "Example trigger matched",
+      "severity": "info",
+      "citation": "EXAMPLE-REG-1.1",
+      "fields_used": ["example_field_1"]
+    }
+  : null
+// === end ===
+
+// === rule: default ===
+true
+  ? {
+      "route": "QUARANTINE_REVIEW",
+      "reason": "No rule matched; default route",
+      "severity": "info",
+      "citation": "",
+      "fields_used": []
+    }
+  : null
+// === end ===

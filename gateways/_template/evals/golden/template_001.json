@@ -1,0 +1,17 @@
+{
+  "id": "template_001",
+  "input": {
+    "source_filename": "example.pdf",
+    "fields": {
+      "example_field_1": "trigger"
+    }
+  },
+  "expected": {
+    "document_type": "example_document",
+    "fields_present": ["example_field_1"],
+    "decision": {
+      "route": "QUARANTINE_REVIEW"
+    }
+  },
+  "evaluated_at": 1735689600
+}

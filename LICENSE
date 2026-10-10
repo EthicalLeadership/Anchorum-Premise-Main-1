@@ -1,0 +1,32 @@
+Copyright (c) 2026 Egregore AI. All Rights Reserved.
+
+PROPRIETARY AND CONFIDENTIAL
+
+This software and its source code are proprietary and confidential
+information of Egregore AI and constitute valuable trade secrets.
+
+No part of this software may be used, copied, modified, distributed,
+sublicensed, or disclosed to any third party, in whole or in part,
+by any means, without the prior written consent of Egregore AI.
+
+Access to this software is granted only under a separate written
+license agreement and/or non-disclosure agreement (NDA). Any access
+not covered by such an agreement is strictly prohibited.
+
+THIRD-PARTY COMPONENTS
+
+This software may incorporate third-party components that are
+distributed under their own open-source licenses. Such components,
+and the specific license that applies to each, are identified in
+THIRD_PARTY_NOTICES.md in this repository. Nothing in this LICENSE
+modifies, replaces, or restricts the terms of any third-party
+license, and all rights granted by those licenses remain in full
+force and effect for the components they cover.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

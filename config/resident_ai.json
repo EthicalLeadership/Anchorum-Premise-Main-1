@@ -1,0 +1,22 @@
+{
+  "model": "llama3.1:8b-instruct-q4_K_M",
+  "embed_model": "nomic-embed-text",
+  "ollama_host": "http://127.0.0.1:11434",
+  "temperature": 0.0,
+  "seed": 86849,
+  "top_k": 1,
+  "top_p": 1.0,
+  "num_ctx": 8192,
+  "num_predict": 2048,
+  "retrieval_top_k": 5,
+  "chunk_size": 512,
+  "chunk_overlap": 64,
+  "dossier_id": "DOSSIER-PIPELINE",
+  "output_dir": "../Red dart/resident_ai",
+  "prompts_dir": "prompts/v1",
+  "vector_store_dir": "../Red dart/resident_ai/vector_store",
+  "documents_dirs": [
+    "../red dart"
+  ],
+  "audit_log": "../Red dart/resident_ai/audit/ollama_calls.jsonl"
+}

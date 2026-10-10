@@ -1,0 +1,6 @@
+{
+  "example_role": {
+    "display": "Example Role",
+    "patterns": ["example", "sample", "placeholder"]
+  }
+}

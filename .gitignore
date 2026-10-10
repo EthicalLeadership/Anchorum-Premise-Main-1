@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+
+# Virtualenvs
+.venv/
+.venv_*/
+
+# Case data — must never enter this repo
+config/actors.json
+config/case_*.json
+cases/
+emails/
+output/
+output_proton/
+*.eml
+*.zarc
+*.db
+*.log
+
+# Secrets
+.env
+.env.local
+secrets/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+# --- added by ancorum staging ---
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+config/mail_config.json
+data/
+*.jsonl
+*.sqlite
+*.db
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.bak
+*.tmp
+logger.mjs
+tmp_audit_disk.bin
+# --- end ---
+
+# Aider Studio (auto-added)
+REPO_MAP.md
+.aider/

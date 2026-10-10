@@ -1,0 +1,4 @@
+# Run outputs are per-invocation and are not source. Keep the directory
+# (for the default outdir) but ignore everything inside it.
+*
+!.gitignore

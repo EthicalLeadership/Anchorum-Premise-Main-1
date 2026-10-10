@@ -1,0 +1,8 @@
+{
+  "version": "v1",
+  "analyze_claim.txt": "59a3dc9139ab71b3cd5b56b4d38541cacb27b62317c3135b3da6b5447650a965",
+  "draft_letter.txt": "dd612d15b67f5afef358caa84603f14693c315b7d8acca6377da5162ff6c397d",
+  "rag_answer.txt": "45b1fdcef48db1e76ba4cfc6ea1819c34084d69b757bca693af1d62fae39e859",
+  "summarize_email.txt": "b1ad88efb88e37b5d51192de9cd0c351eb47366dde1dd6cc5764ca45f1cb53be",
+  "system.txt": "f9efe2287e11e38fbea907d7aa08241ea98cc4a1fcabeff5af42607de173014c"
+}

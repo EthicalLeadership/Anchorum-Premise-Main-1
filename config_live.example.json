@@ -1,0 +1,15 @@
+{
+  "dossier": "DOSSIER-PIPELINE-LIVE",
+  "output_dir": "/home/kark/Desktop/Dossier Intake Source/pipeline_output",
+  "proton": {
+    "host": "127.0.0.1",
+    "port": 1143,
+    "username": "your-address@protonmail.com",
+    "password": "YOUR_BRIDGE_PASSWORD",
+    "use_ssl": false,
+    "mailbox": "INBOX"
+  },
+  "pipeline": {
+    "batch_size": 50
+  }
+}
