@@ -1,14 +1,11 @@
-# Base pipeline dependencies
 SQLAlchemy>=2.0
 PyJWT>=2.8
-requests>=2.32
-
-# Resident AI deterministic local intelligence layer
-chromadb>=0.5
-markdownify>=0.13
-sentence-transformers>=3.4
-pymupdf>=1.24
+fastapi>=0.110
+pydantic>=2.0
+jinja2>=3.1
+python-multipart>=0.0.9
 cel-python>=0.5.0
 PyYAML>=6.0
 cryptography>=42.0
 fpdf2>=2.7
+pytest>=8.0
