@@ -77,3 +77,5 @@ REPO_MAP.md
 .aider/
 
 .aider*
+# Kimi project memory
+.kimi-memory/

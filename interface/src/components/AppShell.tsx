@@ -17,6 +17,7 @@ import type {
   CustodyEntry,
   DrawerObject,
   Locale,
+  SessionRole,
   ShellBootstrap,
   WorkspaceSection,
 } from "../types";
@@ -54,7 +55,6 @@ const workspaceSections: WorkspaceSection[] = [
   "evidence",
   "missions",
   "legal-lens",
-  "admin",
 ];
 
 const workspaceLabels: Record<WorkspaceSection, MessageKey> = {
@@ -103,9 +103,15 @@ const caseStatusLabels: Record<
   on_hold: "case.header.status.on_hold",
 };
 
+const RAIL_BY_ROLE: Record<SessionRole, readonly CaseSection[]> = {
+  case_admin: ["overview", "evidence", "timeline", "audit", "settings"],
+  reviewer: ["overview", "evidence", "timeline", "audit"],
+  auditor: ["overview", "evidence", "audit"],
+};
+
 export function AppShell({
   locale,
-  user,
+  session,
   case: activeCase,
   activeGlobalSection,
   activeSection,
@@ -253,11 +259,11 @@ export function AppShell({
           )}
         </div>
 
-        {user && (
+        {(
           <nav className="topbar__primary-nav" aria-label={t("nav.primary")}>
             {workspaceSections.map((section) => {
               if (!permissions.canSeeGlobalSection(section)) return null;
-              if (section === "admin" && !user.isTenantAdmin) return null;
+              if (section === "admin" && session.role !== "case_admin") return null;
               return (
                 <a
                   key={section}
@@ -284,7 +290,7 @@ export function AppShell({
             <LocaleLink locale={locale} target="en" />
           </div>
 
-          {user ? (
+          {(
             <div className="menu-root" data-menu-root>
               <button
                 type="button"
@@ -293,7 +299,7 @@ export function AppShell({
                 aria-controls="user-menu"
                 onClick={(event) => toggleMenu("user", event)}
               >
-                <span>{user.name}</span>
+                <span>{session.name}</span>
                 <span aria-hidden="true">▾</span>
                 <span className="sr-only">
                   {t("topbar.user_menu")}
@@ -304,7 +310,7 @@ export function AppShell({
                 className="menu"
                 hidden={openMenu !== "user"}
               >
-                {user.isTenantAdmin && (
+                {session.role === "case_admin" && (
                   <a href={routes.administration}>
                     {t("topbar.user_menu.administration")}
                   </a>
@@ -312,8 +318,6 @@ export function AppShell({
                 <a href={routes.signOut}>{t("topbar.sign_out")}</a>
               </div>
             </div>
-          ) : (
-            <a href={routes.signIn}>{t("topbar.user_menu.sign_in")}</a>
           )}
         </div>
       </header>
@@ -373,6 +377,7 @@ export function AppShell({
           <nav className="rail" aria-label={t("nav.case_nav")}>
             <ul className="rail__list">
               {sections.map((section) =>
+                RAIL_BY_ROLE[session.role].includes(section) &&
                 permissions.canSeeSection(section) ? (
                   <li key={section}>
                     <a

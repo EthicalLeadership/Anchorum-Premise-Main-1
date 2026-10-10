@@ -71,16 +71,20 @@ Reconcile this table after every screen.
 | `i18n.test.ts` | Built, strengthened |
 | `AppShell.test.tsx` | Built |
 | `types.ts` | Built |
-| `CaseList.tsx` | Not built |
-| `CreateCase.tsx` | Not built |
-| `Overview.tsx` | Not built |
-| `VerificationTile.tsx` | Not built |
-| `RightDrawer.tsx` | Not built |
+| `CaseList.tsx` | Built |
+| `CreateCase.tsx` | Built |
+| `Overview.tsx` | Built |
+| `VerificationTile.tsx` | Built |
+| `RightDrawer.tsx` | Built in `AppShell.tsx` |
 | `GatePanel.tsx` | Not built |
-| `QuickLinks.tsx` | Not built |
-| `TimelineItem.tsx` | Not built |
-| `dupont-v-acme.ts` (fixture) | **Not built — required before U2 screens** |
-| `adapter.ts` / `adapter.test.ts` | Not built |
+| `QuickLinks.tsx` | Built in `Overview.tsx` |
+| `TimelineItem.tsx` | Built |
+| `dupont-v-acme.ts` (fixture) | Built |
+| `adapter.ts` / `adapter.test.ts` | Built |
+| Search screen | Built |
+| Timeline screen | Built |
+| Administration screen | Built |
+| Audit and exports screen | Partial — audit and gate preview render; export generation is not implemented |
 
 ---
 
@@ -175,27 +179,29 @@ Anatomy and copy live in the plan; this file owns the contract.
 - Rules are verbatim from the plan. Do not paraphrase.
 - Screens: all · U1
 
-### C10 — SearchBox & FilterBar · not built
+### C10 — SearchBox & FilterBar · built in Search screen
 - Scope: current case. Global search deferred (§1.5).
-- FR and EN stemming both apply.
+- FR and EN stemming both apply in the fixture search implementation.
 - Screens 5 · U5
 
-### C11 — TimelineItem · not built
+### C11 — TimelineItem · built
 - Date · event · people · source link · date precision (always visible).
 - Correction creates a new revision; prior value and reason preserved.
 - Screens 6 · U6
 
-### C12 — AuditLogRow & ChainIndicator · not built
+### C12 — AuditLogRow & ChainIndicator · built in AuditExports
 - Chain indicator: linked · broken · not checked. Text, not colour alone.
 - Screens 7, Overview (limited) · U7a owner, U2c limited use
 
-### C13 — ExportPanel & GatePanel · not built
+### C13 — ExportPanel & GatePanel · partial in AuditExports
 - Export types: evidence index, signed audit package.
 - Gates: restriction, disclaimer, Barreau check — each pass/fail.
 - A failing gate blocks export and names the item.
+- Gate preview is wired; there is no export-generation adapter method, so no export
+  file or signed package is produced.
 - Screens 7 · U7b
 
-### C14 — AdminMembersTable & InviteForm · not built
+### C14 — AdminMembersTable & InviteForm · built
 - Members table and invite form. Case assignments.
 - Screens 8 · U8
 
@@ -203,7 +209,7 @@ Anatomy and copy live in the plan; this file owns the contract.
 - Label, help, error, required marker. Errors name the field and the problem.
 - Screens 2, 3, 8 · U1
 
-### C16 — ConfirmWithReasonDialog · not built
+### C16 — ConfirmWithReasonDialog · built
 - Sensitive changes only: role changes, restrictions, holds, exports with disclaimers.
 - Requires reason, confirms again, audited.
 - Inline confirm patterns are removed where C16 applies.

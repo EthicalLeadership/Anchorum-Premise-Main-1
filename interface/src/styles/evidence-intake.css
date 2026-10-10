@@ -1,0 +1,8 @@
+.dropzone { border: 2px dashed var(--tp-line); padding: var(--sp-4); display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; }
+.evidence-intake table { width: 100%; border-collapse: collapse; margin-top: var(--sp-3); }
+.evidence-intake th, .evidence-intake td { text-align: left; padding: var(--sp-2); border-bottom: 1px solid var(--tp-line); }
+.progress-strip ol { display: flex; gap: var(--sp-1); list-style: none; margin: 0; padding: 0; }
+.progress-strip li { padding: var(--sp-1); background: var(--state-idle-bg); color: var(--tp-muted); }
+.progress-strip li[data-done="true"] { background: var(--state-ok-bg); color: var(--state-ok); }
+.progress-strip li[data-failed="true"] { background: var(--state-fail-bg); color: var(--state-fail); }
+.progress-strip p { color: var(--state-fail); }

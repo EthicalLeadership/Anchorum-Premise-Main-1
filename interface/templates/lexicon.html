@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Lexicon</h2>
+<p class="lede">F-09b: the lexicon must not declare runtime semantics the engine does not enforce.</p>
+<div class="card">
+<dl class="kv">
+<dt>path</dt><dd>{{ data.path }}</dd>
+<dt>exists</dt><dd>{{ data.exists }}</dd>
+{% if data.version %}<dt>version</dt><dd>{{ data.version }}</dd>{% endif %}
+{% if data.size %}<dt>size</dt><dd>{{ data.size }}</dd>{% endif %}
+{% if data.sha256 %}<dt>sha256</dt><dd>{{ data.sha256 }}</dd>{% endif %}
+{% if data.concepts is defined %}<dt>concepts</dt><dd>{{ data.concepts }}</dd>{% endif %}
+{% if data.patterns is defined %}<dt>patterns</dt><dd>{{ data.patterns }}</dd>{% endif %}
+{% if data.top_keys %}<dt>top-level keys</dt><dd>{{ data.top_keys|join(', ') }}</dd>{% endif %}
+</dl>
+</div>
+{% if data.has_runtime_block is defined %}
+<div class="error">F-09b FAILED: lexicon declares a runtime: block. load_lexicon does not read it. Either wire it into ccsp/verify.py or remove it.</div>
+{% else %}
+<div class="card"><span class="status ok">F-09b passing</span> &nbsp; no runtime: block present.</div>
+{% endif %}
+{% if data.parse_error %}<div class="error">parse error: {{ data.parse_error }}</div>{% endif %}
+{% endblock %}

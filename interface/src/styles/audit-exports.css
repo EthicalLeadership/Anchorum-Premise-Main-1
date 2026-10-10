@@ -1,0 +1,43 @@
+.audit-exports {
+  display: grid;
+  gap: var(--sp-6);
+}
+
+.audit-exports > section {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.audit-exports select {
+  display: block;
+  max-width: 28rem;
+}
+
+.audit-exports__gates {
+  display: grid;
+  gap: var(--sp-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.audit-exports__gates li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  border: 1px solid var(--tp-line);
+  padding: var(--sp-3);
+}
+
+.audit-chain--broken,
+.audit-exports__gates [data-result="fail"] {
+  color: var(--state-fail);
+}
+
+.audit-chain--broken {
+  border: 1px solid currentColor;
+  font-weight: 700;
+  padding-inline: var(--sp-1);
+  text-decoration: underline;
+  text-decoration-style: wavy;
+}

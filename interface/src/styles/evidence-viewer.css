@@ -1,0 +1,5 @@
+.evidence-viewer table{width:100%;border-collapse:collapse}
+.evidence-viewer th,.evidence-viewer td{text-align:left;padding:var(--sp-2);border-bottom:1px solid var(--tp-line)}
+.evidence-viewer .read-only{color:var(--tp-muted)}
+.evidence-viewer [data-chain="broken"]{color:var(--state-fail);background:var(--state-fail-bg)}
+.evidence-viewer [data-chain="linked"]{color:var(--state-ok)}

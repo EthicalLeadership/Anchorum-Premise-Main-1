@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>GRIC</h2>
+<p class="lede">F-09d: what v1.0 said, what v1.1 says, what contracts.py actually has. Computed from the spec markdown and the imported dataclass.</p>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+<div class="grid">
+  <div class="stat"><div class="n">{{ 'present' if data.v10_present else 'missing' }}</div><div class="l">GRIC v1.0</div></div>
+  <div class="stat"><div class="n">{{ 'present' if data.v11_present else 'missing' }}</div><div class="l">GRIC v1.1</div></div>
+</div>
+{% if data.v10_status_line %}<div class="card"><h3>v1.0 status enum</h3><p class="mono">{{ data.v10_status_line }}</p></div>{% endif %}
+{% if data.v11_status_line %}<div class="card"><h3>v1.1 status enum</h3><p class="mono">{{ data.v11_status_line }}</p></div>{% endif %}
+{% if data.contracts_status_line %}<div class="card"><h3>contracts.ResultStatus</h3><p class="mono">{{ data.contracts_status_line }}</p></div>{% endif %}
+{% if data.rows %}
+<h3>Field drift</h3>
+<table>
+<thead><tr><th>Field</th><th>v1.0</th><th>v1.1</th><th>contracts</th><th>Status</th></tr></thead>
+<tbody>
+{% for r in data.rows %}
+<tr>
+  <td class="mono">{{ r.field }}</td>
+  <td class="mono">{{ r.v1_0 }}</td>
+  <td class="mono">{{ r.v1_1 }}</td>
+  <td class="mono">{{ r.contracts }}</td>
+  <td><span class="status {{ r.status }}">{{ r.status }}</span></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endif %}
+{% endblock %}

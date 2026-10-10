@@ -15,9 +15,11 @@ export type WorkspaceSection =
   | "legal-lens"
   | "admin";
 
+export type SessionRole = "case_admin" | "reviewer" | "auditor";
+
 export interface SessionUser {
   name: string;
-  isTenantAdmin: boolean;
+  role: SessionRole;
 }
 
 export interface CaseSummary {
@@ -74,7 +76,7 @@ export interface ShellRoutes {
 
 export interface ShellBootstrap {
   locale: Locale;
-  user: SessionUser | null;
+  session: SessionUser;
   case: CaseSummary | null;
   activeGlobalSection: WorkspaceSection;
   activeSection: CaseSection;

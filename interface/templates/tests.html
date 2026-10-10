@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Tests</h2>
+<p class="lede">F-09c: pipeline regressions marked as strict xfails. Run <code>pytest --runxfail</code> to see the underlying failures.</p>
+<div class="card">
+<dl class="kv">
+<dt>source</dt><dd>{{ data.path }}</dd>
+<dt>exists</dt><dd>{{ data.exists }}</dd>
+<dt>xfail markers</dt><dd>{{ data.total_markers }}</dd>
+</dl>
+</div>
+{% if data.xfail_reasons %}
+<h3>Xfail reasons</h3>
+<table>
+<thead><tr><th>#</th><th>Reason</th></tr></thead>
+<tbody>
+{% for r in data.xfail_reasons %}
+<tr><td class="mono">{{ loop.index }}</td><td>{{ r }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}
+<div class="card"><span class="status ok">no strict xfails</span> &nbsp; all tests pass on their own terms.</div>
+{% endif %}
+{% endblock %}

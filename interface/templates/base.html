@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Anchorum GRIC Inspector</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>Anchorum GRIC Inspector</h1>
+  <span class="version">v0.1.0</span>
+  <nav>
+    <a href="/" {% if active == 'home' %}class="active"{% endif %}>Home</a>
+    <a href="/manifest" {% if active == 'manifest' %}class="active"{% endif %}>Manifest</a>
+    <a href="/lexicon" {% if active == 'lexicon' %}class="active"{% endif %}>Lexicon</a>
+    <a href="/tests" {% if active == 'tests' %}class="active"{% endif %}>Tests</a>
+    <a href="/gric" {% if active == 'gric' %}class="active"{% endif %}>GRIC</a>
+    <a href="/project" {% if active == 'project' %}class="active"{% endif %}>Project</a>
+    <a href="/document" {% if active == 'document' %}class="active"{% endif %}>Document</a>
+  </nav>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

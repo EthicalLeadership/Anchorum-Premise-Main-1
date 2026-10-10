@@ -1,0 +1,6 @@
+.confirm-dialog__backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:var(--sp-4);background:var(--state-idle-bg)}
+.confirm-dialog{width:min(100%,34rem);padding:var(--sp-4);border:1px solid var(--tp-line);background:var(--tp-bg);color:var(--tp-fg)}
+.confirm-dialog form{display:grid;gap:var(--sp-3)}
+.confirm-dialog textarea{min-height:7rem}
+.confirm-dialog__actions{display:flex;justify-content:flex-end;gap:var(--sp-2)}
+.confirm-dialog :focus-visible{outline:var(--focus-width) solid var(--focus-ring);outline-offset:var(--focus-offset)}

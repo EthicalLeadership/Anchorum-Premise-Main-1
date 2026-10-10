@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>GRIC boundary inspector</h2>
+<p class="lede">Read-only viewer for the GOV to RTM contract defined by GRIC v1.1. Panels surface the actual state of the lexicon, fixtures, tests, and interface contract.</p>
+<div class="grid">
+  <a class="stat" href="/manifest"><div class="n">Manifest</div><div class="l">Fixture hashes</div></a>
+  <a class="stat" href="/lexicon"><div class="n">Lexicon</div><div class="l">F-09b status</div></a>
+  <a class="stat" href="/tests"><div class="n">Tests</div><div class="l">F-09c xfails</div></a>
+  <a class="stat" href="/gric"><div class="n">GRIC</div><div class="l">F-09d drift</div></a>
+  <a class="stat" href="/project"><div class="n">Project</div><div class="l">Live engine</div></a>
+</div>
+{% endblock %}

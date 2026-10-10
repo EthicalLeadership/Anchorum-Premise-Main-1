@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Projection</h2>
+<p class="lede">Send text to the CCSP engine. Blank-line separated blocks become candidates.</p>
+<form method="post" action="/project">
+  <textarea name="text" placeholder="The court established liability for the breach.">{{ text }}</textarea>
+  <button type="submit">Project</button>
+</form>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if result %}
+<div class="card">
+<h3>Result</h3>
+<dl class="kv">
+<dt>concept_id</dt><dd>{{ result.concept_id or '—' }}</dd>
+<dt>classification</dt><dd>{{ result.classification }}</dd>
+<dt>admissible</dt><dd>{{ result.admissible }}</dd>
+<dt>canonical_text</dt><dd>{{ result.canonical_text }}</dd>
+<dt>semantic_hash</dt><dd>{{ result.semantic_hash }}</dd>
+<dt>config_hash</dt><dd>{{ result.config_hash }}</dd>
+<dt>rules_hash</dt><dd>{{ result.rules_hash }}</dd>
+<dt>candidate_count</dt><dd>{{ result.candidate_count }}</dd>
+<dt>admissible_count</dt><dd>{{ result.admissible_count }}</dd>
+<dt>forbidden_concept_count</dt><dd>{{ result.forbidden_concept_count }}</dd>
+<dt>fallback_reason</dt><dd>{{ result.fallback_reason or '—' }}</dd>
+<dt>vertical_scope</dt><dd>{{ result.vertical_scope|join(', ') }}</dd>
+<dt>matched_entries</dt><dd>{{ result.matched_entries|join(', ') }}</dd>
+</dl>
+</div>
+{% endif %}
+{% endblock %}

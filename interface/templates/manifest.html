@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Manifest</h2>
+<p class="lede">Every entry in {{ data.path }}, resolved against disk.</p>
+{% if data.summary %}
+<div class="grid">
+  <div class="stat"><div class="n">{{ data.summary.total }}</div><div class="l">Total</div></div>
+  <div class="stat"><div class="n">{{ data.summary.ok }}</div><div class="l">OK</div></div>
+  <div class="stat"><div class="n">{{ data.summary.missing }}</div><div class="l">Missing</div></div>
+  <div class="stat"><div class="n">{{ data.summary.mismatch }}</div><div class="l">Mismatch</div></div>
+</div>
+{% endif %}
+<table>
+<thead><tr><th>Status</th><th>Path</th><th>Size</th><th>Expected</th><th>Actual</th></tr></thead>
+<tbody>
+{% for r in data.rows %}
+<tr>
+  <td><span class="status {{ r.status }}">{{ r.status }}</span></td>
+  <td class="mono">{{ r.path }}</td>
+  <td class="mono">{{ r.size }}</td>
+  <td class="mono">{{ r.expected[:16] }}</td>
+  <td class="mono">{{ (r.actual or '—')[:16] }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,9 @@
+.administration{display:grid;gap:var(--sp-6)}
+.administration>section{display:grid;gap:var(--sp-3)}
+.administration table{width:100%;border-collapse:collapse}
+.administration th,.administration td{text-align:left;padding:var(--sp-2);border-bottom:1px solid var(--tp-line)}
+.administration form{display:grid;gap:var(--sp-3);max-width:38rem}
+.administration form>label{display:grid;gap:var(--sp-1)}
+.administration__assignments{display:grid;gap:var(--sp-2);border:1px solid var(--tp-line);padding:var(--sp-3)}
+.administration__assignments label{display:flex;gap:var(--sp-2);align-items:center}
+.administration :focus-visible{outline:var(--focus-width) solid var(--focus-ring);outline-offset:var(--focus-offset)}

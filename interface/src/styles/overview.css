@@ -1,0 +1,10 @@
+.verification-tile { border: 1px solid var(--tp-line); padding: var(--sp-3); }
+.verification-segments { display: flex; gap: var(--sp-1); }
+.verification-segments .segment { flex: 1 1 0; height: 8px; border-radius: 0; background: var(--state-idle); }
+.verification-segments .segment-pass { background: var(--state-ok); }
+.verification-segments .segment-fail { background: var(--state-fail); }
+.verification-steps { list-style: none; padding: 0; }
+.step-pass { color: var(--state-ok); }
+.step-fail { color: var(--state-fail); }
+.verification-failing { background: var(--state-fail-bg); color: var(--state-fail); padding: var(--sp-2); }
+.verification-when { color: var(--tp-muted); }

@@ -1,0 +1,7 @@
+.case-list__header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.filter-bar { display: flex; gap: 1rem; margin: 1rem 0; }
+.filter-bar label { display: grid; gap: 0.25rem; }
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th, .data-table td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--tp-border); }
+.state-block { padding: 1.5rem; border: 1px dashed var(--tp-border); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

@@ -22,7 +22,7 @@ const testCase: NonNullable<ShellBootstrap["case"]> = {
 
 const bootstrap: ShellBootstrap = {
   locale: "en",
-  user: { name: "Operator", isTenantAdmin: false },
+  session: { name: "Operator", role: "reviewer" },
   case: testCase,
   activeSection: "evidence",
   activeGlobalSection: "evidence",
@@ -34,7 +34,7 @@ const bootstrap: ShellBootstrap = {
     cases: "/cases",
     signIn: "/auth/login",
     signOut: "/auth/signout",
-    administration: "/admin",
+    administration: "#/admin",
     globalSection: (section) => `/${section}`,
     caseSection: (caseId, section) =>
       `/cases/${encodeURIComponent(caseId)}/${section}`,
@@ -171,6 +171,19 @@ describe("AppShell", () => {
     expect(document.querySelector("#right-drawer")).toHaveAttribute("hidden");
   });
 
+  it("closes the user menu and returns focus to its trigger on Escape", async () => {
+    renderShell();
+    const trigger = screen.getByRole("button", { name: /Operator/ });
+
+    fireEvent.click(trigger);
+    const menu = document.getElementById("user-menu")!;
+    expect(menu).not.toHaveAttribute("hidden");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(menu).toHaveAttribute("hidden");
+  });
+
   it("shows tenant administration only to tenant administrators", () => {
     const { rerender } = renderShell();
     fireEvent.click(screen.getByRole("button", { name: /Operator/ }));
@@ -182,7 +195,7 @@ describe("AppShell", () => {
     rerender(
       <AppShell
         {...bootstrap}
-        user={{ name: "Admin", isTenantAdmin: true }}
+        session={{ name: "Admin", role: "case_admin" }}
         permissions={{
           ...bootstrap.permissions,
           canSeeGlobalSection: (section) => section === "admin",
@@ -193,14 +206,52 @@ describe("AppShell", () => {
       </AppShell>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Admin/ }));
-    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute(
-      "href",
-      "/admin",
-    );
     expect(screen.getByRole("link", { name: "Administration" })).toHaveAttribute(
       "href",
-      "/admin",
+      "#/admin",
     );
+  });
+
+  describe("role-gated rail", () => {
+    const open = (role: "case_admin" | "reviewer" | "auditor") =>
+      render(
+        <AppShell
+          {...bootstrap}
+          session={{ name: "Tester", role }}
+          permissions={{
+            ...bootstrap.permissions,
+            canSeeSection: (section) =>
+              role === "case_admin" ||
+              (role === "reviewer" && section !== "settings") ||
+              (role === "auditor" &&
+                (section === "overview" ||
+                  section === "evidence" ||
+                  section === "audit")),
+          }}
+        >
+          <p>x</p>
+        </AppShell>,
+      );
+
+    it("shows Administration and Case settings to a case admin", () => {
+      open("case_admin");
+      expect(screen.getByRole("link", { name: "Case settings" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /Tester/ }));
+      expect(screen.getByRole("link", { name: "Administration" })).toBeInTheDocument();
+    });
+
+    it("hides Administration and Case settings from a reviewer", () => {
+      open("reviewer");
+      expect(screen.queryByRole("link", { name: "Case settings" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /Tester/ }));
+      expect(screen.queryByRole("link", { name: "Administration" })).not.toBeInTheDocument();
+    });
+
+    it("shows Audit but not Timeline to an auditor", () => {
+      open("auditor");
+      expect(screen.getByRole("link", { name: "Audit and exports" })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Timeline" })).not.toBeInTheDocument();
+    });
   });
 
   it("renders a visible, localized failure when a verification action rejects", async () => {

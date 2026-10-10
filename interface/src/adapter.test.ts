@@ -27,7 +27,7 @@ describe("fixture adapter", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.key).toBe("CASE-2024-018");
-    expect(result.value.title).toBe("Dupont v. Acme");
+    expect(result.value.title).toBe("DUPONT v. ACME");
     expect(result.value.holdCount).toBe(1);
   });
 
@@ -124,6 +124,19 @@ describe("fixture adapter", () => {
     expect(result.error).toMatch(/^[A-Z][A-Z0-9_]+$/);
   });
 
+  it("returns the seeded timeline with all four date precisions", async () => {
+    const result = await adapter.timeline.list(fixture.case.id);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toHaveLength(4);
+    expect(result.value.map((event) => event.precision).sort()).toEqual([
+      "approximate",
+      "exact",
+      "range",
+      "unknown",
+    ]);
+  });
+
   // ---------------------------------------------------------------------------
   // 3. No component branches on isFixture / isLive
   // ---------------------------------------------------------------------------
@@ -177,5 +190,154 @@ describe("fixture adapter", () => {
       );
     }
     expect(result.error).toBe("BACKEND_UNREACHABLE");
+  });
+});
+
+describe("cases.list / cases.create", () => {
+  it("fixture path lists the seed and appends created cases", async () => {
+    const a = createAdapter({ backend: null });
+    const before = await a.cases.list();
+    expect(before.ok && before.value.length).toBe(1);
+    const made = await a.cases.create({
+      key: "CASE-NEW", title: "N", jurisdiction: "QC", matterType: "labour",
+      timezone: "America/Montreal", description: "", memberIds: [],
+    });
+    expect(made.ok).toBe(true);
+    const after = await a.cases.list();
+    expect(after.ok && after.value.length).toBe(2);
+  });
+
+  it("rejects the seeded key", async () => {
+    const a = createAdapter({ backend: null });
+    const r = await a.cases.create({
+      key: "CASE-2024-018", title: "N", jurisdiction: "QC", matterType: "labour",
+      timezone: "America/Montreal", description: "", memberIds: [],
+    });
+    expect(r).toEqual({ ok: false, error: "CASE_KEY_TAKEN" });
+  });
+
+  it("unreachable backend gives BACKEND_UNREACHABLE", async () => {
+    const a = createAdapter({ backend: { baseUrl: "http://invalid.invalid" } });
+    const r = await a.cases.create({
+      key: "K", title: "N", jurisdiction: "QC", matterType: "labour",
+      timezone: "America/Montreal", description: "", memberIds: [],
+    });
+    expect(r).toEqual({ ok: false, error: "BACKEND_UNREACHABLE" });
+  });
+});
+
+describe("evidence, audit and session cases", () => {
+  const bytes = () => new Uint8Array([1, 2, 3]).buffer;
+
+  it("ingest fixture path returns id, hash, duplicate", async () => {
+    const a = createAdapter({ backend: null });
+    const r = await a.evidence.ingest(fixture.case.id, { name: "n.pdf", bytes: bytes() } as never);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.id).toMatch(/^E-/);
+      expect(r.value.hash).toMatch(/^[0-9a-f]{64}$/);
+      expect(typeof r.value.duplicate).toBe("boolean");
+    }
+  });
+
+  it("ingest unreachable backend gives BACKEND_UNREACHABLE", async () => {
+    const a = createAdapter({ backend: { baseUrl: "http://invalid.invalid" } });
+    const r = await a.evidence.ingest(fixture.case.id, { name: "n.pdf", bytes: bytes() } as never);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toBe("BACKEND_UNREACHABLE");
+  });
+
+  it("cases.get falls back to a session case", async () => {
+    const a = createAdapter({ backend: null });
+    const made = await a.cases.create({
+      key: "CASE-SESS", title: "S", jurisdiction: "QC", matterType: "labour",
+      timezone: "America/Montreal", description: "", memberIds: [],
+    });
+    expect(made.ok).toBe(true);
+    if (made.ok) {
+      const got = await a.cases.get(made.value.id);
+      expect(got.ok).toBe(true);
+    }
+  });
+
+  it("audit.list fixture path returns the fixture audit", async () => {
+    const a = createAdapter({ backend: null });
+    const r = await a.audit.list(fixture.case.id);
+    expect(r).toEqual({ ok: true, value: fixture.audit });
+  });
+
+  it("session evidence is readable, has empty custody, and is not verifiable", async () => {
+    const a = createAdapter({ backend: null });
+    const made = await a.evidence.ingest(fixture.case.id, { name: "n.pdf", bytes: new Uint8Array([1, 2, 3]).buffer } as never);
+    expect(made.ok).toBe(true);
+    if (made.ok) {
+      const got = await a.evidence.get(made.value.id);
+      expect(got.ok).toBe(true);
+      const cu = await a.evidence.custody(made.value.id);
+      expect(cu).toEqual({ ok: true, value: [] });
+      const v = await a.evidence.verify(made.value.id);
+      expect(v.ok).toBe(false);
+      if (!v.ok) expect(v.error).toBe("NOT_FOUND");
+    }
+  });
+});
+
+describe("session.get", () => {
+  it("returns the seeded fixture session", async () => {
+    const a = createAdapter({ backend: null });
+    const r = await a.session.get();
+    expect(r).toEqual({ ok: true, value: { name: "A. Roy", role: "case_admin" } });
+  });
+});
+
+describe("members adapter", () => {
+  it("lists seeded members and retains invited members with case assignments", async () => {
+    const a = createAdapter({ backend: null });
+    const before = await a.members.list();
+    expect(before.ok).toBe(true);
+    if (!before.ok) return;
+    expect(before.value[0]).toMatchObject({
+      name: "A. Roy",
+      email: "a.roy@example.test",
+      role: "case_admin",
+      caseIds: [fixture.case.id],
+    });
+
+    const invited = await a.members.invite({
+      email: "new.person@example.test",
+      role: "auditor",
+      caseIds: [fixture.case.id],
+    });
+    expect(invited.ok).toBe(true);
+    const after = await a.members.list();
+    expect(after.ok).toBe(true);
+    if (after.ok) {
+      expect(after.value.at(-1)).toMatchObject({
+        email: "new.person@example.test",
+        role: "auditor",
+        status: "invited",
+        caseIds: [fixture.case.id],
+      });
+    }
+  });
+
+  it("audits role changes with the required reason", async () => {
+    const a = createAdapter({ backend: null });
+    const changed = await a.members.changeRole("M-2", "auditor", "Temporary audit review");
+    expect(changed.ok).toBe(true);
+    if (!changed.ok) return;
+    expect(changed.value.role).toBe("auditor");
+    const audit = await a.audit.list(fixture.case.id);
+    expect(audit.ok).toBe(true);
+    if (audit.ok) {
+      expect(audit.value.at(-1)).toMatchObject({
+        event: "member_role_changed",
+        memberId: "M-2",
+        previousRole: "reviewer",
+        role: "auditor",
+        reason: "Temporary audit review",
+        chain: "linked",
+      });
+    }
   });
 });

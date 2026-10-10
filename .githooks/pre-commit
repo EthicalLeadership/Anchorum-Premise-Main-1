@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
-# Reject commits that contain shell scripts with syntax errors.
-rc=0
-for f in $(git diff --cached --name-only --diff-filter=ACM -- '*.sh'); do
-    if ! bash -n "$f" 2>/dev/null; then
-        echo "pre-commit: syntax error in $f"
-        bash -n "$f" 2>&1 | head -5
-        rc=1
-    fi
-done
-exit $rc
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+exec "${PYTHON:-python3}" "$repo_root/scripts/check_integrity.py"

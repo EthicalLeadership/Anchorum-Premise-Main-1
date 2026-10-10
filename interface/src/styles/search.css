@@ -1,0 +1,4 @@
+.search form{display:flex;gap:var(--sp-2);margin-bottom:var(--sp-3)}
+.search input{flex:1;padding:var(--sp-2)}
+.search-results{list-style:none;padding:0}
+.search-results li{padding:var(--sp-2);border-bottom:1px solid var(--tp-line)}

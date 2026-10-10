@@ -1,12 +1,25 @@
 import { AppShell } from "./components/AppShell";
+import { useEffect, useMemo, useState } from "react";
+import { createAdapter } from "./adapter";
+import { CaseList } from "./screens/CaseList";
+import { Overview } from "./screens/Overview";
+import { EvidenceIntake } from "./screens/EvidenceIntake";
+import { Search } from "./screens/Search";
+import { Register } from "./screens/Register";
+import { EvidenceViewer } from "./screens/EvidenceViewer";
+import { CreateCase } from "./screens/CreateCase";
+import { Timeline } from "./screens/Timeline";
+import { Administration } from "./screens/Administration";
+import { AuditExports } from "./screens/AuditExports";
 import { translate } from "./i18n";
-import type { ShellBootstrap } from "./types";
+import { StateBlock } from "./components/StateBlock";
+import type { CaseSection, CaseSummary, SessionUser, ShellBootstrap } from "./types";
 
 const routes: ShellBootstrap["routes"] = {
-  cases: "/cases",
+  cases: "#/cases",
   signIn: "/auth/login",
   signOut: "/auth/signout",
-  administration: "/admin",
+  administration: "#/admin",
   globalSection: (section) => {
     const paths = {
       workspace: "/workspace",
@@ -14,7 +27,7 @@ const routes: ShellBootstrap["routes"] = {
       evidence: "/evidence",
       missions: "/missions",
       "legal-lens": "/legal-lens",
-      admin: "/admin",
+      admin: "#/admin",
     };
     return paths[section];
   },
@@ -30,28 +43,169 @@ export function App() {
       ? "fr"
       : "en";
 
+  const adapter = useMemo(() => createAdapter({ backend: null }), []);
+  const [session, setSession] = useState<SessionUser | null>(null);
+  const [sessionError, setSessionError] = useState(false);
+  useEffect(() => {
+    let live = true;
+    adapter.session.get().then((r) => {
+      if (!live) return;
+      if (r.ok) setSession(r.value);
+      else setSessionError(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [adapter]);
+  const [hash, setHash] = useState(window.location.hash);
+  const path = hash.split("?")[0];
+  const caseRoute = path.match(/^#\/cases\/([^/]+)(?:\/|$)/);
+  const activeCaseId =
+    caseRoute && caseRoute[1] !== "new"
+      ? decodeURIComponent(caseRoute[1])
+      : null;
+  const [caseLoad, setCaseLoad] = useState<
+    | { caseId: string; kind: "loading" }
+    | { caseId: string; kind: "ready"; value: CaseSummary | null }
+    | null
+  >(null);
+  useEffect(() => {
+    const onChange = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", onChange);
+    return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+  useEffect(() => {
+    if (!activeCaseId) {
+      setCaseLoad(null);
+      return;
+    }
+    let live = true;
+    setCaseLoad({ caseId: activeCaseId, kind: "loading" });
+    adapter.cases.get(activeCaseId).then((result) => {
+      if (!live) return;
+      setCaseLoad({
+        caseId: activeCaseId,
+        kind: "ready",
+        value: result.ok ? result.value : null,
+      });
+    });
+    return () => {
+      live = false;
+    };
+  }, [adapter, activeCaseId]);
+
+  if (sessionError) return <StateBlock locale={locale} kind="error" />;
+  if (!session) return <StateBlock locale={locale} kind="loading" />;
+  if (
+    activeCaseId &&
+    (caseLoad?.caseId !== activeCaseId || caseLoad.kind === "loading")
+  ) {
+    return <StateBlock locale={locale} kind="loading" />;
+  }
+  const activeCase =
+    activeCaseId && caseLoad?.caseId === activeCaseId && caseLoad.kind === "ready"
+      ? caseLoad.value
+      : null;
+
+  const activeSection = path.endsWith("/timeline")
+    ? "timeline"
+    : path.endsWith("/audit")
+      ? "audit"
+      : path.endsWith("/settings")
+        ? "settings"
+        : path.includes("/evidence") || path.endsWith("/register")
+          ? "evidence"
+          : "overview";
+  const activeGlobalSection: ShellBootstrap["activeGlobalSection"] =
+    path === "#/admin" ? "admin" : "workspace";
+
   return (
     <AppShell
       locale={locale}
-      user={null}
-      case={null}
-      activeGlobalSection="workspace"
-      activeSection="overview"
+      session={session}
+      case={activeCase}
+      activeGlobalSection={activeGlobalSection}
+      activeSection={activeSection}
       permissions={{
-        canSeeSection: () => false,
-        canSeeGlobalSection: () => false,
+        canSeeSection: (section: CaseSection) =>
+          session.role === "case_admin" ||
+          (session.role === "reviewer" && section !== "settings") ||
+          (session.role === "auditor" &&
+            (section === "overview" ||
+              section === "evidence" ||
+              section === "audit")),
+        canSeeGlobalSection: (s) => s === "cases" || (s === "admin" && session.role === "case_admin"),
       }}
       routes={routes}
     >
+      {path === "#/cases" ? (
+        <CaseList locale={locale} adapter={adapter} />
+      ) : path === "#/cases/new" ? (
+        <CreateCase locale={locale} adapter={adapter} />
+      ) : /^#\/cases\/[^/]+(?:\/overview)?$/.test(path) ? (
+        <Overview
+          locale={locale}
+          adapter={adapter}
+          caseId={decodeURIComponent(path.split("/")[2])}
+        />
+      ) : /^#\/cases\/[^/]+\/intake$/.test(path) ? (
+        <EvidenceIntake
+          locale={locale}
+          adapter={adapter}
+          caseId={decodeURIComponent(hash.split("/")[2])}
+        />
+      ) : /^#\/cases\/[^/]+\/(evidence|register)$/.test(path) ? (
+        <Register
+          locale={locale}
+          adapter={adapter}
+          caseId={decodeURIComponent(hash.split("/")[2])}
+        />
+      ) : /^#\/cases\/[^/]+\/search$/.test(path) ? (
+        <Search
+          locale={locale}
+          adapter={adapter}
+          caseId={decodeURIComponent(hash.split("/")[2])}
+        />
+      ) : /^#\/cases\/[^/]+\/timeline$/.test(path) ? (
+        <Timeline
+          locale={locale}
+          adapter={adapter}
+          caseId={decodeURIComponent(hash.split("/")[2])}
+        />
+      ) : /^#\/cases\/[^/]+\/audit$/.test(path) ? (
+        <AuditExports
+          locale={locale}
+          adapter={adapter}
+          caseId={decodeURIComponent(hash.split("/")[2])}
+        />
+      ) : /^#\/cases\/[^/]+\/evidence\/[^/]+$/.test(path) ? (
+        <EvidenceViewer
+          locale={locale}
+          adapter={adapter}
+          caseId={decodeURIComponent(hash.split("/")[2])}
+          evidenceId={decodeURIComponent(hash.split("/")[4])}
+        />
+      ) : path === "#/admin" ? (
+        session.role === "case_admin" ? (
+          <Administration locale={locale} adapter={adapter} />
+        ) : (
+          <StateBlock
+            locale={locale}
+            kind="permission_limited"
+            message={translate(locale, "state.permission_limited")}
+          />
+        )
+      ) : (
       <section className="empty-state" aria-labelledby="empty-state-title">
         <h1 id="empty-state-title">
           {translate(locale, "topbar.switch_case.none")}
         </h1>
         <p>{translate(locale, "state.no_case_body")}</p>
-        <a className="btn btn--primary" href={routes.cases}>
+        <a className="btn btn--primary" href="#/cases">
           {translate(locale, "case.list.browse")}
         </a>
       </section>
+      )}
     </AppShell>
   );
 }

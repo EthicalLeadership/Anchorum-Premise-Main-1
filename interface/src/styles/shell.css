@@ -6,7 +6,7 @@ body {
   margin: 0;
   background: var(--tp-bg);
   color: var(--tp-fg);
-  font-family: var(--counsel-body, system-ui, sans-serif);
+  font-family: var(--counsel-body);
 }
 
 button,
