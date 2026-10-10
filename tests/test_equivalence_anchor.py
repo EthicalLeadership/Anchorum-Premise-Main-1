@@ -58,10 +58,10 @@ class EquivalenceAnchorTests(unittest.TestCase):
     def test_legacy_vs_orchestrated_control_record_equivalence(self):
         raw = build_email(
             message_id="<equivalence-anchor@example.com>",
-            subject="Required: Vacation Selection and Position Confirmation",
+            subject="Quarterly update to workplace policy handbook",
             body=(
-                "Client Company requires your response. This is mandatory and without fail.\n"
-                "Please confirm position and vacation selection immediately."
+                "Attached please find the quarterly update to the workplace policy handbook.\n"
+                "The updated document is available in the shared drive. No action is required."
             ),
         )
 
