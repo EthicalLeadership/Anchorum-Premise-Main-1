@@ -101,7 +101,13 @@ class ControlPlane:
         self._backfill_sequence_and_signatures()
 
     def _signing_key(self) -> bytes:
-        key = os.getenv("GDC_CONTROL_SIGNING_KEY", "gdc-dev-signing-key")
+        key = os.getenv("GDC_CONTROL_SIGNING_KEY")
+        if not key:
+            raise RuntimeError(
+                "GDC_CONTROL_SIGNING_KEY is not set. Refusing to sign control "
+                "records with a hard-coded fallback. Set the variable for the "
+                "environment (dev/test/prod)."
+            )
         return key.encode("utf-8")
 
     def _signing_key_id(self) -> str:
