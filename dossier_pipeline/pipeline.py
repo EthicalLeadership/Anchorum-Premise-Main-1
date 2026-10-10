@@ -561,15 +561,9 @@ class DossierPipeline:
             )
 
 
-            # Create a control-chain record for rejected_policy (needed for anchor equivalence),
-            # but do not emit control-chain derived replay events.
-            record = self.control.execute(
-                adapted,
-                policy,
-                route=arbitration.route,
-                reasoning=reasoning,
-                divergence_reason=None,
-            )
+            # Per STATE_MACHINE_SPEC.md: REJECTED_POLICY must short-circuit
+            # control execution. No control-chain record on rejection path.
+            # (F-11 decision; closes F-13 and F-09c.)
 
             # Ensure dedupe is updated so rejected messages don't re-run forever.
             self.write_router.mark_seen(envelope.message_id, envelope.raw_sha256)
@@ -580,16 +574,15 @@ class DossierPipeline:
                 message_key=envelope.message_key,
                 message_id=envelope.message_id,
                 actor=classification.actor.value,
-                route=record.payload["route"],
+                route=arbitration.route.value,
                 reason=policy.reason,
-                record_hash=record.record_hash,
-                previous_hash=record.previous_hash,
+                record_hash="",
+                previous_hash="",
                 raw_sha256=envelope.raw_sha256,
                 data={
                     "quarantine": policy.quarantine,
                     "stage": "policy",
                     "evidence_id": evidence_packet.evidence_id,
-                    "control_record_hash": record.record_hash,
                     "decision_trace": {
                         "arbitration_mode": "ORCHESTRATED",
                         "trust_boundary_version": "1.0.0",
