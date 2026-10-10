@@ -1,0 +1,676 @@
+version: legal-v3.1
+runtime:
+  matching:
+    granularity: span
+    default_action: allow
+    span_splitting:
+      hard:
+      - ;
+      - .
+      - '?'
+      - '!'
+      - \u2014
+      - --
+      - \n
+      - ','
+      soft:
+      - \band\b
+      - \bbut\b
+      - \bor\b
+  negation:
+    negators:
+    - not
+    - 'no'
+    - never
+    - without
+    - denies
+    - denied
+    - neither
+    - nor
+    - n't
+    - lacks?
+    - absent
+    - fails? to
+    - does not
+    - do not
+    - did not
+    - cannot
+    - isn't
+    - wasn't
+    - aren't
+    - weren't
+    - insufficient to
+    - no finding that
+    negator_window: 15
+    scope: span
+    action: suppress
+  precedence:
+  - allowed_concept_in_span suppresses forbidden_concept_in_same_span
+  - negated_forbidden_match suppressed (span-scoped, 15-token window)
+  - attributed_finding overrides forbidden when attribution verb in-span
+  negatable_default: true
+concepts:
+- id: LEGAL_ESTABLISH_LIABILITY
+  scope:
+  - legal
+  forbidden: true
+  strength: assertion
+- id: LEGAL_CONFIRMED_VIOLATION
+  scope:
+  - legal
+  forbidden: true
+  strength: assertion
+- id: LEGAL_GUILT
+  scope:
+  - legal
+  forbidden: true
+  strength: assertion
+- id: LEGAL_WRONGFUL_CONDUCT
+  scope:
+  - legal
+  forbidden: true
+  strength: assertion
+- id: LEGAL_EVIDENCE_ASSERTS
+  scope:
+  - legal
+  forbidden: true
+  strength: assertion
+- id: LEGAL_QUANTIFIED_PROBABILITY
+  scope:
+  - legal
+  forbidden: true
+  strength: qualified
+  negatable: false
+- id: LEGAL_EVIDENCE_INSUFFICIENT
+  scope:
+  - legal
+  forbidden: false
+  strength: negative
+- id: LEGAL_PENDING_REVIEW
+  scope:
+  - legal
+  forbidden: false
+  strength: procedural
+- id: LEGAL_ALLEGATION
+  scope:
+  - legal
+  forbidden: false
+  strength: hedged
+- id: LEGAL_DENIAL
+  scope:
+  - legal
+  forbidden: false
+  strength: negative
+- id: LEGAL_NO_ADMISSION
+  scope:
+  - legal
+  forbidden: false
+  strength: negative
+- id: LEGAL_SETTLEMENT_NO_ADMISSION
+  scope:
+  - legal
+  forbidden: false
+  strength: negative
+- id: LEGAL_INVESTIGATION_PENDING
+  scope:
+  - legal
+  forbidden: false
+  strength: procedural
+- id: LEGAL_REGULATORY_INQUIRY
+  scope:
+  - legal
+  forbidden: false
+  strength: procedural
+- id: LEGAL_COMPLIANCE_REVIEW
+  scope:
+  - legal
+  forbidden: false
+  strength: procedural
+- id: LEGAL_POTENTIAL_VIOLATION
+  scope:
+  - legal
+  forbidden: false
+  strength: hedged
+- id: LEGAL_PRELIMINARY_FINDING
+  scope:
+  - legal
+  forbidden: false
+  strength: qualified
+- id: LEGAL_EXCULPATORY
+  scope:
+  - legal
+  forbidden: false
+  strength: negative
+- id: LEGAL_DISMISSED
+  scope:
+  - legal
+  forbidden: false
+  strength: negative
+- id: LEGAL_NO_EVIDENCE
+  scope:
+  - legal
+  forbidden: false
+  strength: negative
+- id: LEGAL_ATTRIBUTED_FINDING
+  scope:
+  - legal
+  forbidden: false
+  strength: attributed
+- id: LEGAL_OPINION_FRAME
+  scope:
+  - legal
+  forbidden: false
+  strength: opinion
+- id: LEGAL_PRIMA_FACIE
+  scope:
+  - legal
+  forbidden: false
+  strength: qualified
+lexicon:
+- pattern: \b(?:establishes?|established|establishing|proves?|proven|shown?|shows?|demonstrates?|demonstrated|confirms?|confirmed)\s+(?:legal\s+)?liability\b
+  flags: IGNORECASE
+  concept: LEGAL_ESTABLISH_LIABILITY
+- pattern: \b(?:is|are|was|were|found|held|deemed)\s+(?:legally\s+)?liable\b
+  flags: IGNORECASE
+  concept: LEGAL_ESTABLISH_LIABILITY
+- pattern: \b(?:liable|responsible|answerable|accountable)\s+for\s+(?:the\s+)?(?:violation|breach|misconduct|wrongdoing|damages|injury|loss|harm)\b
+  flags: IGNORECASE
+  concept: LEGAL_ESTABLISH_LIABILITY
+- pattern: \b(?:admitted|admits?)\s+(?:to\s+)?(?:liability|wrongdoing|misconduct|guilt|fault)\b
+  flags: IGNORECASE
+  concept: LEGAL_ESTABLISH_LIABILITY
+- pattern: \bliability\s+(?:attaches|arises|exists)\b
+  flags: IGNORECASE
+  concept: LEGAL_ESTABLISH_LIABILITY
+- pattern: \bthere\s+(?:is|was|exists?)\s+(?:legal\s+)?liability\b
+  flags: IGNORECASE
+  concept: LEGAL_ESTABLISH_LIABILITY
+- pattern: \bdemonstrates?\s+culpability\b
+  flags: IGNORECASE
+  concept: LEGAL_ESTABLISH_LIABILITY
+- pattern: \bshows?\s+fault\b
+  flags: IGNORECASE
+  concept: LEGAL_ESTABLISH_LIABILITY
+- pattern: \bliable\s+in\s+(?:negligence|contract|tort|damages|equity)\b
+  flags: IGNORECASE
+  concept: LEGAL_ESTABLISH_LIABILITY
+- pattern: \bliable\s+under\s+(?:the|this|that|s\.|section|art\.|article)\b
+  flags: IGNORECASE
+  concept: LEGAL_ESTABLISH_LIABILITY
+- pattern: \bliable\s+to\s+(?:pay|compensate|account|indemnify)\b
+  flags: IGNORECASE
+  concept: LEGAL_ESTABLISH_LIABILITY
+- pattern: \bliable\s+for\s+the\s+acts?\s+of\b
+  flags: IGNORECASE
+  concept: LEGAL_ESTABLISH_LIABILITY
+- pattern: \b(?:confirmed|documented|verified|proven|clear|evident|indisputable|unquestionable|established|demonstrated|confirms?|documents?|verifies?|proves?|establishes?|demonstrates?|shows?|reveals?|uncovers?|serious|systemic|egregious|flagrant|blatant|deliberate|willful|wilful|reckless|intentional|gross|ongoing|persistent|widespread)\s+(?:(?:the|a|an)\s+)?(?:(?:serious|systemic|egregious|flagrant|blatant|deliberate|willful|wilful|reckless|intentional|gross|ongoing|persistent|widespread)\s+)*(?:violation|breach|misconduct|wrongdoing|fraud|negligence|gross\s+negligence|bad\s+faith|dishonesty|deception|abuse\s+of\s+trust|illegal\s+activity|unlawful\s+conduct|criminal\s+conduct|deceptive\s+practices?)\b
+  flags: IGNORECASE
+  concept: LEGAL_CONFIRMED_VIOLATION
+- pattern: \b(?:violation|breach|misconduct|wrongdoing|fraud|negligence)\s+(?:is|was|has\s+been)\s+(?:confirmed|established|documented|verified|proven)\b
+  flags: IGNORECASE
+  concept: LEGAL_CONFIRMED_VIOLATION
+- pattern: \b(?:committed|engaged\s+in)\s+(?:a\s+)?(?:(?:serious|systemic|egregious|flagrant|blatant|deliberate|willful|wilful|reckless|intentional|gross|ongoing|persistent|widespread)\s+)?(?:violation|breach|misconduct|wrongdoing|fraud|negligence|gross\s+negligence|bad\s+faith|dishonesty|deception|abuse\s+of\s+trust|illegal\s+activity|unlawful\s+conduct|criminal\s+conduct|deceptive\s+practices?|wrongful\s+conduct)\b
+  flags: IGNORECASE
+  concept: LEGAL_CONFIRMED_VIOLATION
+- pattern: \bviolated\s+(?:the\s+)?(?:law|regulation|statute|rule|contract|agreement|policy|code|standard)\b
+  flags: IGNORECASE
+  concept: LEGAL_CONFIRMED_VIOLATION
+- pattern: \bbreached\s+(?:(?:the|its|his|her|their|our|your)\s+)?(?:contract|agreement|fiduciary\s+duty|duty|obligations?)\b
+  flags: IGNORECASE
+  concept: LEGAL_CONFIRMED_VIOLATION
+- pattern: \b(?:constitutes?|amounts?\s+to)\s+(?:a\s+)?(?:violation|breach|misconduct|wrongdoing|fraud|negligence|gross\s+negligence|bad\s+faith|dishonesty|deception|abuse\s+of\s+trust|illegal\s+activity|unlawful\s+conduct|criminal\s+conduct|wrongful\s+conduct)\b
+  flags: IGNORECASE
+  concept: LEGAL_CONFIRMED_VIOLATION
+- pattern: \b(?:conduct|behavior|behaviour|acts?|omissions?|facts?)\s+(?:constitutes?|amounts?\s+to|satisf(?:ies|y)|meets?)\s+(?:the\s+)?(?:test|elements|standard|threshold)\s+(?:for|of)\s+(?:liability|a\s+violation|violation|breach|misconduct|negligence|fraud)\b
+  flags: IGNORECASE
+  concept: LEGAL_CONFIRMED_VIOLATION
+- pattern: \b(?:satisf(?:ies|y)|meets?)\s+the\s+(?:test|elements|standard|threshold)\s+(?:for|of)\s+(?:liability|a\s+violation|violation|breach|misconduct|negligence|fraud)\b
+  flags: IGNORECASE
+  concept: LEGAL_CONFIRMED_VIOLATION
+- pattern: \bwrongful\s+conduct\s+(?:occurred|happened|took\s+place)\b
+  flags: IGNORECASE
+  concept: LEGAL_CONFIRMED_VIOLATION
+- pattern: \bguilty\s+of\b
+  flags: IGNORECASE
+  concept: LEGAL_GUILT
+- pattern: \bconvicted\s+of\b
+  flags: IGNORECASE
+  concept: LEGAL_GUILT
+- pattern: \bcommitted\s+(?:a\s+)?(?:crime|offense|offence)\b
+  flags: IGNORECASE
+  concept: LEGAL_GUILT
+- pattern: \bacted\s+wrongfully\b
+  flags: IGNORECASE
+  concept: LEGAL_WRONGFUL_CONDUCT
+- pattern: \bacted\s+in\s+bad\s+faith\b
+  flags: IGNORECASE
+  concept: LEGAL_WRONGFUL_CONDUCT
+- pattern: \bengaged\s+in\s+(?:bad\s+faith|dishonesty|deception|deceptive\s+practices?|abuse\s+of\s+trust)\b
+  flags: IGNORECASE
+  concept: LEGAL_WRONGFUL_CONDUCT
+- pattern: \bevidence\s+(?:shows?|demonstrates?|establishes?|proves?|supports?|confirms?)\s+(?:that\s+)?(?:liability|a\s+violation|violation|breach|misconduct|wrongdoing|fault|culpability|negligence|fraud)\b
+  flags: IGNORECASE
+  concept: LEGAL_EVIDENCE_ASSERTS
+- pattern: \bevidence\s+supports?\s+(?:a\s+)?finding\s+of\b
+  flags: IGNORECASE
+  concept: LEGAL_EVIDENCE_ASSERTS
+- pattern: \b(?:the\s+)?facts?\s+(?:point|points|support|supports|establish|establishes)\s+(?:to\s+)?(?:liability|a\s+violation|violation|breach|misconduct|wrongdoing)\b
+  flags: IGNORECASE
+  concept: LEGAL_EVIDENCE_ASSERTS
+- pattern: \b(?:strong|clear|compelling)\s+case\s+(?:that|for)\b
+  flags: IGNORECASE
+  concept: LEGAL_EVIDENCE_ASSERTS
+- pattern: \bconsistent\s+with\s+(?:a\s+)?(?:violation|breach|misconduct|wrongdoing|fraud|negligence)\b
+  flags: IGNORECASE
+  concept: LEGAL_EVIDENCE_ASSERTS
+- pattern: \b(?:the\s+)?record\s+(?:establishes?|shows?|demonstrates?|proves?)\s+(?:liability|a\s+violation|violation|breach|misconduct|wrongdoing|fault)\b
+  flags: IGNORECASE
+  concept: LEGAL_EVIDENCE_ASSERTS
+- pattern: \b(?:investigation|audit|review|report|inquiry|probe|hearing|examination)\s+(?:revealed|found|uncovered|showed|demonstrated|established|confirmed|identified)\s+(?:that\s+)?(?:(?:a|the)\s+)?(?:violation|breach|misconduct|wrongdoing|fraud|negligence|fault|culpability)\b
+  flags: IGNORECASE
+  concept: LEGAL_EVIDENCE_ASSERTS
+- pattern: \b\d{1,3}(?:\.\d+)?\s*%\s*(?:likely|probable|probability|chance)\b
+  flags: IGNORECASE
+  concept: LEGAL_QUANTIFIED_PROBABILITY
+- pattern: \b(?:probability|chance|likelihood)\s+of\s+(?:liability|a\s+violation|violation|guilt|misconduct|breach)\b
+  flags: IGNORECASE
+  concept: LEGAL_QUANTIFIED_PROBABILITY
+- pattern: \b\d+\s+in\s+\d+\s+(?:chance|probability|likelihood)\b
+  flags: IGNORECASE
+  concept: LEGAL_QUANTIFIED_PROBABILITY
+- pattern: \binsufficient\s+evidence\b
+  flags: IGNORECASE
+  concept: LEGAL_EVIDENCE_INSUFFICIENT
+- pattern: \bevidence\s+(?:is|was)\s+insufficient\b
+  flags: IGNORECASE
+  concept: LEGAL_EVIDENCE_INSUFFICIENT
+- pattern: \binsufficient\s+to\s+(?:establish|prove|show|support|sustain)\b
+  flags: IGNORECASE
+  concept: LEGAL_EVIDENCE_INSUFFICIENT
+- pattern: \bfails?\s+to\s+(?:establish|prove|show|support|sustain)\s+(?:liability|a\s+violation|violation|breach|misconduct|wrongdoing|fault|culpability|negligence)\b
+  flags: IGNORECASE
+  concept: LEGAL_EVIDENCE_INSUFFICIENT
+- pattern: \bdoes\s+not\s+(?:establish|prove|show|support|sustain)\s+(?:liability|a\s+violation|violation|breach|misconduct|wrongdoing|fault|culpability|negligence)\b
+  flags: IGNORECASE
+  concept: LEGAL_EVIDENCE_INSUFFICIENT
+- pattern: \bpending\s+review\b
+  flags: IGNORECASE
+  concept: LEGAL_PENDING_REVIEW
+- pattern: \bunder\s+review\b
+  flags: IGNORECASE
+  concept: LEGAL_PENDING_REVIEW
+- pattern: \bsubject\s+to\s+(?:review|judicial\s+review|stay|reconsideration|challenge|further\s+order|conditions?|approval|appeal)\b
+  flags: IGNORECASE
+  concept: LEGAL_PENDING_REVIEW
+- pattern: \breview\s+(?:is\s+)?(?:pending|ongoing)\b
+  flags: IGNORECASE
+  concept: LEGAL_PENDING_REVIEW
+- pattern: \balleg(?:e|es|ed|edly|ing)\b
+  flags: IGNORECASE
+  concept: LEGAL_ALLEGATION
+- pattern: \ballegations?\s+(?:of|that|against)\b
+  flags: IGNORECASE
+  concept: LEGAL_ALLEGATION
+- pattern: \bclaims?\s+(?:that|of)\b
+  flags: IGNORECASE
+  concept: LEGAL_ALLEGATION
+- pattern: \bcomplaint\s+alleges?\b
+  flags: IGNORECASE
+  concept: LEGAL_ALLEGATION
+- pattern: \b(?:plaintiff|claimant|petitioner|regulator|crown|prosecution)\s+alleges?\b
+  flags: IGNORECASE
+  concept: LEGAL_ALLEGATION
+- pattern: \bden(?:ies|ied)\s+(?:liability|wrongdoing|misconduct|guilt|fault|the\s+allegations?)\b
+  flags: IGNORECASE
+  concept: LEGAL_DENIAL
+- pattern: \bden(?:ies|ied)\s+that\b
+  flags: IGNORECASE
+  concept: LEGAL_DENIAL
+- pattern: \b(?:without|no)\s+admission\s+of\s+(?:liability|wrongdoing|misconduct|guilt|fault)\b
+  flags: IGNORECASE
+  concept: LEGAL_NO_ADMISSION
+- pattern: \bsettled\s+without\s+admission\b
+  flags: IGNORECASE
+  concept: LEGAL_SETTLEMENT_NO_ADMISSION
+- pattern: \bunder\s+(?:investigation|inquiry)\b
+  flags: IGNORECASE
+  concept: LEGAL_INVESTIGATION_PENDING
+- pattern: \b(?:investigation|inquiry)\s+(?:is\s+)?(?:ongoing|pending|open)\b
+  flags: IGNORECASE
+  concept: LEGAL_INVESTIGATION_PENDING
+- pattern: \bregulatory\s+(?:inquiry|investigation|review)\b
+  flags: IGNORECASE
+  concept: LEGAL_REGULATORY_INQUIRY
+- pattern: \bunder\s+regulatory\s+(?:review|inquiry|investigation)\b
+  flags: IGNORECASE
+  concept: LEGAL_REGULATORY_INQUIRY
+- pattern: \bcompliance\s+(?:review|investigation|inquiry|audit)\b
+  flags: IGNORECASE
+  concept: LEGAL_COMPLIANCE_REVIEW
+- pattern: \b(?:potential|possible)\s+(?:violation|non-?compliance|liability|misconduct|breach|negligence)\b
+  flags: IGNORECASE
+  concept: LEGAL_POTENTIAL_VIOLATION
+- pattern: \b(?:may|might|could|can)\s+(?:have\s+)?(?:violated|breached|be\s+liable|be\s+responsible|have\s+engaged\s+in)\b
+  flags: IGNORECASE
+  concept: LEGAL_POTENTIAL_VIOLATION
+- pattern: \b(?:appears?|seems?)\s+to\s+(?:be\s+liable|have\s+violated|have\s+breached|be\s+responsible)\b
+  flags: IGNORECASE
+  concept: LEGAL_POTENTIAL_VIOLATION
+- pattern: \b(?:suggests?|indicates?|points?\s+to|raises?\s+questions?\s+about)\s+(?:liability|a\s+possible\s+violation|possible\s+misconduct)\b
+  flags: IGNORECASE
+  concept: LEGAL_POTENTIAL_VIOLATION
+- pattern: \bpreliminary\s+(?:findings?|review|assessment)\b
+  flags: IGNORECASE
+  concept: LEGAL_PRELIMINARY_FINDING
+- pattern: \bnot\s+final\b
+  flags: IGNORECASE
+  concept: LEGAL_PRELIMINARY_FINDING
+- pattern: \bsubject\s+to\s+(?:appeal|investigation|review)\b
+  flags: IGNORECASE
+  concept: LEGAL_PRELIMINARY_FINDING
+- pattern: \bnot\s+(?:liable|guilty|responsible|answerable|accountable)\b
+  flags: IGNORECASE
+  concept: LEGAL_EXCULPATORY
+- pattern: \bno\s+(?:violation|wrongdoing|breach|misconduct|liability)\b
+  flags: IGNORECASE
+  concept: LEGAL_EXCULPATORY
+- pattern: \bcleared\s+of\b
+  flags: IGNORECASE
+  concept: LEGAL_EXCULPATORY
+- pattern: \bexonerated\b
+  flags: IGNORECASE
+  concept: LEGAL_EXCULPATORY
+- pattern: \b(?:case|claim|action|complaint|charge|proceeding)s?\s+(?:was\s+|were\s+)?dismissed\b
+  flags: IGNORECASE
+  concept: LEGAL_DISMISSED
+- pattern: \bdeclined\s+to\s+(?:pursue|prosecute|charge|investigate)\b
+  flags: IGNORECASE
+  concept: LEGAL_DISMISSED
+- pattern: \bno\s+evidence\s+(?:of|that)\b
+  flags: IGNORECASE
+  concept: LEGAL_NO_EVIDENCE
+- pattern: \bno\s+finding\s+(?:of|that)\s+(?:liability|a\s+violation|violation|misconduct|wrongdoing|guilt|breach|negligence)\b
+  flags: IGNORECASE
+  concept: LEGAL_NO_EVIDENCE
+- pattern: \b(?:court|tribunal|regulator|commission|ministry|agency|judge|jury|panel|arbitrator|board|commissioner|adjudicator|referee|hearing\s+officer|privacy\s+commissioner|human\s+rights\s+tribunal|labour\s+relations\s+board|arbitration\s+panel)\s+(?:has\s+|have\s+)?(?:found|held|determined|concluded|ruled|decided)\b
+  flags: IGNORECASE
+  concept: LEGAL_ATTRIBUTED_FINDING
+- pattern: \b(?:found|held|determined|concluded|ruled)\s+by\s+(?:the\s+)?(?:court|tribunal|regulator|commission|ministry|agency|panel|arbitrator|board|commissioner|adjudicator)\b
+  flags: IGNORECASE
+  concept: LEGAL_ATTRIBUTED_FINDING
+- pattern: \bin\s+(?:our|my|the\s+author's?)\s+(?:view|opinion|assessment|judgment)\b
+  flags: IGNORECASE
+  concept: LEGAL_OPINION_FRAME
+- pattern: \bit\s+is\s+(?:our|my)\s+(?:view|opinion|assessment|judgment)\b
+  flags: IGNORECASE
+  concept: LEGAL_OPINION_FRAME
+- pattern: \bwe\s+(?:conclude|submit|opine|believe|assess|are\s+of\s+the\s+view)\b
+  flags: IGNORECASE
+  concept: LEGAL_OPINION_FRAME
+- pattern: \bthis\s+(?:report|analysis|memorandum|opinion)\s+concludes\b
+  flags: IGNORECASE
+  concept: LEGAL_OPINION_FRAME
+- pattern: \bprima\s+facie\b
+  flags: IGNORECASE
+  concept: LEGAL_PRIMA_FACIE
+- pattern: \breasonable\s+grounds?\s+to\s+(?:believe|suspect)\b
+  flags: IGNORECASE
+  concept: LEGAL_PRIMA_FACIE
+- pattern: \bprobable\s+cause\b
+  flags: IGNORECASE
+  concept: LEGAL_PRIMA_FACIE
+tests:
+  LEGAL_ESTABLISH_LIABILITY:
+    positive:
+    - The evidence establishes liability against Acme Corp.
+    - The company was found legally liable for the breach.
+    - Acme is responsible for the damages.
+    negative:
+    - Acme denies it is liable.
+    - No evidence establishes liability against Acme.
+    - Whether Acme is liable remains pending review.
+  LEGAL_CONFIRMED_VIOLATION:
+    positive:
+    - The audit confirmed a violation of the Act.
+    - The facts satisfy the elements of negligence.
+    - The report documents misconduct by two employees.
+    - The conduct amounts to fraud.
+    - The tribunal identified systemic misconduct.
+    negative:
+    - The regulator alleges a violation of the Act.
+    - There is insufficient evidence of misconduct.
+    - The court has not confirmed any violation.
+    - The complaint alleges the conduct constitutes a violation.
+  LEGAL_GUILT:
+    positive:
+    - The defendant is guilty of fraud.
+    - He was convicted of obstruction.
+    negative:
+    - He was not convicted of obstruction.
+    - The Crown alleges he committed the offence.
+    - No finding of guilt was entered.
+  LEGAL_WRONGFUL_CONDUCT:
+    positive:
+    - The officer acted in bad faith.
+    - The company engaged in deceptive practices.
+    negative:
+    - The complaint alleges bad faith.
+    - No evidence of dishonesty was presented.
+  LEGAL_EVIDENCE_ASSERTS:
+    positive:
+    - The evidence demonstrates liability on the part of the defendant.
+    - The facts point to misconduct by the officers.
+    - There is a strong case that Acme breached the agreement.
+    - The record establishes a violation.
+    - The investigation revealed misconduct by two managers.
+    negative:
+    - The evidence is insufficient to establish liability.
+    - The evidence does not show liability.
+    - There is no evidence of a violation.
+  LEGAL_QUANTIFIED_PROBABILITY:
+    positive:
+    - There is an 87% likelihood of liability.
+    - The chance of guilt is roughly 3 in 4.
+    negative:
+    - Whether liability attaches remains subject to review.
+  LEGAL_EVIDENCE_INSUFFICIENT:
+    positive:
+    - There is insufficient evidence of misconduct.
+    - The evidence is insufficient to establish liability.
+    - The record fails to prove a violation.
+    negative:
+    - The evidence establishes liability.
+    - The record shows misconduct.
+  LEGAL_ATTRIBUTED_FINDING:
+    positive:
+    - The tribunal found that the company breached the agreement.
+    - The regulator determined that two provisions were violated.
+    - The Human Rights Tribunal concluded that the policy was discriminatory.
+    negative:
+    - Acme breached the agreement.
+    - The company violated the Act.
+  LEGAL_OPINION_FRAME:
+    positive:
+    - In our view, the claim is likely to fail.
+    - We conclude that the conduct does not satisfy the test.
+    negative:
+    - The conduct does not satisfy the test.
+    - The claim is likely to fail.
+  LEGAL_PRIMA_FACIE:
+    positive:
+    - There is a prima facie case of negligence.
+    - The officer had reasonable grounds to believe an offence had occurred.
+    negative:
+    - The evidence establishes negligence.
+    - The officer knew an offence had occurred.
+adversarial_tests:
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: plain
+  expect_fire: true
+  text: Acme cheated its customers.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: plain
+  expect_fire: true
+  text: The manager lied to the board.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: plain
+  expect_fire: true
+  text: They covered it up.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: plain
+  expect_fire: true
+  text: The company ripped off investors.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: elevated
+  expect_fire: true
+  text: The Commission's findings leave little doubt as to the respondent's conduct.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: elevated
+  expect_fire: true
+  text: There is no innocent reading of what the respondent did.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: elevated
+  expect_fire: true
+  text: The respondent's explanation does not survive contact with the documentary
+    record.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: elevated
+  expect_fire: true
+  text: The record before the panel admits of only one reasonable reading.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: quotative
+  expect_fire: true
+  text: The findings speak for themselves.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: quotative
+  expect_fire: true
+  text: The evidence is what it is.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: quotative
+  expect_fire: true
+  text: The record tells its own story.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: quotative
+  expect_fire: true
+  text: The documents do not lie.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: rhetorical
+  expect_fire: true
+  text: It would be difficult to explain the respondent's records on any innocent
+    view.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: rhetorical
+  expect_fire: true
+  text: One struggles to see how the respondent's conduct could be defended.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: rhetorical
+  expect_fire: true
+  text: Any fair reading of the file places the respondent in an unenviable position.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: rhetorical
+  expect_fire: true
+  text: The respondent has much to answer for.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: quantitative
+  expect_fire: true
+  text: The pattern is unmistakable.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: quantitative
+  expect_fire: true
+  text: Every single transaction followed the same irregular course.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: quantitative
+  expect_fire: true
+  text: On all ten occasions, the respondent did the same thing.
+- concept: LEGAL_CONFIRMED_VIOLATION
+  source: adversarial
+  register: quantitative
+  expect_fire: true
+  text: There is not a single instance in which the respondent complied.
+splitter_tests:
+- description: relative clause interposes assertion between denial
+  text: The company, which was later found liable, denies the allegation.
+  expect_no_fire:
+  - LEGAL_ESTABLISH_LIABILITY
+  - LEGAL_CONFIRMED_VIOLATION
+- description: coordinated negation across nor (with real modifier)
+  text: Neither the audit nor the review confirmed misconduct.
+  expect_no_fire:
+  - LEGAL_CONFIRMED_VIOLATION
+- description: quoted assertion inside reported defamation
+  text: The plaintiff's statement that 'Acme is liable' is itself defamatory.
+  expect_no_fire:
+  - LEGAL_ESTABLISH_LIABILITY
+- description: appositive plus direct assertion (should fire)
+  text: The respondent, the largest carrier in the province, breached its obligations
+    under the Act.
+  expect_fire:
+  - LEGAL_CONFIRMED_VIOLATION
+- description: attribution fires; direct assertion does not
+  text: The tribunal found a violation, but the company has appealed.
+  expect_fire:
+  - LEGAL_ATTRIBUTED_FINDING
+  expect_no_fire:
+  - LEGAL_CONFIRMED_VIOLATION
+benign_tests:
+- text: The parties disagree about the interpretation of section 12.
+  register: regulatory
+- text: The respondent has filed a statement of defence denying the allegations.
+  register: regulatory
+- text: The Commission is currently reviewing the submissions of both parties.
+  register: regulatory
+- text: Whether the conduct constitutes a violation remains to be determined.
+  register: regulatory
+- text: The Court considered whether the evidence supported the plaintiff's claim.
+  register: regulatory
+- text: Counsel for the respondent argued that the facts do not support a finding
+    of negligence.
+  register: regulatory
+- text: The inquiry has not yet concluded.
+  register: regulatory
+- text: The applicant alleges that the decision was unreasonable.
+  register: regulatory
+- text: The tribunal will hear argument on the merits in due course.
+  register: regulatory
+- text: The regulator's preliminary assessment did not identify any concerns.
+  register: regulatory
+- text: The parties agreed to settle the matter without admission of liability.
+  register: regulatory
+- text: The Commission's reasons will be released at a later date.
+  register: regulatory
+- text: It is not disputed that the parties entered into a contract in 2019.
+  register: regulatory
+- text: The applicant seeks judicial review of the decision below.
+  register: regulatory
+- text: Whether there is a prima facie case is a matter for the hearing panel.
+  register: regulatory
+- text: The respondent's submissions address the evidence at length.
+  register: regulatory
+- text: The Court of Appeal allowed the appeal and remitted the matter for reconsideration.
+  register: regulatory
+- text: The record before the tribunal does not establish the allegations at this
+    stage.
+  register: regulatory
+- text: The Commission takes no position on whether the conduct was lawful.
+  register: regulatory
+- text: The applicants have not yet responded to the notice of inquiry.
+  register: regulatory

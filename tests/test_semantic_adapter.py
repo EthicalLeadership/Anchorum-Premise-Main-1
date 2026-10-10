@@ -144,7 +144,7 @@ def test_build_for_vertical_with_real_lexicon():
 
     from dossier_pipeline.governance import build_for_vertical
 
-    lexicon_path = _root / "lexicons" / "legal-v1.yaml"
+    lexicon_path = _root / "lexicons" / "legal-v3.1.yaml"
     if not lexicon_path.exists():
         pytest.skip(f"lexicon file not present: {lexicon_path}")
 

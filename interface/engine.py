@@ -11,7 +11,7 @@ from ccsp.verify import Engine, SemanticCandidate, load_lexicon
 from interface.gric.schemas import ProjectionResponse
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-LEXICON_PATH = REPO_ROOT / "lexicons" / "legal-v1.yaml"
+LEXICON_PATH = REPO_ROOT / "lexicons" / "legal-v3.1.yaml"
 VERTICAL = "legal"
 
 
