@@ -1,7 +1,6 @@
 """
 Dossier DOSSIER-PIPELINE — Integrated Pipeline Orchestrator
 
-from fpdf import FPDF
 Wires the canonical stores together with transaction recovery, hardened
 projections, and stage-specific failure handling.
 """
@@ -14,6 +13,8 @@ import json
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional
+
+from fpdf import FPDF
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -81,17 +82,7 @@ class ParseError(RuntimeError):
 
 
 class IntakeError(RuntimeError):
-        def _generate_pdf(self, envelope):
-            """Generate a PDF from the email envelope content."""
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", size=12)
-            pdf.cell(200, 10, txt=f"Email from: {envelope.sender}", ln=True)
-            pdf.cell(200, 10, txt=f"Subject: {envelope.subject}", ln=True)
-            pdf.multi_cell(0, 10, txt=envelope.body_text)
-            pdf_path = Path(self.output_dir) / f"{envelope.message_id}.pdf"
-            pdf.output(str(pdf_path))
-            return pdf_path
+    pass
 
 
 class ClassificationError(RuntimeError):
@@ -241,6 +232,18 @@ class DossierPipeline:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
         return False
+
+    def _generate_pdf(self, envelope):
+        """Generate a PDF from the email envelope content."""
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+        pdf.cell(200, 10, txt=f"Email from: {envelope.sender}", ln=True)
+        pdf.cell(200, 10, txt=f"Subject: {envelope.subject}", ln=True)
+        pdf.multi_cell(0, 10, txt=envelope.body_text)
+        pdf_path = Path(self.output_dir) / f"{envelope.message_id}.pdf"
+        pdf.output(str(pdf_path))
+        return pdf_path
 
     def process_email(self, raw_bytes: bytes) -> PipelineResult:
         self.state_machine = StrictStateMachine(self.state_machine_spec)

@@ -75,3 +75,5 @@ tmp_audit_disk.bin
 # Aider Studio (auto-added)
 REPO_MAP.md
 .aider/
+
+.aider*
