@@ -67,16 +67,14 @@ class PolicyEngine:
                     )
                     operational_notes.append("conflict_marker")
 
-                # Rule 4: Legal significance with low confidence → quarantine
-                if (
-                    ClassificationLabel.LEGAL_SIGNIFICANT in adapter.classification.labels
-                    and adapter.confidence < 0.6
-                ):
-                    quarantine_reasons.append(
-                        "Legal-significance signal with uncertain classification — "
-                        "human review required"
-                    )
-                    operational_notes.append("legal_significance_low_confidence")
+                # Rule 4 (low-confidence legal) was removed per F-16.
+                # It could not fire: the classifier's confidence is
+                # 0.3 + rule_hits*0.15, and any LEGAL_SIGNIFICANT match adds
+                # at least two hits (language + legal), so confidence >= 0.6
+                # whenever the label is present.  The threshold was exactly
+                # the floor.  If a low-confidence signal is wanted, it needs
+                # a classifier confidence model that can express uncertainty;
+                # see F-16.
 
                 # Rule 5: Privileged content → quarantine for confidentiality protection
                 if ClassificationLabel.PRIVILEGED in adapter.classification.labels:
