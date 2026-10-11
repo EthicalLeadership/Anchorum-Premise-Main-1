@@ -18,7 +18,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from dossier_pipeline.registry._canonical import canonical_json
 from dossier_pipeline.registry.audit import (
     LEGACY_UNSIGNED,
     AuditEntry,

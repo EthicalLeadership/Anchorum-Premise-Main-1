@@ -20,6 +20,19 @@ from .trust_boundary import BOUNDARY_CONTRACT_VERSION
 
 GENESIS_HASH = "0" * 64
 
+# Every timestamp this module writes is UTC with an explicit offset and is
+# tagged with the clock that produced it. The previous implementation used
+# ``datetime.datetime.now()``: naive local time, no timezone, no source, so a
+# reader could not tell whether ordering was meaningful or which clock a value
+# came from (audit finding F-13). No NTP or timestamp authority is used here -
+# recording the source is what makes that limit explicit instead of implied.
+TIME_SOURCE_SYSTEM_CLOCK_UTC = "system_clock_utc"
+
+
+def _utc_now_iso() -> str:
+    """Current time as an offset-aware UTC ISO-8601 string."""
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
 
 class ChainIntegrityError(RuntimeError):
     """Raised when control chain verification fails in strict mode."""
@@ -248,6 +261,10 @@ class ControlPlane:
             "policy_quarantine": policy.quarantine,
             "trace": adapter.trace,
 
+            # Which clock produced this record's timestamp. No NTP or timestamp
+            # authority is used; naming the source keeps that limit explicit.
+            "time_source": TIME_SOURCE_SYSTEM_CLOCK_UTC,
+
             # Transport-proof fields (counts/timestamps + MD-safe base64 fingerprint)
             "received_count": adapter.received_count,
             "received_first_ts": adapter.received_first_ts,
@@ -304,7 +321,7 @@ class ControlPlane:
             self.conn.execute("BEGIN IMMEDIATE")
             current_last_hash = self._get_last_hash()
             sequence_no = self._next_sequence()
-            timestamp = datetime.datetime.now().isoformat()
+            timestamp = _utc_now_iso()
 
             # Hash chain: SHA256(previous_hash + ":" + timestamp + ":" + payload_json)
             record_hash = self._compute_record_hash(current_last_hash, timestamp, payload_json)
@@ -571,7 +588,7 @@ class ControlPlane:
             self.conn.execute("BEGIN IMMEDIATE")
             current_last_hash = self._get_last_hash()
             sequence_no = self._next_sequence()
-            timestamp = datetime.datetime.now().isoformat()
+            timestamp = _utc_now_iso()
             record_hash = self._compute_record_hash(current_last_hash, timestamp, payload_json)
             record_signature = self._compute_record_signature(
                 sequence_no,
@@ -629,7 +646,7 @@ class ControlPlane:
         )
         anchor = {
             **anchor_payload,
-            "exported_at": datetime.datetime.now().isoformat(),
+            "exported_at": _utc_now_iso(),
         }
         anchor_json = json.dumps(anchor, sort_keys=True, ensure_ascii=False)
         anchor["anchor_hash"] = hashlib.sha256(anchor_json.encode()).hexdigest()

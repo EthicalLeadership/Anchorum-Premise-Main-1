@@ -79,3 +79,14 @@ REPO_MAP.md
 .aider*
 # Kimi project memory
 .kimi-memory/
+
+# Stray ImageMagick PostScript dumps named after stdlib modules.
+# Something on this machine writes ~8-13 MB PostScript files to the repository
+# root using stdlib module names as titles; four were committed by the initial
+# scaffold (~40 MB). The writer has not been identified, so these are ignored
+# by absolute root path to stop them being re-added. They never shadowed the
+# stdlib (verified: json resolves to the stdlib path, sys is a builtin).
+/json
+/sys
+/time
+/uuid

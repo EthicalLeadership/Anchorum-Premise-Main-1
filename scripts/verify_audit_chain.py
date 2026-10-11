@@ -1,15 +1,24 @@
 #!/usr/bin/env python3
-"""Verify the integrity of a hash-chained audit log.
+"""Verify the integrity of a hash-chained, signed audit log.
 
 Walks the JSONL audit log and checks:
   * seq is 0, 1, 2, ... with no gaps
   * prev_hash of entry[i] equals entry_hash of entry[i-1]
   * record_hash equals sha256(canonical(record))
   * entry_hash equals sha256(canonical({seq, prev_hash, record_hash}))
+  * signature is a valid HMAC under GDC_AUDIT_SIGNING_KEY
+
+Because the signatures are checked, this script needs the audit signing key:
+set GDC_AUDIT_SIGNING_KEY (and optionally GDC_AUDIT_SIGNING_KEY_ID) in the
+environment. Without it the script reports FAIL rather than silently skipping
+the signature check, since an unchecked signature is not verification.
+
+An entry with no signature at all is reported and not accepted: it cannot be
+distinguished from an entry an attacker inserted.
 
 Exit codes:
   0  chain intact
-  1  chain broken
+  1  chain broken, unverifiable, or signing key unavailable
   2  usage error
 """
 from __future__ import annotations
@@ -26,7 +35,10 @@ def _repo_on_path() -> None:
 
 _repo_on_path()
 
-from dossier_pipeline.registry.audit import AuditLog  # noqa: E402
+from dossier_pipeline.registry.audit import (  # noqa: E402
+    AuditLog,
+    AuditSigningKeyMissing,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -39,7 +51,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"OK audit log empty (file absent: {path})")
         return 0
 
-    log = AuditLog(path)
+    try:
+        log = AuditLog(path)
+    except AuditSigningKeyMissing as exc:
+        print(f"FAIL {exc}", file=sys.stderr)
+        return 1
+
     try:
         errors = log.verify_chain()
     except Exception as e:
