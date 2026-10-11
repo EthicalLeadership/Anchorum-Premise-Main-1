@@ -89,6 +89,16 @@ class VerificationReport:
     anchor_hash: str = ""
 
 
+class EvidenceSignerUnbound(RuntimeError):
+    """Raised when the signer has no key material and would sign with nothing.
+
+    An HMAC keyed by the empty string is a public key: every signature it
+    produces can be computed by anyone, so ``verify()`` proves nothing and the
+    evidence chain stops being tamper-evident. That failure mode is silent and
+    therefore worse than refusing to start, so construction fails closed.
+    """
+
+
 class EvidenceSigner:
     """
     Lightweight signing abstraction.
@@ -96,10 +106,20 @@ class EvidenceSigner:
     Default implementation uses HMAC-SHA256 keyed by an environment secret.
     The interface is intentionally isolated so it can later be replaced by
     a real Ed25519/HSM-backed signer without changing storage or verification.
+
+    The secret is mandatory. Pass one explicitly, or set
+    ``GDC_EVIDENCE_SECRET``. There is deliberately no unbound fallback.
     """
 
     def __init__(self, secret: Optional[str] = None):
-        self.secret = secret if secret is not None else os.getenv("GDC_EVIDENCE_SECRET", "")
+        resolved = secret if secret is not None else os.getenv("GDC_EVIDENCE_SECRET")
+        if resolved is None or not resolved.strip():
+            raise EvidenceSignerUnbound(
+                "No evidence signing secret available. Set GDC_EVIDENCE_SECRET "
+                "(or pass an explicit secret). Refusing to sign evidence with an "
+                "empty key, because those signatures are forgeable by anyone."
+            )
+        self.secret = resolved
 
     def sign(self, message: str) -> str:
         return hmac.new(self.secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
@@ -108,7 +128,7 @@ class EvidenceSigner:
         return hmac.compare_digest(self.sign(message), signature)
 
     def fingerprint(self) -> str:
-        return hashlib.sha256(self.secret.encode("utf-8")).hexdigest() if self.secret else "unbound"
+        return hashlib.sha256(self.secret.encode("utf-8")).hexdigest()
 
 
 def _canonical_json(payload: Any) -> str:

@@ -5,12 +5,48 @@ on:
   pull_request:
 
 jobs:
-  check:
+  integrity:
+    name: Source integrity gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Check source integrity
+      # The gate is stdlib-only, so it runs before any dependency install.
+      # Self-test first: it proves every check actually fires rather than
+      # merely reporting success on a clean tree.
+      - name: Gate self-test
+        run: python scripts/check_integrity.py --selftest
+      - name: Gate (all tracked source)
         run: python scripts/check_integrity.py --all
+
+  tests:
+    name: Test suites
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: interface/package-lock.json
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Python tests
+        run: python -m pytest -q -p no:cacheprovider
+      - name: Install interface dependencies
+        working-directory: interface
+        run: npm ci
+      - name: Interface type-check
+        working-directory: interface
+        run: npx tsc --noEmit
+      - name: Interface tests
+        working-directory: interface
+        run: npx vitest run
+      - name: Interface production build
+        working-directory: interface
+        run: npm run build
