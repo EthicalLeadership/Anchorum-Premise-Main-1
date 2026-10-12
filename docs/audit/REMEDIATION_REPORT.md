@@ -2,8 +2,8 @@
 
 **Remediating audit:** `docs/audit/INDEPENDENT_BUILD_AUDIT.md` (ID **ANCH-2026-10-02-01**,
 defects F-01…F-19, HIGH = F-01…F-06).
-**Repository:** `Anchorumzero_trust-on-Prem`, tree at `298599b` with F-10, F-12,
-F-15 and F-18 applied after it.
+**Repository:** `Anchorumzero_trust-on-Prem`, tree at `298599b` with F-10, F-11,
+F-12, F-15 and F-18 applied after it.
 **Status of this document:** point-in-time verification record. It states what
 was checked and against which tree.
 
@@ -34,7 +34,7 @@ addressed by that work (`.aider/`) and completed here (`REPO_MAP.md`).
 | F-08 | MEDIUM | Packaging excludes most packages | **FIXED** (residual: `scripts*`) |
 | F-09 | MEDIUM | Required data artifact `lexicons/legal-v1.yaml` missing | **RESOLVED** (as v3.1) |
 | F-10 | MEDIUM | Two contradictory revocation mechanisms; one orphaned | **FIXED** |
-| F-11 | MEDIUM | Persistence paths CWD-relative and non-configurable | **PARTIAL** |
+| F-11 | MEDIUM | Persistence paths CWD-relative and non-configurable | **FIXED** |
 | F-12 | MEDIUM | No CI; secret scanner not enforced | **FIXED** |
 | F-13 | MEDIUM | Trusted-time not implemented | **FIXED** |
 | F-14 | LOW | Stray 7.8 MB artifacts at repo root | **FIXED** |
@@ -44,7 +44,7 @@ addressed by that work (`.aider/`) and completed here (`REPO_MAP.md`).
 | F-18 | LOW | Weak JWT secrets padded, not strengthened | **FIXED** |
 | F-19 | MEDIUM | Repository state ambiguity; project at two paths | **PARTIAL** |
 
-**Counts:** 17 fixed, 2 partial, 0 open.
+**Counts:** 18 fixed, 1 partial, 0 open.
 
 ## 3. Fixed findings
 
@@ -220,22 +220,6 @@ diverge. `dossier_pipeline/schema.py` imports from `sqlalchemy` /
 
 ## 4. Partially addressed
 
-### F-11 — CWD-relative paths (MEDIUM) — PARTIAL
-
-The paths are now injectable, which is the substance of the finding: the pipeline
-takes `output_dir`, `main.py` reads it from `OUTPUT_DIR`, and `anchor_cli.py`
-exposes `--output-dir`. But the *defaults* remain CWD-relative:
-
-```
-dossier_pipeline/pipeline.py:146:        output_dir: str = "./output",
-dossier_pipeline/main.py:257:        "output_dir": env("OUTPUT_DIR", "./output"),
-dossier_pipeline/anchor_cli.py:117:    parser.add_argument("--output-dir", default="./output")
-```
-
-So a process started from an unexpected directory still writes its custody data
-somewhere unintended unless configured. A configured absolute default (or a
-startup check that resolves and logs the data directory) would close this.
-
 ### F-19 — Repository state ambiguity (MEDIUM) — PARTIAL
 
 The repository itself is now unambiguous: git-initialised, one canonical branch,
@@ -383,6 +367,37 @@ reached a clone, but still present in any naive copy or archive of the tree.
 were deliberately kept: they are harmless, and they stop the artifacts returning
 if that tool is ever run here again.
 
+### F-11 — CWD-relative persistence paths (MEDIUM) — FIXED
+
+The configurability the finding asked for was already in place: `OUTPUT_DIR`,
+`--output-dir` and the `output_dir` constructor argument. What remained was that
+the *default* was the string `"./output"`, resolved against whatever directory
+the process happened to start in — so the same command run twice from two places
+wrote custody data to two different locations, and nothing in the output said
+which.
+
+**Resolution.** Added `DEFAULT_OUTPUT_DIR` and `_resolve_output_dir()` to
+`dossier_pipeline/main.py`. Before dispatch, the entry point resolves the
+configured value to an absolute path and states it:
+
+```
+Data directory: /tmp/output
+```
+
+Verified from two working directories: run from `/tmp` it reports `/tmp/output`;
+run from `/var/tmp` it reports `/var/tmp/output`. Nothing moved — the same
+destination is now stated rather than implied, and the resolved value is what
+every command receives.
+
+The library layer still takes whatever directory it is handed; deciding where
+that is belongs to the entry point, so `DossierPipeline`'s interface is
+unchanged and every existing test still passes an explicit directory.
+
+**Residual.** The default still *follows* the working directory instead of being
+an absolute data directory of its own. That is deliberate — changing it would
+move where existing deployments write — and the point of the fix is that the
+choice is now visible on every run, which is the remedy the finding named.
+
 ## 6. Defects found during remediation (not audit findings)
 
 Corruption was found in the tree that the audit did not report and that no test
@@ -439,6 +454,13 @@ what makes the class of corruption detectable rather than merely repaired.
    packages but not the interpreter, so "same environment" is still only true
    down to the package layer.
 7. **`scripts*` in packaging is inert** (`F-08` residual).
+8. **Read-only CLI commands require the evidence secret.** Because the entry
+   point constructs the evidence store eagerly, `enforce`, `verify-chain` and
+   `verify` fail closed without `GDC_EVIDENCE_SECRET` — observed while verifying
+   F-11. That is the intended F-02 behaviour (refusing to open an evidence store
+   without a key), but operators should know that read-only inspection needs the
+   secret set too. If that proves too strict in practice, the fix is to build the
+   evidence store lazily for commands that never sign.
 
 ## 8. Verification at the time of this report
 
@@ -447,7 +469,7 @@ Run against the tree with every fix above applied:
 | Gate | Command | Result |
 |---|---|---|
 | Integrity self-test | `python3 scripts/check_integrity.py --selftest` | **6/6 PASS** |
-| Integrity, all source | `python3 scripts/check_integrity.py --all` | **OK (226 source files)** |
+| Integrity, all source | `python3 scripts/check_integrity.py --all` | **OK (228 source files)** |
 | Secret scan (tree) | `gitleaks dir . --config .gitleaks.toml` | **0 findings** |
 | Secret scan (staged) | `gitleaks git --staged --config .gitleaks.toml` | **exit 0** |
 | Secret scan (probe) | planted AWS key in a scratch file | **detected, exit 1** |

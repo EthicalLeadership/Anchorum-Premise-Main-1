@@ -50,6 +50,10 @@ def load_actor_rules(config_path: str | None = None) -> dict:
 
 DEFAULT_ACTOR_RULES = load_actor_rules()
 
+# Where custody data goes when nothing configures it. Relative, but resolved to
+# an absolute path before use so the destination is never implied (F-11).
+DEFAULT_OUTPUT_DIR = "./output"
+
 def _decode_header_value(value: str) -> str:
     if not value:
         return ""
@@ -281,6 +285,23 @@ def load_config(config_path: str = None):
     config["batch_size"] = int(pipeline.get("batch_size", config["batch_size"]))
 
     return config
+
+
+def _resolve_output_dir(config: dict) -> Path:
+    """Resolve the data directory to an absolute path and record the decision.
+
+    The default was the string ``"./output"`` — relative to whatever directory
+    the process happened to start in. Two invocations of the same command from
+    two different directories therefore wrote custody data to two different
+    places, and nothing in the output said which. Resolving here does not move
+    any files: it resolves the same destination to an explicit absolute path so
+    the location is visible and reviewable (audit finding F-11).
+
+    The library layer keeps taking whatever directory it is handed; deciding
+    where that is belongs to the entry point.
+    """
+    configured = config.get("output_dir") or DEFAULT_OUTPUT_DIR
+    return Path(configured).expanduser().resolve()
 
 
 def _build_pipeline(config):
@@ -712,6 +733,12 @@ def main():
         config["dossier_id"] = args.dossier
     if args.output_dir is not None:
         config["output_dir"] = args.output_dir
+
+    if args.command:
+        # Say where data will be written, rather than letting the working
+        # directory decide silently (audit finding F-11).
+        config["output_dir"] = str(_resolve_output_dir(config))
+        print(f"Data directory: {config['output_dir']}")
 
     if args.command == "ingest-proton":
         cmd_ingest_proton(args, config)
