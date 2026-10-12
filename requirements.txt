@@ -1,11 +1,24 @@
-SQLAlchemy>=2.0
-PyJWT>=2.8
-fastapi>=0.110
-pydantic>=2.0
-jinja2>=3.1
-python-multipart>=0.0.9
-cel-python>=0.5.0
-PyYAML>=6.0
-cryptography>=42.0
-fpdf2>=2.7
-pytest>=8.0
+# Runtime dependencies for the dossier pipeline, the enforcement layer and the
+# interface server.
+#
+# Floors are the oldest versions supported; ceilings stop an unreviewed major
+# from arriving silently. Open ">=" ranges with no lock allowed two machines to
+# resolve different environments (audit finding F-05).
+#
+#   reproducible install:  pip install -r requirements.lock
+#   development install:   pip install -r requirements-dev.txt
+#
+# "The code needs it" is the bar for this file. pytest lives in
+# requirements-dev.txt; anything test-only does not belong here.
+
+SQLAlchemy>=2.0,<3
+PyJWT>=2.8,<3
+fastapi>=0.110,<1
+uvicorn>=0.30,<1
+pydantic>=2.0,<3
+jinja2>=3.1,<4
+python-multipart>=0.0.9,<0.1
+cel-python>=0.5,<1
+PyYAML>=6.0,<7
+cryptography>=42.0,<51
+fpdf2>=2.7,<3

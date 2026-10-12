@@ -525,32 +525,39 @@ class ControlPlane:
         }
 
     def get_all_records(self) -> List[Dict]:
+        """Return every committed record, in sequence order.
+
+        This is the integrity accessor, so it deliberately does not filter.
+        ``export_anchor`` and ``verify_anchor`` compute the Merkle root and
+        record count from this result: if it dropped any record, the anchor
+        would not cover the chain and the dropped record could be altered or
+        deleted without detection.
+
+        An earlier revision silently excluded records whose payload had
+        ``policy_allowed is False`` in order to keep rejected outcomes out of a
+        presentation view. That filter is gone (audit finding F-04). It is no
+        longer reachable anyway - ``REJECTED_POLICY`` short-circuits control
+        execution per STATE_MACHINE_SPEC.md and writes no control record - but
+        leaving it here invited the next reader to re-derive the old behaviour.
+        Filtering for display belongs to the caller, never to the function that
+        defines what the chain contains.
+        """
         cur = self.conn.execute(
             "SELECT sequence_no, record_hash, previous_hash, timestamp, payload, decision, route, signature "
             "FROM control_records ORDER BY id ASC"
         )
-        rows = cur.fetchall()
-
-        def include_record(payload_obj: Dict[str, Any]) -> bool:
-            # Invariants/harness expect rejected_policy outcomes NOT to appear in the
-            # visible chain, but equivalence/anchor tests still require that records
-            # exist and are retrievable via get_record_by_hash().
-            return payload_obj.get("policy_allowed", True) is not False
-
         return [
             {
-                "sequence_no": r[0],
-                "record_hash": r[1],
-                "previous_hash": r[2],
-                "timestamp": r[3],
-                "payload": payload,
-                "decision": r[5],
-                "route": r[6],
-                "signature": r[7],
+                "sequence_no": row[0],
+                "record_hash": row[1],
+                "previous_hash": row[2],
+                "timestamp": row[3],
+                "payload": json.loads(row[4]),
+                "decision": row[5],
+                "route": row[6],
+                "signature": row[7],
             }
-            for r in rows
-            if include_record(json.loads(r[4]))
-            for payload in [json.loads(r[4])]
+            for row in cur.fetchall()
         ]
 
     def get_event_stream(self) -> List[Dict[str, Any]]:

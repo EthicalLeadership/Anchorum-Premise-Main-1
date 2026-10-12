@@ -90,3 +90,10 @@ REPO_MAP.md
 /sys
 /time
 /uuid
+
+# Stray relative-path tree from another project.
+# A tool invoked with a path like "home/kark/Desktop/<other-project>/..." was
+# run with the repository root as its working directory, so it created that
+# tree *inside* this repo instead of under /home. The files belong to a
+# different codebase and are not part of this project's history.
+/home/

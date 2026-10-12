@@ -1,0 +1,62 @@
+# Exact dependency closure of the environment that passes this project's gates.
+#
+# Provenance: resolved and verified green on Python 3.14.4 with
+#   pytest 294 passed, tsc clean, vitest 14 files / 72 tests.
+# Regenerate after changing requirements.txt with:
+#   uv pip compile requirements.txt -o requirements.lock
+# or, if you are using plain pip:
+#   pip install -r requirements.txt && pip freeze | sort > requirements.lock
+#
+# Install reproducibly with:
+#   pip install -r requirements.lock
+#
+# Rationale (audit finding F-05): requirements.txt used open ">=" ranges and
+# resolved to ~185 packages including torch and a full CUDA stack, so no two
+# machines got the same environment and a "green" run was not reproducible.
+# The heavyweight ML stack is no longer a dependency of this codebase at all;
+# the closure below is the whole runtime plus the test runner.
+#
+# Test tooling is not split out here on purpose: a lockfile describes one
+# verified environment, and pytest is part of what was verified.
+
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.15.1
+cel-python==0.5.0
+cffi==2.1.1
+click==8.5.0
+cryptography==50.0.2
+defusedxml==0.7.1
+fastapi==0.143.0
+fonttools==4.66.1
+fpdf2==2.8.9
+google-re2==1.1.20251105
+h11==0.16.0
+idna==3.20
+iniconfig==2.3.1
+jinja2==3.1.6
+jmespath==1.1.0
+lark==1.3.1
+markupsafe==3.0.4
+opentelemetry-api==1.45.1
+packaging==26.3
+pendulum==3.2.0
+pillow==12.3.0
+pluggy==1.6.0
+pycparser==3.11
+pydantic==2.14.0
+pydantic-core==2.50.0
+pygments==2.21.0
+PyJWT==2.15.1
+pytest==9.1.1
+python-dateutil==2.9.0.post0
+python-multipart==0.0.32
+PyYAML==6.0.3
+six==1.17.0
+SQLAlchemy==2.1.4
+starlette==1.7.0
+typeguard==4.6.0
+typing-extensions==4.16.0
+typing-inspection==0.4.4
+tzdata==2026.5
+uvicorn==0.54.0

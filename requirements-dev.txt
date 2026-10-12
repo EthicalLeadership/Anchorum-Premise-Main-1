@@ -1,0 +1,10 @@
+# Development and verification dependencies.
+#
+#   pip install -r requirements-dev.txt
+#
+# Kept separate from requirements.txt so a production or container install does
+# not pull the test runner (audit finding F-05).
+
+-r requirements.txt
+
+pytest>=8.0,<10
