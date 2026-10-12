@@ -17,6 +17,7 @@ from typing import Any
 
 from dossier_pipeline.main import load_config
 from dossier_pipeline.pipeline import DossierPipeline, load_default_spec
+from interface import submission
 
 
 def _json_safe(v: Any) -> Any:
@@ -61,14 +62,37 @@ def _build_pipeline() -> DossierPipeline:
     )
 
 
+def _submit_text(
+    pipeline: DossierPipeline,
+    body: str,
+    cfg: dict,
+    subject: str,
+    sender: str,
+):
+    """Wrap plain text in a synthetic message and run it through the pipeline."""
+    return pipeline.process_email(
+        _wrap_text_as_eml(body, subject, sender, cfg["email"])
+    )
+
+
 def process(
     *,
     text: str | None = None,
     raw_bytes: bytes | None = None,
     file_path: str | None = None,
+    filename: str | None = None,
     subject: str = "(interface submission)",
     sender: str = "interface@localhost",
 ) -> dict:
+    """Run one submission through the dossier pipeline.
+
+    Dispatch is by artifact type, not by "is it an .eml" alone. Everything that
+    used to be decoded as UTF-8 with ``errors="replace"`` now goes through
+    ``interface.submission``, which reads PDFs properly and refuses artifact
+    types it cannot honestly read. Decoding a PDF as text does not fail, it
+    succeeds wrongly, and the pipeline would then commit and sign a control
+    record about content nobody had read.
+    """
     provided = [x for x in (text, raw_bytes, file_path) if x is not None]
     if len(provided) != 1:
         raise ValueError("provide exactly one of text, raw_bytes, file_path")
@@ -76,20 +100,22 @@ def process(
     cfg = _config()
     with _build_pipeline() as pipeline:
         if raw_bytes is not None:
-            result = pipeline.process_email(raw_bytes)
+            name = filename or ""
+            if name and not submission.is_eml(raw_bytes, name):
+                body = submission.extract_text(raw_bytes, name)
+                result = _submit_text(pipeline, body, cfg, subject, sender)
+            else:
+                # No filename, or a MIME message: the bytes are the message.
+                result = pipeline.process_email(raw_bytes)
         elif file_path is not None:
             p = Path(file_path)
             if p.suffix.lower() == ".eml":
                 result = pipeline.process_file(str(p))
             else:
-                body = p.read_text(encoding="utf-8", errors="replace")
-                result = pipeline.process_email(
-                    _wrap_text_as_eml(body, subject, sender, cfg["email"])
-                )
+                body = submission.extract_text_from_file(p)
+                result = _submit_text(pipeline, body, cfg, subject, sender)
         else:
-            result = pipeline.process_email(
-                _wrap_text_as_eml(text or "", subject, sender, cfg["email"])
-            )
+            result = _submit_text(pipeline, text or "", cfg, subject, sender)
 
         return {
             "status": result.status.value,
