@@ -20,6 +20,16 @@ jobs:
         run: python scripts/check_integrity.py --selftest
       - name: Gate (all tracked source)
         run: python scripts/check_integrity.py --all
+      # The secret scan runs before any dependency install, on the checkout as
+      # committed. The version is pinned so the scanner cannot change under the
+      # repository between runs.
+      - name: Install gitleaks
+        run: |
+          GITLEAKS_VERSION=8.30.1
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+      - name: Secret scan
+        run: gitleaks dir . --config .gitleaks.toml --no-banner --redact
 
   tests:
     name: Test suites

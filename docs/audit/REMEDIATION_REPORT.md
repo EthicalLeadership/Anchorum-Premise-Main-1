@@ -2,8 +2,8 @@
 
 **Remediating audit:** `docs/audit/INDEPENDENT_BUILD_AUDIT.md` (ID **ANCH-2026-10-02-01**,
 defects F-01…F-19, HIGH = F-01…F-06).
-**Repository:** `Anchorumzero_trust-on-Prem`, tree at `298599b` with F-10 and
-F-18 applied after it.
+**Repository:** `Anchorumzero_trust-on-Prem`, tree at `298599b` with F-10, F-12,
+F-15 and F-18 applied after it.
 **Status of this document:** point-in-time verification record. It states what
 was checked and against which tree.
 
@@ -15,9 +15,10 @@ each finding: locate the code the finding names, read it, and record the result.
 Where a finding is recorded as fixed, the evidence is quoted; where it is not
 fixed, the remaining gap is named rather than smoothed over.
 
-Honesty note on scope: several findings (F-07, F-08, F-13, F-14, F-15, F-16)
-were closed by other work on this branch before this report was written. They are
-recorded as verified here, not as work done for this report.
+Honesty note on scope: several findings (F-07, F-08, F-13, F-14, F-16) were
+closed by other work on this branch before this report was written. They are
+recorded as verified here, not as work done for this report. F-15 was partly
+addressed by that work (`.aider/`) and completed here (`REPO_MAP.md`).
 
 ## 2. Disposition summary
 
@@ -34,16 +35,16 @@ recorded as verified here, not as work done for this report.
 | F-09 | MEDIUM | Required data artifact `lexicons/legal-v1.yaml` missing | **RESOLVED** (as v3.1) |
 | F-10 | MEDIUM | Two contradictory revocation mechanisms; one orphaned | **FIXED** |
 | F-11 | MEDIUM | Persistence paths CWD-relative and non-configurable | **PARTIAL** |
-| F-12 | MEDIUM | No CI; secret scanner not enforced | **PARTIAL** |
+| F-12 | MEDIUM | No CI; secret scanner not enforced | **FIXED** |
 | F-13 | MEDIUM | Trusted-time not implemented | **FIXED** |
 | F-14 | LOW | Stray 7.8 MB artifacts at repo root | **FIXED** |
-| F-15 | LOW | Dev/tool artifacts in the tree | **PARTIAL** |
+| F-15 | LOW | Dev/tool artifacts in the tree | **FIXED** |
 | F-16 | LOW | No version control | **FIXED** |
 | F-17 | LOW | Declared vs. installed SQLAlchemy divergence | **FIXED** |
 | F-18 | LOW | Weak JWT secrets padded, not strengthened | **FIXED** |
 | F-19 | MEDIUM | Repository state ambiguity; project at two paths | **PARTIAL** |
 
-**Counts:** 15 fixed, 4 partial, 0 open.
+**Counts:** 17 fixed, 2 partial, 0 open.
 
 ## 3. Fixed findings
 
@@ -235,23 +236,6 @@ So a process started from an unexpected directory still writes its custody data
 somewhere unintended unless configured. A configured absolute default (or a
 startup check that resolves and logs the data directory) would close this.
 
-### F-12 — CI and secret scanner (MEDIUM) — PARTIAL
-
-Half is done: `.github/workflows/integrity.yml` exists and runs the gate
-self-test, the gate, the Python suite, `tsc`, `vitest` and the production build;
-`.githooks` is active.
-
-The scanner half is not: `grep -rln gitleaks .githooks/ .github/` returns
-nothing, so `.gitleaks.toml` is still inert — nobody runs it. A committed
-allow-list config that no tool reads provides no protection, and the finding's
-point was precisely that a config is not enforcement.
-
-### F-15 — Dev/tool artifacts (LOW) — PARTIAL
-
-`.aider/` is gone. `REPO_MAP.md` is still present in the working tree (56 KB,
-git-ignored at `.gitignore:76`). Ignored is not removed: it still ends up in a
-naive directory copy or archive of the tree.
-
 ### F-19 — Repository state ambiguity (MEDIUM) — PARTIAL
 
 The repository itself is now unambiguous: git-initialised, one canonical branch,
@@ -274,10 +258,9 @@ can fix.
 
 ## 5. Findings closed in the second pass
 
-Both findings below were recorded as open in the first pass of this report
-because each needed a decision rather than an edit. The decision was made and the
-work is done; the evidence of the old behaviour is kept above each resolution so
-the before-state stays on the record.
+These findings were recorded as open or partial in the first pass of this report.
+Each is closed here; the evidence of the old behaviour is kept above each
+resolution so the before-state stays on the record.
 
 ### F-10 — Two revocation mechanisms, one orphaned (MEDIUM) — FIXED
 
@@ -352,6 +335,54 @@ exactly the minimum, the round-trip, and the adversarial case the old padding
 created — a token signed with the 15-character placeholder was verifiable by
 anyone who knew it, and is now refused outright.
 
+### F-12 — Secret scanner not enforced (MEDIUM) — FIXED
+
+The finding said a config is not enforcement. It was worse than that: the config
+could not even be loaded. `.gitleaks.toml` failed to parse for two independent
+reasons, both from writing regexes as if for a shell or Python literal:
+
+```
+1. double-quoted strings with doubled backslashes -> TOML ends the string at the
+   next quote -> "array elements must be separated by commas"
+2. \s in a TOML basic string is not a legal escape -> "invalid escaped character"
+```
+
+A scanner configuration that cannot be loaded is not a control, and this one had
+never run.
+
+**Resolution.** The config was rewritten using TOML *literal* strings, and two
+further defects were found by actually running it:
+
+- Path patterns were written with a leading slash (`/tests/`) but gitleaks matches
+  repository-relative paths (`tests/...`), so the test and documentation
+  exclusions matched nothing and every fake secret in a fixture was reported.
+- Allowlist regexes match the matched *secret* by default, not the source line, so
+  the placeholder rules needed `regexTarget = 'line'` to fire at all.
+
+Wire-up: `.githooks/pre-commit` now runs both the integrity gate and
+`gitleaks git --staged`, skipping the scan with an explicit notice when gitleaks
+is not installed — a missing optional tool must not block commits, but it must
+not pass silently either. CI runs `gitleaks dir` in the integrity job, before any
+dependency install, with the scanner version pinned so it cannot shift under the
+repository.
+
+**Verification that the gate actually fires.** A probe file containing a
+random-looking AWS key was added, the scan was run, and the scan failed with
+exactly that finding; the probe was then deleted and the scan returned clean. The
+first probe used `AKIAIOSFODNN7EXAMPLE`, which gitleaks' built-in defaults
+allowlist as a published example and therefore detected nothing — a reminder that
+a probe which cannot fail proves nothing.
+
+### F-15 — Dev/tool artifacts in the tree (LOW) — FIXED
+
+`.aider/` was already gone. `REPO_MAP.md` (57 KB, generated by Aider, a tool no
+longer present in this repository) was still on disk: git-ignored, so it never
+reached a clone, but still present in any naive copy or archive of the tree.
+
+**Resolution.** Deleted. The `.gitignore` entries for `REPO_MAP.md` and `.aider/`
+were deliberately kept: they are harmless, and they stop the artifacts returning
+if that tool is ever run here again.
+
 ## 6. Defects found during remediation (not audit findings)
 
 Corruption was found in the tree that the audit did not report and that no test
@@ -411,12 +442,15 @@ what makes the class of corruption detectable rather than merely repaired.
 
 ## 8. Verification at the time of this report
 
-Run against the tree with F-04, F-05, F-06, F-10 and F-18 applied:
+Run against the tree with every fix above applied:
 
 | Gate | Command | Result |
 |---|---|---|
 | Integrity self-test | `python3 scripts/check_integrity.py --selftest` | **6/6 PASS** |
-| Integrity, all source | `python3 scripts/check_integrity.py --all` | **OK** |
+| Integrity, all source | `python3 scripts/check_integrity.py --all` | **OK (226 source files)** |
+| Secret scan (tree) | `gitleaks dir . --config .gitleaks.toml` | **0 findings** |
+| Secret scan (staged) | `gitleaks git --staged --config .gitleaks.toml` | **exit 0** |
+| Secret scan (probe) | planted AWS key in a scratch file | **detected, exit 1** |
 | Lock drift / SBOM | `python3 scripts/generate_sbom.py --check` | **OK — 41 packages, 0 drift** |
 | Python suite | `python3 -m pytest -q -p no:cacheprovider` | **319 passed, 0 failed, 0 skipped** |
 | Type-check | `npx tsc --noEmit` (in `interface/`) | **exit 0** |
@@ -427,3 +461,7 @@ The suite grew from 279 passed + 1 skipped at the original audit to 319 passed
 with no skips. The delta includes the new fail-closed signing tests, the F-18
 secret-policy tests (11), the F-10 revocation guard tests (6), and
 `tests/test_interface_api.py`.
+
+The probe row is deliberate: a scanner that reports "clean" is only evidence if
+it also fails when it should, so the scan was demonstrated to fire before being
+trusted.

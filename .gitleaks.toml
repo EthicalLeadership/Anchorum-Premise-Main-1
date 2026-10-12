@@ -1,31 +1,64 @@
-title = "ANCHORUM staging allowlist"
+# Secret-scanning configuration (gitleaks).
+#
+# This file had never worked. It failed to parse for two independent reasons,
+# which is why nothing ever ran it (audit finding F-12):
+#
+#   1. Double-quoted strings with doubled backslashes. In TOML a basic string
+#      treats \\ as one backslash and the NEXT quote closes the string, so every
+#      pattern containing a [\"...\"] class ended early, which the parser
+#      reported as "array elements must be separated by commas".
+#   2. TOML basic strings allow only a fixed set of escapes, so a pattern using
+#      \s for whitespace is rejected outright as "invalid escaped character".
+#
+# Every pattern below is therefore a TOML literal string (single quotes), where
+# backslashes reach the regex engine untouched.
+#
+# Two further corrections, both found by actually running the scanner:
+#
+#   * Path patterns are matched against repository-relative paths such as
+#     "tests/test_auth.py", never against "/tests/...". The previous list wrote
+#     them with a leading slash, so the test and docs exclusions matched nothing
+#     and every fake secret in a fixture was reported as a leak.
+#   * gitleaks matches allowlist regexes against the matched *secret* by
+#     default, not the source line. The placeholder rules below describe source
+#     lines, so they need regexTarget = 'line' to fire at all.
+#
+# A scanner configuration that cannot be loaded is not a control; a scanner that
+# fires only on its own test fixtures teaches people to ignore it.
+
+title = "ANCHORUM secret-scanning allowlist"
+
 [extend]
 useDefault = true
 
-[allowlist]
-description = "docs, tests, fixtures, vendor, public OAuth client IDs"
+[[allowlists]]
+description = "Documentation, tests, fixtures, vendored code and build caches."
 paths = [
-  "(?i)\\\\.md$",
-  "(?i)\\\\.rst$",
-  "(?i)/docs?/",
-  "(?i)/website/",
-  "(?i)/references?/",
-  "(?i)/test(s)?/",
-  "(?i)\\\\.test\\\\.",
-  "(?i)\\\\.spec\\\\.",
-  "(?i)/vendor/",
-  "(?i)/third_party/",
-  "(?i)/node_modules/",
-  "(?i)/knowledge_commons/ingested/",
-  "(?i)/evidence_snapshot/",
-  "(?i)/fixtures?/",
-  "(?i)package-lock\\\\.json$",
-  "(?i)yarn\\\\.lock$",
+  '(?i)\.md$',
+  '(?i)\.rst$',
+  '(?i)(^|/)docs?/',
+  '(?i)(^|/)website/',
+  '(?i)(^|/)references?/',
+  '(?i)(^|/)tests?/',
+  '(?i)\.test\.',
+  '(?i)\.spec\.',
+  '(?i)(^|/)vendor/',
+  '(?i)(^|/)third_party/',
+  '(?i)(^|/)node_modules/',
+  '(?i)(^|/)\.venv/',
+  '(?i)(^|/)__pycache__/',
+  '(?i)(^|/)\.mypy_cache/',
+  '(?i)package-lock\.json$',
+  '(?i)yarn\.lock$',
 ]
+
+[[allowlists]]
+description = "Source lines that name a credential without containing one."
+regexTarget = 'line'
 regexes = [
-  "(?i)(_OAUTH_CLIENT_ID|OAUTH_CLIENT_ID|COPILOT_OAUTH_CLIENT_ID|CLIENT_ID)\\\\s*[:=]\\\\s*[\\"\x27][^\\"\x27]+[\\"\x27]",
-  "private_key:\\\\s*[A-Za-z_]+PrivateKey",
-  "session_key\\\\s*=\\\\s*\\\\w+",
-  "(?i)(VOICE_ID|VAPI_DEFAULT_VOICE_ID)\\\\s*[:=]\\\\s*[\\"\x27][A-Za-z0-9]{16,}[\\"\x27]",
-  "(?i)(Bearer|Basic)\\\\s+(YOUR_|MY_|xxx|example|placeholder|token_here)",
+  '(?i)(_OAUTH_CLIENT_ID|OAUTH_CLIENT_ID|COPILOT_OAUTH_CLIENT_ID|CLIENT_ID)\s*[:=]\s*\S+',
+  '(?i)private_key\s*[:=]\s*\w*PrivateKey',
+  '(?i)session_key\s*[:=]\s*\w+',
+  '(?i)(VOICE_ID|VAPI_DEFAULT_VOICE_ID)\s*[:=]\s*\S+',
+  '(?i)(Bearer|Basic)\s+(YOUR_|MY_|xxx|example|placeholder|token_here)',
 ]

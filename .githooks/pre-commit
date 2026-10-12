@@ -1,5 +1,30 @@
 #!/usr/bin/env bash
+# Pre-commit gate. Two independent checks, both of which must pass.
 set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
-exec "${PYTHON:-python3}" "$repo_root/scripts/check_integrity.py"
+
+# 1. Source integrity: zero-byte files, syntax errors, duplicated declarations
+#    and content, and imports spliced into docstrings.
+"${PYTHON:-python3}" "$repo_root/scripts/check_integrity.py"
+
+# 2. Secret scanning on the staged changes.
+#
+#    .gitleaks.toml used to be inert: nothing invoked it, and it could not even
+#    be parsed, so it provided no protection at all (audit finding F-12). This is
+#    the point where a secret would actually enter history, so this is where the
+#    scan belongs.
+#
+#    If gitleaks is not installed the hook says so and continues. A missing
+#    optional tool must not block commits, but it must not pass silently either:
+#    a check that quietly does nothing is worse than no check, because it reads
+#    as coverage.
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks not installed - secret scan SKIPPED"
+  echo "pre-commit: install gitleaks to enable it"
+  exit 0
+fi
+
+cd "$repo_root"
+# --redact keeps a detected secret out of terminal scrollback and CI logs.
+gitleaks git --staged --config .gitleaks.toml --no-banner --redact
