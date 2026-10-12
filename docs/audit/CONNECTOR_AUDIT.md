@@ -456,7 +456,19 @@ count.
 | `scripts/check_integrity.py --all` | OK |
 | `gitleaks dir .` | no leaks found |
 | `scripts/generate_sbom.py --check` | SBOM matches `requirements.lock` |
-| `pytest` | **362 passed** (336 before this pass; +26 new) |
+| `pytest`, commit `0e9c273` | **354 passed** |
+| `pytest`, working tree | **362 passed** |
+| `pytest tests/test_pdf_text.py` | 26 passed |
+
+Both figures are given because they are different claims. The working tree carries
+uncommitted work from a concurrent actor — a modified front end and an untracked
+`tests/test_interface_api.py` — and those 8 tests account for the difference. Only
+the committed figure travels with a clone; it was re-run in a detached worktree of
+`0e9c273`, untouched by the concurrent edits, where the integrity gate, secret
+scan and SBOM check also pass.
+
+Before this pass the committed tree ran 328 tests, so the change is +26, matching
+the new pins in `tests/test_pdf_text.py`.
 
 ## 12. Reproduction
 
