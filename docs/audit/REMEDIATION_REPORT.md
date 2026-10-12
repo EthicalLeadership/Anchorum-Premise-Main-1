@@ -414,6 +414,42 @@ an absolute data directory of its own. That is deliberate — changing it would
 move where existing deployments write — and the point of the fix is that the
 choice is now visible on every run, which is the remedy the finding named.
 
+### Residual 8 — read-only commands required the evidence secret — FIXED
+
+Recorded in the first pass as residual risk 8: because the entry point built the
+evidence store eagerly, `enforce`, `verify-chain` and `verify` all failed closed
+without `GDC_EVIDENCE_SECRET`, including the two that never look at an evidence
+signature.
+
+**Resolution.** The requirement was removed where it was not real, and kept
+where it is. `EvidenceStore.__init__` no longer resolves its signer; the signer
+resolves on first use, so opening the store to read it needs no key material.
+`verify()` grew an explicit `verify_signatures` flag, because two different
+things had been conflated: a hash link is arithmetic over stored bytes and needs
+no key, while a signature can only be checked with the key that made it. The
+structural path checks hash links, ordering and duplicate ids; `verify_signatures=True`
+(the default) fails closed without the key rather than downgrading silently.
+
+Signing is unaffected and still refuses without a key — `ingest`,
+`add_custody_event` and `export_bundle` all raise `EvidenceSignerUnbound`. The
+F-02 pin for `EvidenceSigner` is untouched and still passes.
+
+`cmd_verify` now calls `pipeline.evidence.verify()` explicitly, because opening
+the store no longer verifies signatures and the command claims to. Without the
+secret it prints which check could not run and exits 2 — a sentence, not a
+traceback.
+
+Verified at the CLI, with `GDC_CONTROL_SIGNING_KEY` set and
+`GDC_EVIDENCE_SECRET` unset: `enforce` exit 0, `verify-chain` exit 0, `verify`
+exit 2 with `Evidence integrity: NOT VERIFIED`. With the secret set, `verify`
+reports `Evidence integrity: PASS` and exits 0.
+
+The deferred check still catches tampering — pinned by
+`tests/test_evidence_store_access.py` (12 tests), which forges a stored
+signature and requires the structural check to pass while the keyed check fails.
+That test exists to hold the limit honest: a structural result says nothing
+about authenticity, and must never be reported as though it does.
+
 ## 6. Defects found during remediation (not audit findings)
 
 Corruption was found in the tree that the audit did not report and that no test
@@ -470,13 +506,9 @@ what makes the class of corruption detectable rather than merely repaired.
    packages but not the interpreter, so "same environment" is still only true
    down to the package layer.
 7. **`scripts*` in packaging is inert** (`F-08` residual).
-8. **Read-only CLI commands require the evidence secret.** Because the entry
-   point constructs the evidence store eagerly, `enforce`, `verify-chain` and
-   `verify` fail closed without `GDC_EVIDENCE_SECRET` — observed while verifying
-   F-11. That is the intended F-02 behaviour (refusing to open an evidence store
-   without a key), but operators should know that read-only inspection needs the
-   secret set too. If that proves too strict in practice, the fix is to build the
-   evidence store lazily for commands that never sign.
+*(Item 8 of this list — the read-only command requirement — was closed after the
+first pass and is recorded in §5 under "Residual 8" rather than left here as a
+risk that no longer exists.)*
 
 ## 8. Verification at the time of this report
 
@@ -490,16 +522,17 @@ Run against the tree with every fix above applied:
 | Secret scan (staged) | `gitleaks git --staged --config .gitleaks.toml` | **exit 0** |
 | Secret scan (probe) | planted AWS key in a scratch file | **detected, exit 1** |
 | Lock drift / SBOM | `python3 scripts/generate_sbom.py --check` | **OK — 41 packages, 0 drift** |
-| Python suite (committed tree) | `python3 -m pytest -q -p no:cacheprovider` in a worktree of `473cdc5` | **316 passed, 0 failed, 0 skipped** |
-| Python suite (working tree) | `python3 -m pytest -q -p no:cacheprovider` | **324 passed, 0 failed, 0 skipped** |
+| Python suite (committed tree) | `python3 -m pytest -q -p no:cacheprovider` in a worktree of the commit | **328 passed, 0 failed, 0 skipped** |
+| Python suite (working tree) | `python3 -m pytest -q -p no:cacheprovider` | **336 passed, 0 failed, 0 skipped** |
 | Type-check | `npx tsc --noEmit` (in `interface/`) | **exit 0** |
 | UI suite | `npx vitest run` (in `interface/`) | **14 files / 75 tests passed** |
 | Production build | `npm run build` (in `interface/`) | **exit 0** |
 
-The suite grew from 279 passed + 1 skipped at the original audit to 324 passed
+The suite grew from 279 passed + 1 skipped at the original audit to 336 passed
 with no skips. The delta includes the new fail-closed signing tests, the F-18
 secret-policy tests (11), the F-10 revocation guard tests (6),
-`tests/test_control_record_integrity.py` (5), and `tests/test_interface_api.py`.
+`tests/test_control_record_integrity.py` (5),
+`tests/test_evidence_store_access.py` (12), and `tests/test_interface_api.py`.
 
 **The five tests in `tests/test_control_record_integrity.py` were validated by
 mutation, not merely by passing.** Closing out this report showed that three of
@@ -517,8 +550,8 @@ not evidence, and this report does not count it as such.
 matters: `tests/test_interface_api.py` is not committed. It is untracked work
 belonging to a concurrent actor, so it runs in the working tree and is absent
 from the commit. Everything else in the table — the integrity gate, the secret
-scan, the SBOM check — is reproducible from `473cdc5` alone, and that is where
-the committed numbers come from. A clean clone reports 316, not 324.
+scan, the SBOM check — is reproducible from this branch alone, and that is where
+the committed numbers come from. A clean clone reports 328, not 336.
 
 The interface rows are in the same position: `tsc`, `vitest` and the production
 build were run in `interface/` on the working tree, which carries the other
@@ -527,7 +560,7 @@ and they are that actor's work to commit.
 
 This is the F-19 hazard in miniature: "the tree is green" and "the commit is
 green" are different claims, and only the second one travels. Every Python-side
-number in this table was re-run against a detached worktree of `473cdc5`, which
+number in this table was re-run against a detached worktree of the commit, which
 is untouched by the other actor's working-tree edits.
 
 The probe row is deliberate: a scanner that reports "clean" is only evidence if

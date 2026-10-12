@@ -166,11 +166,42 @@ class EvidenceStore:
 
     def __init__(self, db_path: str, signer: Optional[EvidenceSigner] = None):
         self.db_path = db_path
-        self.signer = signer or EvidenceSigner()
+        # The signer is resolved on first use, not here. Opening the store to
+        # read it needs no key material; only signing and signature
+        # verification do. Resolving eagerly made every read-only command fail
+        # closed without GDC_EVIDENCE_SECRET - including commands that never
+        # look at an evidence signature - which is a false requirement, not a
+        # control. Signing and explicit verification still fail closed (F-02).
+        self._signer = signer
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
         self._init_db()
         self.state = self._recompute_state()
+
+    @property
+    def signer(self) -> EvidenceSigner:
+        """The store's signer, resolved on first use.
+
+        Raises ``EvidenceSignerUnbound`` when no key material is configured, so
+        signing and signature verification remain fail-closed; they just no
+        longer do so merely because the store was opened.
+        """
+        if self._signer is None:
+            self._signer = EvidenceSigner()
+        return self._signer
+
+    def configured_signer(self) -> Optional[EvidenceSigner]:
+        """The signer if key material is available, else ``None``.
+
+        Used to decide whether signatures *can* be checked. Never raises, so a
+        caller can open and inspect a store without a key and still refuse to
+        claim it verified signatures.
+        """
+        if self._signer is not None:
+            return self._signer
+        if os.getenv("GDC_EVIDENCE_SECRET", "").strip():
+            return self.signer
+        return None
 
     def _init_db(self) -> None:
         self.conn.execute("PRAGMA journal_mode=WAL")
@@ -236,7 +267,13 @@ class EvidenceStore:
         return int(cur.fetchone()[0])
 
     def _recompute_state(self) -> SystemState:
-        report = self.verify()
+        # Opening the store checks what can be checked without a key: the hash
+        # links, the ordering, the duplicate ids. Signature verification needs
+        # key material, so when none is configured it is deferred to an
+        # explicit verify() call - which does require the key. The alternative
+        # would be to report "unverified" as "OK", which is the failure this
+        # module exists to prevent.
+        report = self.verify(verify_signatures=self.configured_signer() is not None)
         return report.system_state
 
     def ingest(
@@ -551,7 +588,23 @@ class EvidenceStore:
 
         return str(bundle_path)
 
-    def verify(self) -> VerificationReport:
+    def verify(self, *, verify_signatures: bool = True) -> VerificationReport:
+        """Recompute the evidence chain and report integrity.
+
+        ``verify_signatures`` is the distinction that matters: the hash chain,
+        ordering and duplicate checks are arithmetic over stored bytes and need
+        no key, while a signature can only be checked with the key that made it.
+        Passing ``verify_signatures=False`` therefore yields a *structural*
+        result that says nothing about authenticity, which is why the default
+        is ``True`` and why it fails closed instead of downgrading silently.
+        """
+        if verify_signatures and self.configured_signer() is None:
+            raise EvidenceSignerUnbound(
+                "verify() checks signatures, which requires GDC_EVIDENCE_SECRET. "
+                "Pass verify_signatures=False for a structural-only check, and "
+                "do not report that as authenticity."
+            )
+
         packets = self.get_packets()
         custody_events = self.get_custody_events()
         mismatches: List[Dict[str, Any]] = []
@@ -610,7 +663,7 @@ class EvidenceStore:
                     }
                 )
             duplicate_seen.add(packet.evidence_id)
-            if not self.signer.verify(packet.hash_self, packet.signature_system):
+            if verify_signatures and not self.signer.verify(packet.hash_self, packet.signature_system):
                 mismatches.append(
                     {
                         "sequence_no": packet.sequence_no,
@@ -624,7 +677,7 @@ class EvidenceStore:
 
         for event in custody_events:
             message = f"{event.custody_id}:{event.evidence_id}:{event.actor_id}:{event.action.value}:{event.timestamp_utc}"
-            if not self.signer.verify(message, event.signature):
+            if verify_signatures and not self.signer.verify(message, event.signature):
                 mismatches.append(
                     {
                         "custody_id": event.custody_id,

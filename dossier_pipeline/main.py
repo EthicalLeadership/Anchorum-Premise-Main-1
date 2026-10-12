@@ -24,6 +24,7 @@ from glob import glob
 from pathlib import Path
 
 from .contracts import ResultStatus
+from .evidence import EvidenceSignerUnbound
 from .pipeline import DossierPipeline
 from .proton_connector import ProtonMailConnector
 
@@ -324,13 +325,36 @@ def cmd_verify(args, config):
     replay_report = pipeline.replay.verify()
     chain_report = pipeline.control.verify_chain()
     projection_report = pipeline.projection_health_report()
+    # Evidence signatures can only be checked with the key that made them, and
+    # opening the store deliberately no longer does that for you. This call is
+    # what makes the command's claim mean something: it fails closed without
+    # GDC_EVIDENCE_SECRET rather than reporting a pass it cannot support. An
+    # operator who asked for verification and cannot have it deserves a sentence
+    # saying so, not a traceback.
+    try:
+        evidence_report = pipeline.evidence.verify()
+    except EvidenceSignerUnbound as exc:
+        print("VERIFICATION REPORT", file=sys.stderr)
+        print("Evidence integrity: NOT VERIFIED", file=sys.stderr)
+        print(f"  {exc}", file=sys.stderr)
+        sys.exit(2)
     print("VERIFICATION REPORT")
-    print(f"Chain integrity: {'PASS' if chain_report['integrity_pass'] else 'FAIL'}")
-    print(f"Replay integrity: {'PASS' if replay_report.integrity_pass else 'FAIL'}")
-    print(f"Projection OK:    {projection_report['ok']}")
-    print(f"Projection sev:   {projection_report['severity']}")
+    print(f"Chain integrity:    {'PASS' if chain_report['integrity_pass'] else 'FAIL'}")
+    print(f"Replay integrity:   {'PASS' if replay_report.integrity_pass else 'FAIL'}")
+    print(
+        f"Evidence integrity: {'PASS' if evidence_report.integrity_pass else 'FAIL'}"
+        f" ({evidence_report.total_packets} packets,"
+        f" {evidence_report.total_custody_events} custody events)"
+    )
+    print(f"Projection OK:      {projection_report['ok']}")
+    print(f"Projection sev:     {projection_report['severity']}")
 
-    if (not chain_report["integrity_pass"]) or (not replay_report.integrity_pass) or (not projection_report["ok"]):
+    if (
+        (not chain_report["integrity_pass"])
+        or (not replay_report.integrity_pass)
+        or (not evidence_report.integrity_pass)
+        or (not projection_report["ok"])
+    ):
         sys.exit(2)
 
 
