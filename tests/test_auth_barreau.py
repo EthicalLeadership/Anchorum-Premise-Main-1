@@ -5,6 +5,10 @@ from dossier_pipeline.auth import (decode_token, fingerprint_credential,
 from dossier_pipeline.barreau_gate import BarreauGate, BarreauGateError
 from dossier_pipeline.schema import Case, Document, JurisdictionStamp, User
 
+# A signing secret must now clear auth.MIN_SECRET_KEY_LENGTH, so the test uses
+# one of realistic length rather than the old 14-character placeholder.
+TEST_SECRET = "test-secret-key-0123456789abcdef-32plus"
+
 
 class AuthBarreauTests(unittest.TestCase):
     def test_fingerprint_is_stable(self):
@@ -14,16 +18,16 @@ class AuthBarreauTests(unittest.TestCase):
         )
 
     def test_jwt_issue_and_validate(self):
-        token = issue_token("testuser", "test-secret-key", roles=["admin", "barreau"], expires_minutes=5)
-        payload = validate_bearer_token(token.access_token, "test-secret-key", required_role="barreau")
+        token = issue_token("testuser", TEST_SECRET, roles=["admin", "barreau"], expires_minutes=5)
+        payload = validate_bearer_token(token.access_token, TEST_SECRET, required_role="barreau")
         self.assertEqual(payload["sub"], "testuser")
         self.assertIn("barreau", payload["roles"])
-        self.assertEqual(decode_token(token.access_token, "test-secret-key")["sub"], "testuser")
+        self.assertEqual(decode_token(token.access_token, TEST_SECRET)["sub"], "testuser")
 
     def test_jwt_role_gate_rejects_missing_role(self):
-        token = issue_token("testuser", "test-secret-key", roles=["viewer"], expires_minutes=5)
+        token = issue_token("testuser", TEST_SECRET, roles=["viewer"], expires_minutes=5)
         with self.assertRaises(PermissionError):
-            validate_bearer_token(token.access_token, "test-secret-key", required_role="barreau")
+            validate_bearer_token(token.access_token, TEST_SECRET, required_role="barreau")
 
     def test_barreau_gate_accepts_known_credential(self):
         fingerprint = fingerprint_credential("member-card-123")

@@ -2,9 +2,10 @@
 
 **Remediating audit:** `docs/audit/INDEPENDENT_BUILD_AUDIT.md` (ID **ANCH-2026-10-02-01**,
 defects F-01…F-19, HIGH = F-01…F-06).
-**Repository:** `Anchorumzero_trust-on-Prem`, tree at `298599b`.
-**Status of this document:** point-in-time verification record. It states what was
-checked, when, and against which commit.
+**Repository:** `Anchorumzero_trust-on-Prem`, tree at `298599b` with F-10 and
+F-18 applied after it.
+**Status of this document:** point-in-time verification record. It states what
+was checked and against which tree.
 
 ## 1. Method
 
@@ -31,7 +32,7 @@ recorded as verified here, not as work done for this report.
 | F-07 | MEDIUM | `dossier_pipeline/README.md` false about its dependencies | **FIXED** |
 | F-08 | MEDIUM | Packaging excludes most packages | **FIXED** (residual: `scripts*`) |
 | F-09 | MEDIUM | Required data artifact `lexicons/legal-v1.yaml` missing | **RESOLVED** (as v3.1) |
-| F-10 | MEDIUM | Two contradictory revocation mechanisms; one orphaned | **OPEN** |
+| F-10 | MEDIUM | Two contradictory revocation mechanisms; one orphaned | **FIXED** |
 | F-11 | MEDIUM | Persistence paths CWD-relative and non-configurable | **PARTIAL** |
 | F-12 | MEDIUM | No CI; secret scanner not enforced | **PARTIAL** |
 | F-13 | MEDIUM | Trusted-time not implemented | **FIXED** |
@@ -39,10 +40,10 @@ recorded as verified here, not as work done for this report.
 | F-15 | LOW | Dev/tool artifacts in the tree | **PARTIAL** |
 | F-16 | LOW | No version control | **FIXED** |
 | F-17 | LOW | Declared vs. installed SQLAlchemy divergence | **FIXED** |
-| F-18 | LOW | Weak JWT secrets padded, not strengthened | **OPEN** |
+| F-18 | LOW | Weak JWT secrets padded, not strengthened | **FIXED** |
 | F-19 | MEDIUM | Repository state ambiguity; project at two paths | **PARTIAL** |
 
-**Counts:** 13 fixed, 4 partial, 2 open.
+**Counts:** 15 fixed, 4 partial, 0 open.
 
 ## 3. Fixed findings
 
@@ -271,9 +272,14 @@ copy is `anchorum-prem-main` and the rest are archived, that failure mode stays
 live. This is an operational decision about the machine, outside what a commit
 can fix.
 
-## 5. Open findings
+## 5. Findings closed in the second pass
 
-### F-10 — Two revocation mechanisms, one orphaned (MEDIUM) — OPEN
+Both findings below were recorded as open in the first pass of this report
+because each needed a decision rather than an edit. The decision was made and the
+work is done; the evidence of the old behaviour is kept above each resolution so
+the before-state stays on the record.
+
+### F-10 — Two revocation mechanisms, one orphaned (MEDIUM) — FIXED
 
 `dossier_pipeline/registry/keys.py` still implements a file-based revocation
 list, still documents it, and is still exported and advertised:
@@ -286,16 +292,28 @@ registry/keys.py:118:    return (root or DEFAULT_KEY_DIR).parent / "revoked_keys
 ```
 
 No first-party caller invokes the file-based path (the only other matches are
-unrelated dict `.keys()` calls). So the finding stands exactly as written: two
-contradictory mechanisms coexist, one is dead but exported, and the next reader
-cannot tell which is authoritative. The fix is a decision, not a patch: either
-delete the file-based path and its exports, or mark it deprecated and name the
-anchor as the single source of truth.
+unrelated dict `.keys()` calls). Two contradictory mechanisms coexisted, one
+dead but exported, and the next reader could not tell which was authoritative.
 
-### F-18 — Weak JWT secrets padded, not strengthened (LOW) — OPEN
+**Resolution.** The file-based path was deleted: `revocation_file`, `revoke`,
+`revoked_signers` and `is_revoked` are gone from `registry/keys.py`, and the
+module docstring no longer describes a mechanism that does not exist.
 
-The finding's complaint is intact. `auth.py` defines the policy but does not
-enforce it:
+Deletion was chosen over a deprecation marker because the anchor path is the
+live, tested, enforced one — `registry/store.py:7` already declares "Revocation
+is a property of the anchor, not a separate file", `trust.revoke` sets a
+monotonic `revoked_at`, and `store.py:125`/`:199` enforce it — so a second
+importable implementation contradicted a live invariant. A dead alternative is
+what the next reader adopts by mistake, which is the same failure mode as F-04.
+
+`tests/test_revocation_single_source.py` (6 tests) guards the decision: it fails
+if the file-based API reappears, if the anchor API disappears, or if key
+generation starts writing a revocation file again. Deleting the dead code broke
+no test, which is itself the evidence that nothing depended on it.
+
+### F-18 — Weak JWT secrets padded, not strengthened (LOW) — FIXED
+
+`auth.py` defined the policy but did not enforce it:
 
 ```
 16:MIN_SECRET_KEY_LENGTH = 32
@@ -305,12 +323,34 @@ enforce it:
 32:    return sha256(secret_key.encode("utf-8")).hexdigest()
 ```
 
-A 5-character secret is still accepted, still silently stretched to a 64-character
-digest. The digest adds length but no entropy — the secret remains as
-guessable as the password typed, and hashing does not slow a dictionary attack
-the way a KDF would. There is no minimum-length check anywhere on the input
-side. Either reject short secrets at issuance, or derive with a KDF (PBKDF2 /
-scrypt / Argon2) and treat the result as a key rather than a password.
+A 5-character secret was accepted and silently stretched to a 64-character
+digest, which added length but no entropy: the secret stayed exactly as
+guessable as the password typed.
+
+**Resolution.** `_normalize_secret_key` now rejects a weak secret instead of
+transforming it, raising a new `WeakSecretKey` (a `ValueError` subclass, so
+existing callers that catch `ValueError` keep working). `None`, empty, and
+anything shorter than `MIN_SECRET_KEY_LENGTH` are refused, with a message that
+reports how long the secret was and how long it must be. The parameter types of
+`issue_token`, `decode_token` and `validate_bearer_token` were widened to
+`Optional[str]`, because "the configuration was missing" deserves a typed error
+rather than a `TypeError` raised from `len(None)`.
+
+A KDF was considered and rejected. Deriving with PBKDF2, scrypt or Argon2 treats
+the signing key as a human password, which is the assumption that made the
+original code look defensible; the key is configuration, and the correct answer
+to a configuration value with insufficient entropy is to refuse it, not to slow
+down whoever guesses it.
+
+Because secrets of at least `MIN_SECRET_KEY_LENGTH` characters were already
+returned unchanged, only the insecure path changed behaviour: tokens signed with
+a properly-sized secret still verify, so this is not a breaking change for any
+deployment that was doing the right thing.
+
+`tests/test_auth_secret_policy.py` (11 tests) covers the refusal, the boundary at
+exactly the minimum, the round-trip, and the adversarial case the old padding
+created — a token signed with the 15-character placeholder was verifiable by
+anyone who knew it, and is now refused outright.
 
 ## 6. Defects found during remediation (not audit findings)
 
@@ -354,29 +394,36 @@ what makes the class of corruption detectable rather than merely repaired.
    unconfigured.
 3. **No enforcement on the key id.** `GDC_CONTROL_SIGNING_KEY_ID` defaults to
    `local-dev` (`F-01` residual).
-4. **`F-10` and `F-18` are open** and are both corrective decisions, not
-   investigations. Neither has a patch, and neither should be closed by a
-   cosmetic change.
-5. **The Python interpreter version is not pinned.** The audit ran on 3.12.3;
+4. **The secret policy is enforced when signing, not at startup.** `F-18` now
+   refuses a weak signing secret, but only when `issue_token` or `decode_token`
+   is called. A service that reads its JWT secret from the environment still
+   starts with a bad one and fails on first use; validating it during startup
+   would fail earlier and more visibly.
+5. **Revocation is implemented, but only for signers the anchor knows.** `F-10`
+   leaves one mechanism, which is an improvement, but `store` enforces
+   revocation from the anchor it was constructed with. Rebuilding the store when
+   the anchor changes is the caller's responsibility, as `store.py` says.
+6. **The Python interpreter version is not pinned.** The audit ran on 3.12.3;
    these gates ran green on 3.14.4 with pytest 9.x. `requirements.lock` pins the
    packages but not the interpreter, so "same environment" is still only true
    down to the package layer.
-6. **`scripts*` in packaging is inert** (`F-08` residual).
+7. **`scripts*` in packaging is inert** (`F-08` residual).
 
 ## 8. Verification at the time of this report
 
-Run against tree `298599b`:
+Run against the tree with F-04, F-05, F-06, F-10 and F-18 applied:
 
 | Gate | Command | Result |
 |---|---|---|
 | Integrity self-test | `python3 scripts/check_integrity.py --selftest` | **6/6 PASS** |
-| Integrity, all source | `python3 scripts/check_integrity.py --all` | **OK (224 source files)** |
+| Integrity, all source | `python3 scripts/check_integrity.py --all` | **OK** |
 | Lock drift / SBOM | `python3 scripts/generate_sbom.py --check` | **OK — 41 packages, 0 drift** |
-| Python suite | `python3 -m pytest -q -p no:cacheprovider` | **302 passed, 0 failed, 0 skipped** |
+| Python suite | `python3 -m pytest -q -p no:cacheprovider` | **319 passed, 0 failed, 0 skipped** |
 | Type-check | `npx tsc --noEmit` (in `interface/`) | **exit 0** |
 | UI suite | `npx vitest run` (in `interface/`) | **14 files / 75 tests passed** |
 | Production build | `npm run build` (in `interface/`) | **exit 0** |
 
-The suite grew from 279 passed + 1 skipped at the original audit to 302 passed
-with no skips; the delta includes the new fail-closed signing tests and
+The suite grew from 279 passed + 1 skipped at the original audit to 319 passed
+with no skips. The delta includes the new fail-closed signing tests, the F-18
+secret-policy tests (11), the F-10 revocation guard tests (6), and
 `tests/test_interface_api.py`.

@@ -5,8 +5,18 @@ One key = one signer identity. Signer IDs are strings, e.g. "kark-2026-09".
 Private keys 0600. Public keys 0644.
 
 Rotation: generate a new key with a new signer_id.
-Revocation: append to revoked_keys.txt. Revoked keys can still verify old
-entries; new entries signed by them are rejected by the store.
+
+Revocation is deliberately not implemented here. It is a state transition on
+the trust anchor (``trust.revoke`` sets the signer's ``revoked_at``), and it is
+the store that refuses entries from a revoked signer.
+
+This module used to offer a second, contradictory mechanism as well: it
+appended signer IDs to a ``revoked_keys.txt`` beside the key directory. Nothing
+called it, nothing enforced it, and no test covered it — while ``store``
+rejected revoked signers on the basis of the anchor and not the file. A dead
+alternative to a live invariant is not harmless: it is what the next reader
+adopts by mistake. It was removed (audit finding F-10) and this comment is the
+only trace it should leave.
 """
 from __future__ import annotations
 import os, stat
@@ -114,35 +124,6 @@ def load_public_key(signer_id: str, *, root: Optional[Path] = None) -> Ed25519Pu
 def list_signers(*, root: Optional[Path] = None) -> list[str]:
     return sorted(p.stem for p in key_dir(root).glob("*.pub"))
 
-def revocation_file(root: Optional[Path] = None) -> Path:
-    return (root or DEFAULT_KEY_DIR).parent / "revoked_keys.txt"
-
-def revoke(signer_id: str, *, reason: str = "", root: Optional[Path] = None) -> None:
-    _validate_signer_id(signer_id)
-    f = revocation_file(root)
-    f.parent.mkdir(parents=True, exist_ok=True)
-    existing = set()
-    if f.exists():
-        for line in f.read_text().splitlines():
-            line = line.strip()
-            if line and not line.startswith("#"):
-                existing.add(line.split()[0])
-    if signer_id in existing:
-        return
-    with f.open("a") as fh:
-        fh.write(signer_id + (f"  # {reason}" if reason else "") + "\n")
-
-def revoked_signers(*, root: Optional[Path] = None) -> set[str]:
-    f = revocation_file(root)
-    if not f.exists():
-        return set()
-    out = set()
-    for line in f.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#"):
-            out.add(line.split()[0])
-    return out
-
-def is_revoked(signer_id: str, *, root: Optional[Path] = None) -> bool:
-    _validate_signer_id(signer_id)
-    return signer_id in revoked_signers(root=root)
+# Revocation of a signer is NOT defined here. Use trust.revoke to produce a new
+# anchor with revoked_at set, and construct the store with that anchor; store
+# refuses entries from a revoked signer. See the module docstring and F-10.
