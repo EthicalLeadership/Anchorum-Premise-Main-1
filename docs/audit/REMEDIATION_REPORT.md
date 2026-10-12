@@ -119,6 +119,12 @@ lock is best-effort by design rather than silently absent. Coverage:
 a subprocess in `tests/test_verify_scripts.py`, so a third-party verifier that
 fails closed when the key is absent is exercised.
 
+The lock is now also exercised across **processes**, which is the real threat —
+two concurrent invocations — rather than only across threads:
+`tests/test_control_record_integrity.py::AuditLockAcrossProcessesTests` forks six
+processes that append to one log, and requires the merged chain to be contiguous
+with no duplicate or missing sequence number.
+
 ### F-04 — Anchor omitted rejected records (HIGH) — FIXED
 
 `ControlPlane.get_all_records()` no longer filters. It previously dropped records
@@ -129,6 +135,11 @@ deleted without the anchor noticing. The accessor now returns every committed
 record, and the docstring explains why filtering belongs to callers, so the old
 behaviour is not re-derived. The only remaining mentions of `policy_allowed` in
 the file are the payload write (`:259`) and that docstring (`:537`).
+
+Pinned by `tests/test_control_record_integrity.py::ControlAccessorTests`, which
+writes `policy_allowed: false` into a committed payload — the exact condition the
+old filter keyed on — and requires the accessor to keep returning it. Restoring
+the filter fails that test; this was confirmed by doing it.
 
 ### F-05 — Environment not reproducible (HIGH) — FIXED
 
@@ -197,6 +208,11 @@ explicit `lexicon_hash`.
 Every timestamp carries which clock produced it, which is what the finding asked
 for — the audit's complaint was that a timestamp was recorded as if it were
 trusted when nothing said where it came from.
+
+Pinned by `tests/test_control_record_integrity.py::RecordClockProvenanceTests`,
+which requires the clock tag on every committed payload and an offset-aware
+timestamp. Deleting the `time_source` line fails that test; this was confirmed by
+doing it.
 
 ### F-14 — Stray artifacts at repo root (LOW) — FIXED
 
@@ -474,24 +490,35 @@ Run against the tree with every fix above applied:
 | Secret scan (staged) | `gitleaks git --staged --config .gitleaks.toml` | **exit 0** |
 | Secret scan (probe) | planted AWS key in a scratch file | **detected, exit 1** |
 | Lock drift / SBOM | `python3 scripts/generate_sbom.py --check` | **OK — 41 packages, 0 drift** |
-| Python suite (committed tree) | `python3 -m pytest -q -p no:cacheprovider` in a worktree of `473cdc5` | **311 passed, 0 failed, 0 skipped** |
-| Python suite (working tree) | `python3 -m pytest -q -p no:cacheprovider` | **319 passed, 0 failed, 0 skipped** |
+| Python suite (committed tree) | `python3 -m pytest -q -p no:cacheprovider` in a worktree of `473cdc5` | **316 passed, 0 failed, 0 skipped** |
+| Python suite (working tree) | `python3 -m pytest -q -p no:cacheprovider` | **324 passed, 0 failed, 0 skipped** |
 | Type-check | `npx tsc --noEmit` (in `interface/`) | **exit 0** |
 | UI suite | `npx vitest run` (in `interface/`) | **14 files / 75 tests passed** |
 | Production build | `npm run build` (in `interface/`) | **exit 0** |
 
-The suite grew from 279 passed + 1 skipped at the original audit to 319 passed
+The suite grew from 279 passed + 1 skipped at the original audit to 324 passed
 with no skips. The delta includes the new fail-closed signing tests, the F-18
-secret-policy tests (11), the F-10 revocation guard tests (6), and
-`tests/test_interface_api.py`.
+secret-policy tests (11), the F-10 revocation guard tests (6),
+`tests/test_control_record_integrity.py` (5), and `tests/test_interface_api.py`.
+
+**The five tests in `tests/test_control_record_integrity.py` were validated by
+mutation, not merely by passing.** Closing out this report showed that three of
+its own "fixed" claims were pinned by nothing that would fail if the fix were
+undone: the F-04 filter could be re-added, the F-13 clock tag deleted, and the
+F-03 lock — which had only ever been exercised by threads — removed, with every
+existing test still green. Each was therefore mutated deliberately: the
+`policy_allowed` filter restored, the `time_source` line deleted, and the pins
+re-run. Exactly the two corresponding tests failed and the other three passed,
+after which the mutations were reverted and `git diff` confirmed the module was
+byte-identical to the commit again. A test that has never been seen to fail is
+not evidence, and this report does not count it as such.
 
 **Why the Python suite is listed twice.** The counts differ, and the reason
 matters: `tests/test_interface_api.py` is not committed. It is untracked work
 belonging to a concurrent actor, so it runs in the working tree and is absent
 from the commit. Everything else in the table — the integrity gate, the secret
 scan, the SBOM check — is reproducible from `473cdc5` alone, and that is where
-the committed numbers come from. A clean clone of this commit reports 311, not
-319.
+the committed numbers come from. A clean clone reports 316, not 324.
 
 The interface rows are in the same position: `tsc`, `vitest` and the production
 build were run in `interface/` on the working tree, which carries the other
