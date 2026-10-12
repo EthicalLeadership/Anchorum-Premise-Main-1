@@ -517,7 +517,7 @@ Run against the tree with every fix above applied:
 | Gate | Command | Result |
 |---|---|---|
 | Integrity self-test | `python3 scripts/check_integrity.py --selftest` | **6/6 PASS** |
-| Integrity, all source | `python3 scripts/check_integrity.py --all` | **OK (229 source files)** |
+| Integrity, all source | `python3 scripts/check_integrity.py --all` | **OK (230 source files)** |
 | Secret scan (tree) | `gitleaks dir . --config .gitleaks.toml` | **0 findings** |
 | Secret scan (staged) | `gitleaks git --staged --config .gitleaks.toml` | **exit 0** |
 | Secret scan (probe) | planted AWS key in a scratch file | **detected, exit 1** |
