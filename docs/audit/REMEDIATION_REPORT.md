@@ -474,7 +474,8 @@ Run against the tree with every fix above applied:
 | Secret scan (staged) | `gitleaks git --staged --config .gitleaks.toml` | **exit 0** |
 | Secret scan (probe) | planted AWS key in a scratch file | **detected, exit 1** |
 | Lock drift / SBOM | `python3 scripts/generate_sbom.py --check` | **OK — 41 packages, 0 drift** |
-| Python suite | `python3 -m pytest -q -p no:cacheprovider` | **319 passed, 0 failed, 0 skipped** |
+| Python suite (committed tree) | `python3 -m pytest -q -p no:cacheprovider` in a worktree of `473cdc5` | **311 passed, 0 failed, 0 skipped** |
+| Python suite (working tree) | `python3 -m pytest -q -p no:cacheprovider` | **319 passed, 0 failed, 0 skipped** |
 | Type-check | `npx tsc --noEmit` (in `interface/`) | **exit 0** |
 | UI suite | `npx vitest run` (in `interface/`) | **14 files / 75 tests passed** |
 | Production build | `npm run build` (in `interface/`) | **exit 0** |
@@ -483,6 +484,24 @@ The suite grew from 279 passed + 1 skipped at the original audit to 319 passed
 with no skips. The delta includes the new fail-closed signing tests, the F-18
 secret-policy tests (11), the F-10 revocation guard tests (6), and
 `tests/test_interface_api.py`.
+
+**Why the Python suite is listed twice.** The counts differ, and the reason
+matters: `tests/test_interface_api.py` is not committed. It is untracked work
+belonging to a concurrent actor, so it runs in the working tree and is absent
+from the commit. Everything else in the table — the integrity gate, the secret
+scan, the SBOM check — is reproducible from `473cdc5` alone, and that is where
+the committed numbers come from. A clean clone of this commit reports 311, not
+319.
+
+The interface rows are in the same position: `tsc`, `vitest` and the production
+build were run in `interface/` on the working tree, which carries the other
+actor's uncommitted front-end changes. They are true of the tree as it stands,
+and they are that actor's work to commit.
+
+This is the F-19 hazard in miniature: "the tree is green" and "the commit is
+green" are different claims, and only the second one travels. Every Python-side
+number in this table was re-run against a detached worktree of `473cdc5`, which
+is untouched by the other actor's working-tree edits.
 
 The probe row is deliberate: a scanner that reports "clean" is only evidence if
 it also fails when it should, so the scan was demonstrated to fire before being
