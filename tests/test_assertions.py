@@ -78,5 +78,51 @@ class RuntimeInvariantTests(unittest.TestCase):
         )
 
 
+    def test_inv_008_actor_branch_fires_in_isolation(self):
+        """The actor branch, with confidence and provenance both clean.
+
+        The existing low-confidence test fires on the confidence branch and
+        would pass even if the actor comparison were still the broken
+        uppercase literal. This test isolates the actor: confidence 0.9,
+        no missing fields, only the actor is UNKNOWN. The invariant must
+        require human_review_required=True, so it must fail when the output
+        says False.
+        """
+        from dossier_pipeline.contracts import ActorType
+
+        classification = {"confidence": 0.9, "actor": ActorType.UNKNOWN.value}
+        provenance = {"missing_fields": []}
+
+        self.assertTrue(
+            invariants_module.check_inv_008(
+                classification=classification,
+                provenance=provenance,
+                output={"human_review_required": True},
+            )
+        )
+        self.assertFalse(
+            invariants_module.check_inv_008(
+                classification=classification,
+                provenance=provenance,
+                output={"human_review_required": False},
+            )
+        )
+
+    def test_inv_008_known_actor_with_clean_inputs_does_not_trigger(self):
+        """Counterpoint: same shape, known actor, nothing fires."""
+        from dossier_pipeline.contracts import ActorType
+
+        classification = {"confidence": 0.9, "actor": ActorType.LEGAL.value}
+        provenance = {"missing_fields": []}
+
+        self.assertTrue(
+            invariants_module.check_inv_008(
+                classification=classification,
+                provenance=provenance,
+                output={"human_review_required": False},
+            )
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

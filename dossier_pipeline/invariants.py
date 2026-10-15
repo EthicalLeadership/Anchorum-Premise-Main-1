@@ -11,6 +11,7 @@ import hashlib
 from typing import Any, Mapping
 
 from .assertions import Invariant, assertions
+from .contracts import LOW_CLASSIFICATION_CONFIDENCE, ActorType
 
 CRITICAL_LABELS = {
     "conflict_marker",
@@ -83,10 +84,28 @@ def check_inv_007(prev_record: Mapping[str, Any] | None, new_record: Mapping[str
 
 
 def check_inv_008(classification: Mapping[str, Any], provenance: Mapping[str, Any], output: Mapping[str, Any]) -> bool:
+    """Human review is required unless the actor is recognised and provenance complete.
+
+    Two defects lived here, and both made this check pass for the wrong reason:
+
+    * the actor was compared against the uppercase string ``"UNKNOWN"`` while
+      :class:`ActorType.UNKNOWN` is the lowercase ``"unknown"``. The branch could
+      never fire, so "an unrecognised actor must be flagged for human review" was
+      enforced by nothing at all;
+    * ``provenance["confidence"]`` was the *classification's* confidence supplied
+      under a provenance name, and its ``< 0.5`` threshold is subsumed by the
+      ``< 0.6`` tested above it, so it could not decide the outcome either.
+
+    The comparison now uses the enum's own value, so this check and
+    :class:`ActorType` cannot drift apart again. The matching provenance signal is
+    set by ``ProvenanceCurator.curate``, which requires human review for an
+    unrecognised actor too: without that, this check would abort the run for real
+    mail rather than describe it.
+    """
+    actor = str(classification.get("actor", "")).strip().lower()
     if (
-        classification["confidence"] < 0.6
-        or classification.get("actor") == "UNKNOWN"
-        or provenance["confidence"] < 0.5
+        classification["confidence"] < LOW_CLASSIFICATION_CONFIDENCE
+        or actor == ActorType.UNKNOWN.value
         or provenance.get("missing_fields")
     ):
         return output.get("human_review_required") is True

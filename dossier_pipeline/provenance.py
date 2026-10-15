@@ -7,7 +7,13 @@ import hashlib
 import re
 from typing import List, Optional
 
-from .contracts import ClassificationResult, EmailEnvelope, ProvenanceResult
+from .contracts import (
+    LOW_CLASSIFICATION_CONFIDENCE,
+    ActorType,
+    ClassificationResult,
+    EmailEnvelope,
+    ProvenanceResult,
+)
 
 
 class ProvenanceCurator:
@@ -61,7 +67,20 @@ class ProvenanceCurator:
                 ).hexdigest()[:16]
 
         complete = len(missing) == 0
-        human_review = not complete or classification.confidence < 0.5
+
+        # A recognised actor is part of what "complete" means here. `decision.py`
+        # already routes an unrecognised actor to QUARANTINE_REVIEW, with the
+        # interpretation "Actor unrecognised manual review required", so without
+        # this clause a committed record could carry that route and simultaneously
+        # state human_review_required = False, and nothing would notice. The
+        # threshold is the constant `inv_008` also reads, so the two cannot
+        # disagree and abort a run between them.
+        unrecognised_actor = classification.actor is ActorType.UNKNOWN
+        human_review = (
+            not complete
+            or classification.confidence < LOW_CLASSIFICATION_CONFIDENCE
+            or unrecognised_actor
+        )
 
         return ProvenanceResult(
             complete=complete,
