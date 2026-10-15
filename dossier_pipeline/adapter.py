@@ -56,6 +56,18 @@ class GovernanceAdapter:
             "received_first_ts": envelope.received_first_ts,
             "received_last_ts": envelope.received_last_ts,
             "received_chain_fingerprint_b64": envelope.received_chain_fingerprint_b64,
+
+            # The artifact the submitter handed over, and which envelope fields
+            # were invented rather than observed. Because these are in the
+            # payload, `payload_hash` now changes when the artifact changes,
+            # which is the property that was missing.
+            "source_sha256": envelope.source_sha256,
+            "source_bytes": envelope.source_bytes,
+            "source_filename": envelope.source_filename,
+            "source_media_type": envelope.source_media_type,
+            "transport": envelope.transport,
+            "synthesised_fields": list(envelope.synthesised_fields),
+            "classification_scope_warning": classification.classification_scope_warning,
         }
 
         payload_hash = hashlib.sha256(
@@ -76,4 +88,11 @@ class GovernanceAdapter:
             message_id=envelope.message_id,
             message_key=envelope.message_key,
             original_message_id=envelope.original_message_id,
+            source_sha256=envelope.source_sha256,
+            source_bytes=envelope.source_bytes,
+            source_filename=envelope.source_filename,
+            source_media_type=envelope.source_media_type,
+            transport=envelope.transport,
+            synthesised_fields=tuple(envelope.synthesised_fields),
+            classification_scope_warning=classification.classification_scope_warning,
         )

@@ -426,7 +426,15 @@ class DossierPipeline:
                 message_id=parsed_envelope.message_id,
                 message_key=parsed_envelope.message_key,
                 reason="duplicate message_id/raw_sha256",
-                data={"stage": "intake", "evidence_id": duplicate_packet.evidence_id},
+                # A duplicate still names the bytes it matched on: without this
+                # a caller cannot tell which artifact was rejected as a repeat.
+                raw_sha256=parsed_envelope.raw_sha256,
+                data={
+                    "stage": "intake",
+                    "evidence_id": duplicate_packet.evidence_id,
+                    "source_sha256": parsed_envelope.source_sha256,
+                    "transport": parsed_envelope.transport,
+                },
             )
 
         classification = self.classifier.classify(envelope)

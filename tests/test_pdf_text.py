@@ -182,10 +182,81 @@ class TestIsEml:
         assert submission.is_eml(_build_pdf("hi"), "brief.pdf") is False
 
 
+class TestControlGlyphs:
+    """The font-glyph substitution: control bytes must never reach the text.
+
+    The defect these pin: the brief is written with a font whose encoding this
+    extractor cannot read, so its apostrophes and en dashes arrive as C0 and C1
+    control characters. Left in place they corrupt every consumer of the
+    extracted text - a search for "court's" finds nothing, and no pattern
+    containing an apostrophe can ever match. The pins below are written so that
+    each fails if the corresponding substitution is removed.
+    """
+
+    def test_control_byte_between_letters_becomes_an_apostrophe(self):
+        text = pdf_text.extract_text(_build_pdf("Newport\x03s Director"))
+        assert "Newport's Director" in text
+
+    def test_the_apostrophe_is_substituted_not_dropped(self):
+        """Dropping the byte would silently change the word."""
+        text = pdf_text.extract_text(_build_pdf("shouldn\x03t"))
+        assert "shouldn't" in text
+        assert "shouldnt" not in text
+
+    def test_c1_byte_becomes_its_windows_1252_character(self):
+        """Byte 0x96 is the en dash in Windows-1252, not a control character."""
+        text = pdf_text.extract_text(_build_pdf("Angel v. Murray \x96 (IRAC)"))
+        assert "Angel v. Murray \u2013 (IRAC)" in text
+
+    def test_other_control_bytes_become_a_word_gap(self):
+        """The citation year is bracketed by control bytes in the real brief."""
+        text = pdf_text.extract_text(_build_pdf("322 A.2d 630 \x011974\x02 CONTRACTS"))
+        assert "322 A.2d 630 1974 CONTRACTS" in text
+
+    def test_the_word_gap_is_single_and_not_doubled(self):
+        """Two control bytes beside spaces must leave one space, not three."""
+        text = pdf_text.extract_text(_build_pdf("322 A.2d 630 \x011974\x02 CONTRACTS"))
+        assert "630 1974 CONTRACTS" in text
+        assert "  " not in text
+
+    def test_no_control_character_survives_extraction(self):
+        raw = _build_pdf("Newport\x03s", "\x96", "\x011974\x02", "\x04")
+        text = pdf_text.extract_text(raw)
+        surviving = [
+            ch for ch in text if ord(ch) < 0x20 and ch not in "\n\r\t"
+        ] + [ch for ch in text if 0x7F <= ord(ch) <= 0x9F]
+        assert surviving == []
+
+    def test_normalisation_is_directly_testable(self):
+        """The rule, without a PDF in the way: one character in, one character out."""
+        assert pdf_text.normalise_control_glyphs("court\x03s") == "court's"
+        assert pdf_text.normalise_control_glyphs("a\x04 b") == "a b"
+        assert pdf_text.normalise_control_glyphs("\x96") == "\u2013"
+        assert len(pdf_text.normalise_control_glyphs("court\x03s")) == len("court's")
+
+    def test_the_control_byte_is_present_in_the_stream_that_is_read(self):
+        """The regression, stated as a test.
+
+        The content stream is Flate-compressed, so the byte has to be looked for
+        where the extractor looks for it, not in the container: asserting on the
+        raw bytes would pass whether or not the substitution happened.
+        """
+        raw = _build_pdf("Newport\x03s")
+        match = pdf_text._STREAM_RE.search(raw)
+        assert match is not None
+        stream = pdf_text._decode_stream(match.group(1))
+        assert stream is not None
+        assert b"\x03" in stream
+        assert "\x03" not in pdf_text.extract_text(raw)
+
+
 class TestRealBrief:
     """The connector against a real PDF, when one is available."""
 
     BRIEF = Path("/tmp/casebrief/angel-v-murray.pdf")
+    _HOME_SAMPLE = Path.home() / "Angel v. Murray \u2013 (IRAC) Case Brief Summary.pdf"
+    if not BRIEF.exists() and _HOME_SAMPLE.exists():
+        BRIEF = _HOME_SAMPLE
 
     @pytest.mark.skipif(
         not BRIEF.exists(), reason="sample PDF not present on this machine"
@@ -201,3 +272,29 @@ class TestRealBrief:
     def test_real_brief_has_no_replacement_characters(self):
         text = submission.extract_text(self.BRIEF.read_bytes(), self.BRIEF.name)
         assert text.count("\ufffd") == 0
+
+    @pytest.mark.skipif(
+        not BRIEF.exists(), reason="sample PDF not present on this machine"
+    )
+    def test_real_brief_has_no_control_characters(self):
+        """This document's font encodes apostrophes and en dashes as controls."""
+        text = submission.extract_text(self.BRIEF.read_bytes(), self.BRIEF.name)
+        surviving = [ch for ch in text if ord(ch) < 0x20 and ch not in "\n\r\t"]
+        surviving += [ch for ch in text if 0x7F <= ord(ch) <= 0x9F]
+        assert surviving == []
+
+    @pytest.mark.skipif(
+        not BRIEF.exists(), reason="sample PDF not present on this machine"
+    )
+    def test_real_brief_possessives_are_searchable(self):
+        """What the substitution is for: these were unfindable as control bytes."""
+        text = submission.extract_text(self.BRIEF.read_bytes(), self.BRIEF.name)
+        for token in ("Newport's", "court's", "shouldn't", "council's"):
+            assert token in text, f"{token!r} is not in the extracted text"
+
+    @pytest.mark.skipif(
+        not BRIEF.exists(), reason="sample PDF not present on this machine"
+    )
+    def test_real_brief_en_dashes_are_recovered(self):
+        text = submission.extract_text(self.BRIEF.read_bytes(), self.BRIEF.name)
+        assert "Angel v. Murray \u2013 (IRAC)" in text

@@ -14,6 +14,10 @@ from interface.server import create_app
 class Response:
     status_code: int
     body: bytes
+    #: Lower-cased response headers. Some contracts travel in a header rather
+    #: than the body (the search route reports its matching method this way,
+    #: because its body is a bare array of hits).
+    headers: dict | None = None
 
     def json(self):
         return json.loads(self.body)
@@ -77,7 +81,11 @@ def request(
             for message in messages
             if message["type"] == "http.response.body"
         )
-        return Response(start["status"], response_body)
+        response_headers = {
+            key.decode().lower(): value.decode(errors="replace")
+            for key, value in start.get("headers", [])
+        }
+        return Response(start["status"], response_body, response_headers)
 
     return asyncio.run(send_request())
 
@@ -245,29 +253,41 @@ def test_local_evidence_upload_list_custody_and_hash_verification(tmp_path):
     evidence = uploaded.json()
     assert evidence["hash"] == hashlib.sha256(content).hexdigest()
     assert evidence["duplicate"] is False
-    assert evidence["processingStatus"] == "stored"
+    # The upload response reports what actually happened to the artifact rather
+    # than a constant. `stored` only means the bytes landed; the analysis pass
+    # then runs, so the value here is the extraction outcome, and an artifact
+    # whose extraction did not succeed reports that instead of looking fine.
+    assert evidence["processingStatus"] == "extracted"
 
     listed = request(app, "GET", f"/cases/{case['id']}/evidence")
     assert listed.status_code == 200
-    assert listed.json() == [
-        {
-            "id": evidence["id"],
-            "name": "original.txt",
-            "status": "received",
-            "badges": ["received"],
-            "quarantinedReason": None,
-            "holdReason": None,
-            "duplicateCandidate": False,
-        }
-    ]
-    assert request(app, "GET", f"/evidence/{evidence['id']}").json() == listed.json()[0]
+    items = listed.json()
+    assert len(items) == 1
+    item = items[0]
+    assert item["id"] == evidence["id"]
+    assert item["name"] == "original.txt"
+    # `received` is the entry status; it advances once the analysis pass has run,
+    # and both are reported so a reader never sees only a stale status.
+    assert item["status"] == "processed"
+    assert item["badges"] == ["received", "processed"]
+    assert item["quarantinedReason"] is None
+    assert item["holdReason"] is None
+    assert item["duplicateCandidate"] is False
+    # The item carries the same compact analysis view the analysis route serves.
+    assert item["analysis"]["status"] == "processed"
+    assert item["analysis"]["scopesTotal"] == 1
+    assert item["analysis"]["scopesMatched"] == 0
+    assert item["analysis"]["analysedAt"] is not None
+    assert request(app, "GET", f"/evidence/{evidence['id']}").json() == item
     downloaded = request(app, "GET", f"/evidence/{evidence['id']}/download")
     assert downloaded.status_code == 200
     assert downloaded.body == content
     custody = request(app, "GET", f"/evidence/{evidence['id']}/custody").json()
-    assert len(custody) == 1
-    assert custody[0]["action"] == "uploaded"
-    assert custody[0]["chain"] == "not_checked"
+    # Two entries: the bytes were accepted, and the analysis pass then ran on
+    # them. The analysis is a custody event in its own right, otherwise the
+    # record would show an artifact that was never read.
+    assert [entry["action"] for entry in custody] == ["uploaded", "analysed"]
+    assert all(entry["chain"] == "not_checked" for entry in custody)
 
     verification = request(app, "POST", f"/evidence/{evidence['id']}/verify")
     assert verification.status_code == 200
@@ -329,7 +349,10 @@ def test_local_evidence_duplicate_is_reported_without_mislabeling_pipeline(tmp_p
     assert first.status_code == second.status_code == 201
     assert first.json()["duplicate"] is False
     assert second.json()["duplicate"] is True
-    assert second.json()["processingStatus"] == "stored"
+    # A duplicate is still analysed (it is its own row), so the status reflects
+    # the extraction outcome. The `duplicate` flag above carries the dedup
+    # signal; the status field is not asked to mean two things at once.
+    assert second.json()["processingStatus"] == "extracted"
     rows = request(app, "GET", f"/cases/{case['id']}/evidence").json()
     assert all(row["duplicateCandidate"] for row in rows)
 
@@ -359,9 +382,11 @@ def test_unimplemented_product_routes_fail_explicitly(tmp_path):
     ).json()
     case_id = case["id"]
 
+    # `timeline` and `search` are implemented now and are covered by the route
+    # tests that assert their real responses; this list holds only the routes
+    # that are still unavailable, so it keeps failing if one silently returns
+    # an empty success instead.
     calls = [
-        ("GET", f"/cases/{case_id}/timeline"),
-        ("GET", f"/cases/{case_id}/search?q=term"),
         ("POST", f"/cases/{case_id}/export?type=evidence_index"),
         ("POST", f"/cases/{case_id}/exports/preview?type=evidence_index"),
         ("GET", "/admin/members"),

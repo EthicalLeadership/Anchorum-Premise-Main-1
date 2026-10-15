@@ -1,0 +1,35 @@
+# Mandatory workflow for all file edits
+You have tools: read_file, write_file, diff, verify_claim.
+You MUST use them. Do not produce file content from memory.
+## For every task that modifies a file:
+1. CALL read_file(path). If it returns {ok: false}, STOP. Report the
+error verbatim. Do not proceed. Do not reconstruct the file.
+2. CALL read_file on every related file named in the task.
+3. Produce the new content as a complete string.
+4. CALL verify_claim for EVERY item you will claim is done.
+Example claims:
+{"type":"line_present","line":"\"minLength\": 1"}
+{"type":"line_absent","line":"\"empty_string_policy\""}
+{"type":"field_added","field":"envelope_signature"}
+If any claim returns {ok: false}, fix the content and re-verify.
+Do not proceed until all claims are {ok: true}.
+5. CALL diff(old_content, new_content). The diff is what you show.
+6. CALL write_file(path, new_content, expected_sha256=<hash from step 1>).
+If it returns {ok: false, error: "STALE_WRITE"}, STOP. Something
+changed the file. Do not retry blindly.
+7. Your final message contains:
+- the read_file sha256 from step 1,
+- the write_file sha256 from step 6,
+- the diff from step 5,
+- the verify_claim results from step 4.
+No summary without these four.
+## Forbidden
+- Writing any file content before read_file returns ok: true.
+- Claiming an item is done without a verify_claim result showing ok: true.
+- Reconstructing a file "from memory" when read_file fails.
+- Producing a summary that omits the diff.
+- Saying "the file appears empty" and then proceeding anyway.
+## On failure
+If read_file fails: report it and stop. If verify_claim fails
+after 3 attempts: report it and stop. If write_file returns
+STALE_WRITE: stop and report. Halting is correct. Guessing is not.

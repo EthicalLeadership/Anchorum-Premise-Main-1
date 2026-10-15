@@ -1,5 +1,7 @@
 # GRIC v1.0 Governance ↔ Runtime Interface Contract
 
+recall "Find Core Application Logic, Entry Point, Configuration, and Dependencies for anchorum-prem"
+
 ## 0. Purpose
 
 This document defines the only permitted coupling boundary between:

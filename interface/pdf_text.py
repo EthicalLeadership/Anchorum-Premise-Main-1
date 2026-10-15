@@ -37,6 +37,52 @@ from pathlib import Path
 PDF_MAGIC = b"%PDF-"
 MAGIC_SCAN_BYTES = 1024
 
+# A control byte is a glyph from a font encoding this extractor cannot read,
+# which is the normal case for a PDF produced by a word processor. Such a byte
+# must never reach the extracted text: it is not text, the API stores and serves
+# that text, and a control character corrupts every consumer of it. The brief
+# this module was repaired against carries fourteen of them, and they fall into
+# exactly the cases handled below.
+#
+# Between two letters the glyph is an apostrophe. All eleven occurrences in that
+# brief are possessives and contractions: "Newport\x03s", "court\x03s",
+# "contract\x03s", "shouldn\x03t", "council\x03s", "city\x03s", "society\x03s".
+# Leaving the byte in place means a search for "court's" finds nothing and no
+# pattern containing an apostrophe can ever match; dropping it would silently
+# change the word ("shouldnt"). It becomes an ASCII apostrophe, which is also
+# the character a reader types when searching for it.
+APOSTROPHE = "'"
+
+#: Windows-1252 defines a printable character for these bytes, and Windows code
+#: pages are what produce them. Byte 0x96, the en dash in this document's own
+#: running title ("Angel v. Murray \x96 (IRAC) Case Brief Summary"), arrives as
+#: the C1 control U+0096 when the byte is decoded as latin-1, which is what this
+#: module does. The bytes Windows-1252 leaves undefined (0x81, 0x8D, 0x8F,
+#: 0x90, 0x9D) are absent from the table and are handled as the controls they
+#: are.
+_C1_FROM_CP1252 = {
+    0x80: "\u20ac", 0x82: "\u201a", 0x83: "\u0192", 0x84: "\u201e",
+    0x85: "\u2026", 0x86: "\u2020", 0x87: "\u2021", 0x88: "\u02c6",
+    0x89: "\u2030", 0x8A: "\u0160", 0x8B: "\u2039", 0x8C: "\u0152",
+    0x8E: "\u017d", 0x91: "\u2018", 0x92: "\u2019", 0x93: "\u201c",
+    0x94: "\u201d", 0x95: "\u2022", 0x96: "\u2013", 0x97: "\u2014",
+    0x98: "\u02dc", 0x99: "\u2122", 0x9A: "\u0161", 0x9B: "\u203a",
+    0x9C: "\u0153", 0x9E: "\u017e", 0x9F: "\u0178",
+}
+
+#: A control byte in word-medial position: the apostrophe case above. Tab,
+#: newline and carriage return are excluded because they are whitespace.
+_IN_WORD_CONTROL_RE = re.compile(
+    r"(?<=[A-Za-z])[\x00-\x08\x0b\x0c\x0e-\x1f](?=[A-Za-z])"
+)
+
+#: Every other control character, C0 and C1 and DEL. A glyph that cannot be
+#: decoded still occupied a position in the line, so it becomes a word gap
+#: rather than vanishing: the citation "322 A.2d 630 \x011974\x02 CONTRACTS"
+#: reads "322 A.2d 630 1974 CONTRACTS", and "the court applied\x04 :
+#: Restatement" reads "the court applied : Restatement".
+_CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
 # A PDF string is followed by an operator; a kerning adjustment of -120/1000 em
 # or more is a word gap in every producer seen so far.
 WORD_GAP_THRESHOLD = -120
@@ -87,6 +133,27 @@ _RUN_BREAK_OPS = frozenset({b"Td", b"TD", b"Tm", b"T*", b"ET"})
 def looks_like_pdf(data: bytes) -> bool:
     """True when the payload opens with a PDF header within the first KiB."""
     return data[:MAGIC_SCAN_BYTES].lstrip().startswith(PDF_MAGIC)
+
+
+def normalise_control_glyphs(text: str) -> str:
+    """Replace the control bytes of an undecodable font encoding with text.
+
+    Two substitutions are made, in this order:
+
+    * a byte in the Windows-1252 range becomes the character that byte denotes,
+      which is how the document's en dashes are recovered;
+    * a control byte between two letters becomes an apostrophe, and every other
+      control byte becomes a word gap.
+
+    No control character survives, so nothing downstream stores, searches or
+    serves one. The apostrophe substitution is one character for one character;
+    the word-gap substitution is collapsed, so a control byte that sat beside a
+    space removes that space rather than adding a second one.
+    """
+    text = "".join(_C1_FROM_CP1252.get(ord(ch), ch) for ch in text)
+    text = _IN_WORD_CONTROL_RE.sub(APOSTROPHE, text)
+    text = _CONTROL_RE.sub(" ", text)
+    return re.sub(r" {2,}", " ", text)
 
 
 def _decode_literal(raw: bytes) -> str:
@@ -244,6 +311,7 @@ def extract_text(data: bytes) -> str:
 
     text = " ".join(run.strip() for run in runs if run.strip())
     text = re.sub(r"[ \t]+", " ", text).strip()
+    text = normalise_control_glyphs(text)
     if len(text) < MIN_USEFUL_CHARS:
         raise NoTextFound(
             "no text layer recovered; the document may be a scan or use an "

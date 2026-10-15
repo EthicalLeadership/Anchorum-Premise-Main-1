@@ -270,6 +270,17 @@ class ControlPlane:
             "received_first_ts": adapter.received_first_ts,
             "received_last_ts": adapter.received_last_ts,
             "received_chain_fingerprint_b64": adapter.received_chain_fingerprint_b64,
+
+            # Artifact identity and provenance honesty signals. These are what
+            # let a reader of the committed record tell a value the submitter
+            # supplied from one this system invented.
+            "source_sha256": adapter.source_sha256,
+            "source_bytes": adapter.source_bytes,
+            "source_filename": adapter.source_filename,
+            "source_media_type": adapter.source_media_type,
+            "transport": adapter.transport,
+            "synthesised_fields": list(adapter.synthesised_fields),
+            "classification_scope_warning": adapter.classification_scope_warning,
         }
 
     def _build_reason_codes(self, policy: PolicyDecision, reasoning: List[str]) -> List[str]:

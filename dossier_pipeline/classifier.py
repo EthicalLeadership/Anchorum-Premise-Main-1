@@ -225,6 +225,22 @@ class EmailClassifier:
                     f"(score={actor_scores[detected_actor]})"
                 )
 
+                # A document submission has no correspondent: nobody sent it. The
+                # scoring above still assigns whichever domain vocabulary happens
+                # to appear most often, which on a court brief reads as "insurer".
+                # For a non-email transport the actor is not applicable, and the
+                # record says so in a field rather than only in this trace
+                # (`trace` is internal-only and is stripped from exports).
+                scope_warning = ""
+                if envelope.transport != "email":
+                    detected_actor = ActorType.UNKNOWN
+                    scope_warning = (
+                        "document transport: actor not applicable "
+                        "(a court filing has no correspondent)"
+                    )
+                    reasoning.append(scope_warning)
+                    rule_hits.append("scope:actor_not_applicable")
+
                 # ---- Label detection ----
                 for label, patterns in self.LABEL_PATTERNS.items():
                     for pattern in patterns:
@@ -271,7 +287,8 @@ class EmailClassifier:
                     confidence=confidence,
                     actor=detected_actor,
                     reasoning=reasoning,
-                    rule_hits=rule_hits
+                    rule_hits=rule_hits,
+                    classification_scope_warning=scope_warning,
                 )
                 gate.execute_now(
                     forward=lambda: None,

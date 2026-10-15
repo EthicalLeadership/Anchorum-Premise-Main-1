@@ -800,6 +800,10 @@ def create_app(
                 "sourceSha256": content_hash,
                 "duplicate": duplicate,
                 "processingStatus": document.extract_status,
+                # The same compact analysis view the evidence item carries, so
+                # the intake screen can say *why* an artifact was not read
+                # rather than only that it was not.
+                "analysis": _analysis_summary(document),
             }
         except OSError:
             db.rollback()

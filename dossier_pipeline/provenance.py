@@ -23,14 +23,23 @@ class ProvenanceCurator:
     ) -> ProvenanceResult:
         missing: List[str] = []
 
-        if not envelope.message_id:
+        # A field the connector invented counts as ABSENT for completeness. The
+        # document bridge synthesises message_id, subject, sender, recipient and
+        # date, so without this the record claims complete provenance built
+        # entirely from values this system made up - which is the opposite of
+        # what a completeness check is for.
+        synthesised = set(getattr(envelope, "synthesised_fields", ()) or ())
+
+        if not envelope.message_id or "message_id" in synthesised:
             missing.append("message_id")
-        if not envelope.date:
+        if not envelope.date or "date" in synthesised:
             missing.append("date")
-        if not envelope.sender:
+        if not envelope.sender or "sender" in synthesised:
             missing.append("sender")
-        if not envelope.subject:
+        if not envelope.subject or "subject" in synthesised:
             missing.append("subject")
+        if not envelope.recipient or "recipient" in synthesised:
+            missing.append("recipient")
 
         # Thread detection via Re:/Fwd:/FW: prefixes.
         # Strip ALL leading prefixes iteratively so that nested replies like

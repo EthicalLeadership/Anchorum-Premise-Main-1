@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createAdapter } from "../adapter";
-import type { IngestResult } from "../adapter";
+import type { EvidenceAnalysis, ExtractStatus, IngestResult } from "../adapter";
 import { EvidenceIntake } from "./EvidenceIntake";
 
 afterEach(cleanup);
@@ -14,6 +14,27 @@ describe("EvidenceIntake", () => {
       value: async () => new TextEncoder().encode("hello").buffer,
     });
     fireEvent.change(screen.getByTestId("file-input"), { target: { files: [file] } });
+  }
+
+  function accepted(
+    processingStatus: ExtractStatus,
+    analysis: EvidenceAnalysis | null = null,
+  ) {
+    const adapter = createAdapter({ backend: null });
+    vi.spyOn(adapter.evidence, "ingest").mockResolvedValue({
+      ok: true,
+      value: {
+        id: "E-STATUS",
+        hash: "abc123",
+        sourceSha256: "abc123",
+        duplicate: false,
+        processingStatus,
+        analysis,
+      },
+    });
+    render(<EvidenceIntake locale="en" adapter={adapter} caseId="CASE-2024-018" />);
+    uploadFile();
+    return adapter;
   }
 
   it("ingests a file and shows a result row", async () => {
@@ -43,8 +64,64 @@ describe("EvidenceIntake", () => {
       ),
     ).toEqual(["Received", "Preserved", "Scanned", "Indexed"]);
 
-    finish({ ok: true, value: { id: "E-TEST", hash: "abc123", duplicate: false } });
+    finish({
+      ok: true,
+      value: {
+        id: "E-TEST",
+        hash: "abc123",
+        sourceSha256: "abc123",
+        duplicate: false,
+      },
+    });
     expect(await screen.findByText(/E-TEST/)).toBeTruthy();
+  });
+
+  it("reports an artifact that was read as done", async () => {
+    accepted("extracted");
+    expect(await screen.findByText("Done")).toBeTruthy();
+  });
+
+  it("reports a refused artifact type as failed, not as done", async () => {
+    // The previous mapping was `processingStatus === "stored" ? "stored"
+    // : "done"`, so this case rendered as "Done" — the opposite of what
+    // happened: the connector has no reader for the file and never looked.
+    accepted("unsupported");
+    expect(await screen.findByText("Failed")).toBeTruthy();
+    expect(screen.queryByText("Done")).toBeNull();
+    expect(
+      screen.getByText(
+        "Not read: this connector has no reader for this file type.",
+      ),
+    ).toHaveAttribute("role", "alert");
+  });
+
+  it("keeps a stored artifact as stored rather than claiming it was read", async () => {
+    accepted("stored");
+    expect(
+      await screen.findByText(
+        "Stored locally; scanning and indexing are not performed.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("Done")).toBeNull();
+  });
+
+  it("treats an unrecognised status as a failure rather than a success", async () => {
+    accepted("who_knows" as ExtractStatus);
+    expect(await screen.findByText("Failed")).toBeTruthy();
+    expect(screen.queryByText("Done")).toBeNull();
+  });
+
+  it("surfaces the coverage warning the analysis reported", async () => {
+    accepted("extracted", {
+      status: "processed",
+      scopesTotal: 8,
+      scopesMatched: 1,
+      warning: "the lexicon covered 1 of 8 scopes",
+      analysedAt: "2026-05-01T10:00:00+00:00",
+    });
+    expect(
+      await screen.findByText("Coverage: the lexicon covered 1 of 8 scopes"),
+    ).toBeTruthy();
   });
 
   it("names a failed ingest stage returned by the adapter", async () => {

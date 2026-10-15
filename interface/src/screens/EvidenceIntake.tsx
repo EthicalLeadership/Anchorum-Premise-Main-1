@@ -1,9 +1,48 @@
 import { useState } from "react";
 import { translate } from "../i18n";
-import type { createAdapter } from "../adapter";
+import type { createAdapter, EvidenceAnalysis, ExtractStatus } from "../adapter";
 import type { Locale } from "../types";
 import { FileDropZone } from "../components/FileDropZone";
 import { ProgressStrip, type IntakeState } from "../components/ProgressStrip";
+
+/**
+ * The upload's outcome mapped onto the progress strip's states.
+ *
+ * This used to read `processingStatus === "stored" ? "stored" : "done"`, which
+ * rendered every other value as a success: an artifact the connector refused to
+ * read, one above the size ceiling, and one whose analysis threw all appeared as
+ * "Done". The mapping is now exhaustive over the vocabulary the API sends, and
+ * anything unrecognised lands on `failed` rather than on `done`, because an
+ * unknown status is not evidence that the artifact was read.
+ */
+const INTAKE_STATE: Record<ExtractStatus, IntakeState> = {
+  stored: "stored",
+  extracted: "done",
+  unsupported: "failed",
+  empty: "failed",
+  skipped_oversize: "failed",
+  failed: "failed",
+};
+
+/**
+ * The stage a failed read is attributed to. Extraction is the "Scanned" step of
+ * the strip; the earlier steps did succeed, and saying so keeps the strip honest
+ * about how far the artifact actually got.
+ */
+const READ_STAGE = "scanned";
+
+const NOT_READ_KEY: Partial<Record<ExtractStatus, string>> = {
+  unsupported: "evidence.intake.result.unsupported",
+  empty: "evidence.intake.result.empty",
+  skipped_oversize: "evidence.intake.result.skipped_oversize",
+  failed: "evidence.intake.result.failed",
+};
+
+function intakeStateFor(status: ExtractStatus | undefined): IntakeState {
+  // No status at all means the bytes were accepted and nothing further was
+  // reported, which is exactly what "stored" says.
+  return status ? INTAKE_STATE[status] ?? "failed" : "stored";
+}
 
 interface Row {
   key: number;
@@ -13,6 +52,9 @@ interface Row {
   state: IntakeState;
   failedStage?: "received" | "preserved" | "scanned" | "indexed";
   error?: string;
+  /** Present when the artifact was not read, so the row can say why. */
+  notReadKey?: string;
+  analysis?: EvidenceAnalysis | null;
   duplicate: boolean;
   id?: string;
   hash?: string;
@@ -53,8 +95,17 @@ export function EvidenceIntake({ locale, adapter, caseId }: Props) {
             bytes: await files[i].arrayBuffer(),
           });
           if (result.ok) {
+            const state = intakeStateFor(result.value.processingStatus);
             patch(row.key, {
-              state: result.value.processingStatus === "stored" ? "stored" : "done",
+              state,
+              // Only a read failure is attributed to a stage. A stored artifact
+              // did not fail; it simply was not read, and the state says that.
+              failedStage:
+                state === "failed" ? READ_STAGE : undefined,
+              notReadKey: result.value.processingStatus
+                ? NOT_READ_KEY[result.value.processingStatus]
+                : undefined,
+              analysis: result.value.analysis ?? null,
               id: result.value.id,
               hash: result.value.hash,
               duplicate: result.value.duplicate,
@@ -111,6 +162,16 @@ export function EvidenceIntake({ locale, adapter, caseId }: Props) {
                     state={r.state}
                     failedStage={r.state === "failed" ? r.failedStage : undefined}
                   />
+                  {r.notReadKey ? (
+                    <p role="alert">{translate(locale, r.notReadKey as never)}</p>
+                  ) : null}
+                  {r.analysis?.warning ? (
+                    <p>
+                      {translate(locale, "evidence.intake.coverage_warning", {
+                        warning: r.analysis.warning,
+                      })}
+                    </p>
+                  ) : null}
                   {r.error ? (
                     <p role="alert">
                       {translate(

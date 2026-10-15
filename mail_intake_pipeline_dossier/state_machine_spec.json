@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "states": {
+    "RECEIVED": {
+      "parse_ok": "PARSED"
+    },
+    "PARSED": {
+      "dedup_ok": "DEDUPED"
+    },
+    "DEDUPED": {
+      "classify_ok": "CLASSIFIED",
+      "duplicate_detected": "DUPLICATE"
+    },
+    "CLASSIFIED": {
+      "policy_allow": "POLICY_ALLOWED",
+      "policy_deny": "POLICY_REJECTED"
+    },
+    "POLICY_ALLOWED": {
+      "evidence_written": "EVIDENCED"
+    },
+    "EVIDENCED": {
+      "commit_success": "COMMITTED"
+    },
+    "COMMITTED": {
+      "outbound_queue": "OUTBOUND_QUEUED"
+    },
+    "OUTBOUND_QUEUED": {
+      "outbound_confirm": "OUTBOUND_CONFIRMED"
+    }
+  },
+  "terminal_states": [
+    "POLICY_REJECTED",
+    "DUPLICATE",
+    "FAILED_RUNTIME",
+    "OUTBOUND_CONFIRMED"
+  ]
+}

@@ -59,15 +59,21 @@ def extract(data: bytes, filename: str = "") -> str:
 
 
 def extract_or_empty(data: bytes, filename: str = "") -> str:
-    """The artifact's text, or "" when the artifact cannot be read.
+    """The artifact's text, or "" when no text can be produced from it.
 
     The API stores the text in a sidecar file so search has something to search.
     A refusal is not an error there: :func:`analyse` has already recorded it on
     the document row, and this call only decides whether a sidecar is written.
+    An unexpected extractor failure is treated the same way for the same reason -
+    the failure is recorded by :func:`analyse` on the same artifact, so raising
+    here would only turn a recorded outcome into a 500 after the bytes and their
+    custody row have already been committed.
     """
     try:
         return submission.extract_text(data, filename)
     except (submission.UnsupportedSubmission, PdfTextError):
+        return ""
+    except Exception:  # noqa: BLE001 - recorded by analyse, not swallowed
         return ""
 
 
@@ -202,6 +208,17 @@ def analyse(
         text = submission.extract_text(data, filename)
     except (submission.UnsupportedSubmission, PdfTextError) as refusal:
         return result(STATUS_UNSUPPORTED, STATUS_UNSUPPORTED, reason=str(refusal))
+    except Exception as exc:  # noqa: BLE001 - recorded, not swallowed
+        # Segmentation failures below are recorded rather than raised; an
+        # extractor failure must be too, or the record is never built and the
+        # caller sees an exception while the document row keeps its defaults.
+        # That is the plausible-looking state this module exists to prevent.
+        return result(
+            STATUS_FAILED,
+            STATUS_FAILED,
+            reason=f"{type(exc).__name__}: {exc}",
+            extract_error=f"{type(exc).__name__}: {exc}",
+        )
 
     if not text.strip():
         return result(STATUS_EMPTY, STATUS_EMPTY, reason="artifact produced no text")

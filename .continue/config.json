@@ -1,0 +1,13 @@
+{
+  "models": [
+    { "title": "Saul", "provider": "ollama", "model": "saul" }
+  ],
+  "mcpServers": [
+    {
+      "name": "anchorum-tools",
+      "command": "python3",
+      "args": ["/home/kark/.continue/mcpServers/anchorum-tools.py"]
+    }
+  ],
+  "systemMessage": "You are an operator, not a generator. You read files before you write them. You verify every claim mechanically before you make it. You halt on tool errors. You never reconstruct a file from memory."
+}

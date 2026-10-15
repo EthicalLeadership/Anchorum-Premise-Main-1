@@ -134,6 +134,10 @@ class PrivacyComplianceLayer:
             raise PrivacyComplianceError("allowed_fields must be a list of permitted envelope fields")
 
         allowed = {str(field).strip() for field in allowed_fields if str(field).strip()}
+        # Every field the envelope can carry, so the minimization check actually
+        # sees it. The transport-proof fields and the artifact-identity fields
+        # were absent from this set, which meant they were never subject to the
+        # check at all: the gate was silently not a gate for them.
         envelope_fields = {
             "message_id",
             "subject",
@@ -146,6 +150,16 @@ class PrivacyComplianceLayer:
             "message_key",
             "original_message_id",
             "ingest_timestamp",
+            "received_count",
+            "received_first_ts",
+            "received_last_ts",
+            "received_chain_fingerprint_b64",
+            "source_sha256",
+            "source_bytes",
+            "source_filename",
+            "source_media_type",
+            "transport",
+            "synthesised_fields",
         }
 
         allowed_without_required = allowed - {"legal_basis", "purpose", "retention_expiry", "reason", "access_reason", "processing_reason"}

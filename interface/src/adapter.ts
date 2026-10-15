@@ -34,11 +34,54 @@ export type CustodyEntry = {
   chain: string;
   failingStep?: string | null;
 };
+/**
+ * What analysis did to an artifact's bytes, as the API reports it. This is the
+ * real vocabulary, not a two-value approximation of it: `unsupported` means the
+ * connector refused the artifact type rather than reading it, and `failed`
+ * means it tried and did not succeed. Collapsing those into "done" would tell a
+ * reader the opposite of what happened.
+ */
+export type ExtractStatus =
+  | "stored"
+  | "extracted"
+  | "unsupported"
+  | "empty"
+  | "skipped_oversize"
+  | "failed";
+
+/** The item-level status the API maps `ExtractStatus` onto. */
+export type EvidenceStatus =
+  | "received"
+  | ExtractStatus
+  | "processed";
+
+/** The analysis-status vocabulary the analysis route reports. */
+export type AnalysisStatus =
+  | "pending"
+  | "processed"
+  | "unsupported"
+  | "empty"
+  | "skipped_oversize"
+  | "failed";
+
+/** The compact analysis view carried by every evidence item. */
+export type EvidenceAnalysis = {
+  status: AnalysisStatus | string;
+  scopesTotal: number;
+  scopesMatched: number;
+  warning: string | null;
+  analysedAt: string | null;
+};
+
 export type Evidence = {
   id: string;
   name: string;
+  // The server sends one of `EvidenceStatus`. The offline fixtures carry their
+  // own labels ("preserved", "integrity_hold") because they stand in for a
+  // backend that is not running, so this stays wider than the wire vocabulary.
   status: string;
   badges: readonly string[];
+  analysis?: EvidenceAnalysis | null;
   quarantinedReason: string | null;
   holdReason: string | null;
   duplicateCandidate: boolean;
@@ -55,8 +98,10 @@ export type IngestResult =
       value: {
         id: string;
         hash: string;
+        sourceSha256: string;
         duplicate: boolean;
-        processingStatus?: "stored" | "indexed";
+        processingStatus?: ExtractStatus;
+        analysis?: EvidenceAnalysis | null;
       };
     }
   | {
@@ -392,16 +437,23 @@ export function createAdapter(config: AdapterConfig) {
             const body = (await response.json()) as {
               id: string;
               hash: string;
+              sourceSha256?: string;
               duplicate?: boolean;
-              processingStatus?: "stored" | "indexed";
+              processingStatus?: ExtractStatus;
+              analysis?: EvidenceAnalysis | null;
             };
             return {
               ok: true,
               value: {
                 id: body.id,
                 hash: body.hash,
+                // The artifact hash the server bound to the record. Reported
+                // separately from `hash` so a reader can see they are the same
+                // value the pipeline stores as `source_sha256`.
+                sourceSha256: body.sourceSha256 ?? body.hash,
                 duplicate: Boolean(body.duplicate),
                 processingStatus: body.processingStatus,
+                analysis: body.analysis ?? null,
               },
             };
           } catch {
@@ -415,8 +467,10 @@ export function createAdapter(config: AdapterConfig) {
         sessionEvidence.push({
           id,
           name: input.name,
-          status: "indexed",
-          badges: ["received", "preserved"],
+          // Offline mode stores the bytes and reads nothing, so "stored" is the
+          // truthful status. "indexed" claimed a step that never ran here.
+          status: "stored",
+          badges: ["received", "stored"],
           quarantinedReason: null,
           holdReason: null,
           duplicateCandidate: duplicate,
@@ -424,7 +478,14 @@ export function createAdapter(config: AdapterConfig) {
         });
         return {
           ok: true,
-          value: { id, hash, duplicate, processingStatus: "indexed" },
+          value: {
+            id,
+            hash,
+            sourceSha256: hash,
+            duplicate,
+            processingStatus: "stored",
+            analysis: null,
+          },
         };
       },
       get(id: string) {

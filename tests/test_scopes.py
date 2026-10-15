@@ -24,14 +24,33 @@ from interface.scopes import (
 
 BRIEF = Path.home() / "Angel v. Murray \u2013 (IRAC) Case Brief Summary.pdf"
 
-#: Per-scope character counts measured in `docs/audit/CONNECTOR_AUDIT.md` §5.
+#: Per-scope character counts measured in `docs/audit/CONNECTOR_AUDIT.md` §5,
+#: re-measured after `interface/pdf_text.py` stopped emitting the brief's
+#: undecodable font glyphs (see `normalise_control_glyphs`).
+#:
+#: Two counts moved, both by exactly the control bytes that are no longer text,
+#: and nothing else changed:
+#:
+#: * `CITATION` 29 -> 27. Its 29 characters were
+#:   `322 A.2d 630 \x011974\x02 CONTRACTS`; two of them were the control bytes
+#:   bracketing the year, and the scope now reads `322 A.2d 630 1974 CONTRACTS`.
+#: * `REASONING` 1495 -> 1494. One control byte in this scope sat beside a
+#:   space, so removing it and collapsing the gap costs one character.
+#:
+#: The other six scopes, including `FACTS` at 2009 and `DISTILLED_RULES` at 599,
+#: are unchanged: their control bytes were in word-medial position and an
+#: apostrophe occupies exactly the character the glyph did. The sum falls from
+#: 4838 to 4835, against 4,842 extracted characters.
+#:
+#: These are the counts the code produces today. If they move again, this dict
+#: moves with them in the same commit as the change that moved them.
 BENCHMARK_CHARS = {
-    CITATION: 29,
+    CITATION: 27,
     FACTS: 2009,
     PROCEDURAL_POSTURE: 188,
     ISSUE: 218,
     RULE: 163,
-    REASONING: 1495,
+    REASONING: 1494,
     HOLDING: 137,
     DISTILLED_RULES: 599,
 }

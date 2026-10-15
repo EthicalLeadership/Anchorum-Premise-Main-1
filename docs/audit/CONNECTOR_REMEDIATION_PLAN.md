@@ -8,10 +8,61 @@ F-01…F-19), which is the audit of the pipeline as a whole.
 **Tree this plan was written against:** the working copy at
 `/home/kark/anchorum-prem-main(1)/anchorum-prem-main`, with C-1 applied
 (commits `0e9c273`, `3dc8c66`).
-**Status of this document:** a plan, not a verification record. Nothing in
-C-2…C-5 is fixed by this document. Every claim below about current behaviour is
-taken from `docs/audit/CONNECTOR_AUDIT.md` §5–§8 and from reading the code named
-in Appendix A.
+**Status of this document:** a plan, not a verification record. Every claim
+below about current behaviour at the time of writing is taken from
+`docs/audit/CONNECTOR_AUDIT.md` §5–§8 and from reading the code named in
+Appendix A.
+
+**Implementation status, appended after the fact.** `W1`, `W2`, `W3` and `W4`
+have since been implemented on this branch, each with the pin this plan requires.
+The `W5` lexicon work is not done, so `C-2` is half closed: the zero-coverage
+outcome is now explicit and the engine still misses a case brief's vocabulary.
+Read the workstream sections as the specification they were written to be, and
+this table as what is on the tree.
+
+| workstream | finding | state | pin |
+|------------|---------|-------|-----|
+| `W1` | `C-5` | Implemented. The record carries `source_sha256`, `source_bytes`, `source_filename`, `source_media_type`, `transport` and `synthesised_fields`; the synthetic wrapper is a function of the artifact alone, so unchanged bytes are recognised as a resubmission. | `tests/test_control_record_integrity.py::ArtifactIdentityInCommittedRecordTests`, `::DocumentResubmissionIdentityTests` |
+| `W2` | `C-3` | Implemented. A non-email transport records `actor = unknown` with `classification_scope_warning` on the committed record, and a synthesised envelope field no longer counts towards provenance completeness. | `tests/test_control_record_integrity.py::ArtifactIdentityInCommittedRecordTests::test_record_does_not_invent_an_actor_for_a_document` |
+| `W3` | `C-4` | Implemented. `interface/analysis.py` reads, segments and projects a stored artifact; `GET /evidence/{id}/analysis` and `POST /evidence/{id}/analyse` serve it; the item's status advances and carries an analysis block; custody entries state whether a chain was checked. | `tests/test_analysis.py`, `tests/test_evidence_analysis_api.py` |
+| `W4` | `C-2` (a) | Implemented. Coverage is computed, and a majority-fallback or zero-match document carries an explicit warning instead of reading as "no legal concepts here". | `tests/test_analysis.py::test_uncovered_language_is_surfaced_as_a_warning` |
+| `W5` | `C-2` (b) | **Open.** The lexicon still covers 1 of the brief's 8 scopes. | |
+| `W6` | `C-6` | Verify only; not re-checked in this pass. | |
+
+Verification measured on this tree: the acceptance run in §3 is green, both as a
+standalone run (16 of 16 checks) and in the suite, where
+`tests/test_acceptance_brief.py` pins the same properties; `pytest` is 422
+passed; `tsc --noEmit` exits 0; `vitest run` is 81 passed; `npm run build`
+succeeds; `scripts/check_integrity.py --all`, `gitleaks dir .` and
+`scripts/generate_sbom.py --check` all pass.
+
+**Test inventory.** The workstream sections below name the test files they expect.
+Several properties were pinned together in one file rather than one file each, so
+this is where the planned names map to the pins that exist. The plan's own names
+are kept here rather than edited out of the sections: a reader who searches for
+one needs to land on the test, not on a gap.
+
+| planned test file | where the pin lives now |
+|-------------------|-------------------------|
+| `tests/test_document_custody_identity.py` | `tests/test_control_record_integrity.py::DocumentResubmissionIdentityTests` (determinism, resubmission, artifact binding) |
+| `tests/test_document_transport_provenance.py` | `tests/test_control_record_integrity.py::ArtifactIdentityInCommittedRecordTests` (transport, synthesised fields, actor, provenance, and the email-path regression guard) |
+| `tests/test_document_api_hash_agreement.py` | as named; the cross-track tie, plus the assertion that the wrapper is not the artifact |
+| `tests/test_analysis_scopes.py` | `tests/test_scopes.py` (segmentation, guarded by the real brief) |
+| `tests/test_analysis_coverage.py` | `tests/test_analysis.py` (coverage counts, the warning, thresholds, refusals) |
+| `tests/test_evidence_analysis_route.py` | `tests/test_evidence_analysis_api.py` (analysis route, re-analysis, item status, custody detail, search, timeline) |
+| `tests/test_legal_doctrine_lexicon.py` | **Does not exist**, because `W5` is open |
+
+The frontend mapping in §7.4 has its own pin,
+`interface/src/screens/EvidenceIntake.test.tsx`, which asserts that a refused or
+failed read renders as a failure rather than as `done`.
+
+**One finding left open deliberately, with the reason.** `check_inv_008` in
+`dossier_pipeline/invariants.py` compares `actor` against the uppercase string
+`"UNKNOWN"`, while `ActorType.UNKNOWN` is the lowercase `"unknown"`, so that
+branch of the check cannot fire. Making it fire would newly require human review
+for real mail whose actor is unrecognised but which otherwise scores high on
+labels, which changes email-path behaviour beyond this plan's scope. It is
+recorded here rather than silently repaired; §13 is where it belongs.
 
 ## 1. How to use this document
 
@@ -33,6 +84,9 @@ to get wrong. Sections 5–10 are the workstreams. Sections 11–15 are sequenci
 hazards, decisions, exclusions and gates. Appendix A is the exact-target list.
 
 ## 2. State at the time of writing
+
+This section is the historical starting point. The current state of the same
+findings is the implementation-status table at the top of this document.
 
 From `docs/audit/CONNECTOR_AUDIT.md` §3 and §13:
 

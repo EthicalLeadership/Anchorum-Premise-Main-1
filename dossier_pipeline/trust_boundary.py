@@ -76,6 +76,18 @@ DEFAULT_CONTRACT = TrustBoundaryContract(
         "received_first_ts",
         "received_last_ts",
         "received_chain_fingerprint_b64",
+        # The record's account of what was received, and which envelope fields
+        # were invented rather than observed. `synthesised_fields` in particular
+        # is the honesty signal: it must travel with the record, not be stripped
+        # from it. Document text and its digest do NOT belong here - if they are
+        # ever put in a payload they must be named in `internal_only_fields`.
+        "source_sha256",
+        "source_bytes",
+        "source_filename",
+        "source_media_type",
+        "transport",
+        "synthesised_fields",
+        "classification_scope_warning",
     ),
     regulated_fields=(
         "original_message_id",
