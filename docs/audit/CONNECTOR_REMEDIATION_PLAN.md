@@ -15,8 +15,10 @@ Appendix A.
 
 **Implementation status, appended after the fact.** `W1`, `W2`, `W3` and `W4`
 have since been implemented on this branch, each with the pin this plan requires.
-The `W5` lexicon work is not done, so `C-2` is half closed: the zero-coverage
-outcome is now explicit and the engine still misses a case brief's vocabulary.
+`W5` is implemented (see the table below), so `C-2` is now fully closed: the
+zero-coverage outcome is explicit and the engine has a doctrinal vocabulary for
+a case brief. The risk register is unchanged; the C2 warning at 1 of 8 scopes is
+the risk register's coverage and is not affected by `W5`.
 Read the workstream sections as the specification they were written to be, and
 this table as what is on the tree.
 
@@ -50,7 +52,7 @@ one needs to land on the test, not on a gap.
 | `tests/test_analysis_scopes.py` | `tests/test_scopes.py` (segmentation, guarded by the real brief) |
 | `tests/test_analysis_coverage.py` | `tests/test_analysis.py` (coverage counts, the warning, thresholds, refusals) |
 | `tests/test_evidence_analysis_route.py` | `tests/test_evidence_analysis_api.py` (analysis route, re-analysis, item status, custody detail, search, timeline) |
-| `tests/test_legal_doctrine_lexicon.py` | **Does not exist**, because `W5` is open |
+| `tests/test_legal_doctrine_lexicon.py` | `tests/test_doctrine_lexicon.py` (shipped under this name; the suite is green) |
 
 The frontend mapping in §7.4 has its own pin,
 `interface/src/screens/EvidenceIntake.test.tsx`, which asserts that a refused or
@@ -93,7 +95,7 @@ From `docs/audit/CONNECTOR_AUDIT.md` §3 and §13:
 | id | severity | connector | state | closed by |
 |----|----------|-----------|-------|-----------|
 | C-1 | Critical | PDF / binary document ingestion | **Fixed** (`0e9c273`) | |
-| C-2 | High | Legal lexicon projection (the "scopes") | Open | `W4` + `W5` |
+| C-2 | High | Legal lexicon projection (the "scopes") | **Fixed** | `W4` + `W5` |
 | C-3 | High | Document classification in the dossier pipeline | Open | `W2` |
 | C-4 | High | Product API → document analysis | Open | `W3` |
 | C-5 | Medium | Custody identity of a submitted artifact | Open | `W1` |
