@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Declarative state machine loader, validator, and strict runtime.
+Dossier DOSSIER-PIPELINE Declarative state machine loader, validator, and strict runtime.
 
 This module treats the JSON spec as the source of truth and provides a runtime
 enforcement layer that rejects illegal state mutation at transition boundaries.

@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Integrated Pipeline Orchestrator
+Dossier DOSSIER-PIPELINE Integrated Pipeline Orchestrator
 
 Wires the canonical stores together with transaction recovery, hardened
 projections, and stage-specific failure handling.
@@ -119,6 +119,17 @@ class DualRejectedPolicyState(str):
 
     def __eq__(self, other):
         return other in {"REJECTED_POLICY", "POLICY_REJECTED"} or str.__eq__(self, other)
+
+
+#: Envelope fields a caller may set from the artifact it actually read.
+SOURCE_FIELDS = (
+    "source_sha256",
+    "source_bytes",
+    "source_filename",
+    "source_media_type",
+    "transport",
+    "synthesised_fields",
+)
 
 
 class DossierPipeline:
@@ -245,7 +256,20 @@ class DossierPipeline:
         pdf.output(str(pdf_path))
         return pdf_path
 
-    def process_email(self, raw_bytes: bytes) -> PipelineResult:
+    def process_email(
+        self,
+        raw_bytes: bytes,
+        source: Optional[Dict] = None,
+    ) -> PipelineResult:
+        """Process one submission.
+
+        `source` carries the identity of the artifact the caller actually read:
+        its SHA-256, size, name and media type, plus the transport it arrived by
+        and which envelope fields were synthesised rather than observed. It is
+        passed explicitly because the caller is the only party that saw the
+        artifact; a value smuggled through a header would be forgeable by
+        whoever set the header.
+        """
         self.state_machine = StrictStateMachine(self.state_machine_spec)
         self.current_state = self.state_machine.current_state()
         self.state_history.append(self.current_state)
@@ -269,7 +293,7 @@ class DossierPipeline:
             )
             self._apply_transition("parse_ok", {"raw_sha256": raw_sha256})
             try:
-                return self._process_email_inner(raw_bytes)
+                return self._process_email_inner(raw_bytes, source)
             except ParseError as exc:
                 return self._fail_with_stage("parse", raw_bytes, exc, ResultStatus.FAILED_RUNTIME)
             except IntakeError as exc:
@@ -293,11 +317,19 @@ class DossierPipeline:
         finally:
             self.execution_lock.release()
 
-    def _process_email_inner(self, raw_bytes: bytes) -> PipelineResult:
+    def _process_email_inner(
+        self,
+        raw_bytes: bytes,
+        source: Optional[Dict] = None,
+    ) -> PipelineResult:
         try:
             parsed_envelope = self.intake.parse_email_bytes(raw_bytes)
         except Exception as exc:
             raise ParseError(str(exc)) from exc
+
+        # Applied before the minimization gate below, so the gate sees the final
+        # field set rather than the parser's defaults.
+        self._apply_source(parsed_envelope, source)
 
         try:
             privacy_decision = self.privacy.validate(
@@ -323,6 +355,7 @@ class DossierPipeline:
                         "received_first_ts",
                         "received_last_ts",
                         "received_chain_fingerprint_b64",
+                        *SOURCE_FIELDS,
                     ],
                 },
             )
@@ -508,6 +541,11 @@ class DossierPipeline:
             raw_payload={
                 "message_id": envelope.message_id,
                 "raw_sha256": envelope.raw_sha256,
+                # The artifact the submitter handed over. `raw_sha256` is the
+                # transport envelope, which for the document bridge is a wrapper
+                # this system made up; without this the signed record has no idea
+                # what was actually submitted.
+                "source_sha256": envelope.source_sha256,
                 "subject": envelope.subject,
                 "sender": envelope.sender,
             },
@@ -684,6 +722,13 @@ class DossierPipeline:
             "record_hash": record.record_hash,
             "previous_hash": record.previous_hash,
             "raw_sha256": envelope.raw_sha256,
+            "source_sha256": envelope.source_sha256,
+            "source_bytes": envelope.source_bytes,
+            "source_filename": envelope.source_filename,
+            "source_media_type": envelope.source_media_type,
+            "transport": envelope.transport,
+            "synthesised_fields": list(envelope.synthesised_fields),
+            "classification_scope_warning": classification.classification_scope_warning,
             "ingest_time": envelope.ingest_timestamp,
         }
 
@@ -747,7 +792,7 @@ class DossierPipeline:
         records = self.control.get_all_records()
         quarantined = [r for r in records if (r.get("route") == "quarantine_review" or r.get("payload", {}).get("policy_quarantine"))]
         lines = [
-            f"# Dossier {self.dossier_id} — Evidence Governance Summary",
+            f"# Dossier {self.dossier_id} Evidence Governance Summary",
             "",
             f"**Generated:** {datetime.datetime.now().isoformat()}",
             f"**Total Records:** {len(records)}",
@@ -907,10 +952,29 @@ class DossierPipeline:
             data={"error_type": type(exc).__name__, "stage": stage, "retryable": retryable},
         )
 
+    @staticmethod
+    def _apply_source(envelope: EmailEnvelope, source: Optional[Dict]) -> None:
+        """Apply a caller-supplied artifact identity to a parsed envelope.
+
+        Only the known source fields are accepted: this is not a way to inject
+        arbitrary keys into the envelope from outside the pipeline.
+        """
+        if not source:
+            return
+        for name in SOURCE_FIELDS:
+            if name not in source:
+                continue
+            value = source[name]
+            if name == "synthesised_fields":
+                value = tuple(value)
+            setattr(envelope, name, value)
+
     def _safe_parse_envelope(self, raw_bytes: bytes):
         try:
             return self.intake.parse_email_bytes(raw_bytes)
         except Exception:
+            # No source is asserted here: the artifact could not be read, so the
+            # honest value is an empty one rather than a hash of unknown meaning.
             return EmailEnvelope(
                 message_id="",
                 subject="",

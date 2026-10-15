@@ -29,9 +29,29 @@ interface. GRIC's logic is absorbed as a library that Prem Main calls.
    - `/cases/{id}/timeline` : extracted chronology
    - `/cases/{id}/search` : full-text and filtered search
    - `/cases/{id}/export` : case memo, evidence index, audit package
+   - `/session` : authenticated UI session bootstrap
+   - `/admin/members` and `/admin/members/{id}/role` : member administration
+
+The current React adapter also calls `POST /cases/{id}/exports/preview`. Keep
+that as a distinct preview operation; it does not replace the documented
+`POST /cases/{id}/export` generation route.
 
 4. GRIC's inspector, if still wanted, moves to `/internal/gric/*` and
    is treated as a developer-only surface, not part of the product UI.
+
+## Local/test API status
+
+`interface/server.py` is the Prem Main app entry point. Its local/test slice
+implements `/health`, `/session`, SQLite-backed case operations, and evidence
+upload/list/download with files under `output/evidence` and SQLite metadata.
+Evidence verification compares stored bytes with their recorded SHA-256 hash.
+Local audit events are not immutable and the custody chain is marked unchecked;
+this is not a production evidence system. `ANCHORUM_LOCAL_API_MODE=1` enables a
+single configured development identity only; it performs no authentication,
+tenant isolation, or case authorization and must not be exposed to a network.
+Timeline, search, member administration, export preview, and export generation
+routes return `501 FEATURE_UNAVAILABLE` until their application services and
+required storage/security guarantees exist.
 
 ## What is not decided here
 

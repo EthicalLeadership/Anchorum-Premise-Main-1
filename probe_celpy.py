@@ -1,4 +1,4 @@
-"""probe_celpy.py — verify the installed celpy supports the API we depend on.
+"""probe_celpy.py verify the installed celpy supports the API we depend on.
 
 Exit 0 = all checks passed. Any FAIL prints a specific message and exits
 non-zero. Run once per environment before deploying a PolicyRuntime change.
@@ -65,7 +65,7 @@ except Exception as exc:
               f"but note the divergence)")
 
 
-# Check 5: map expression return type. Informational — PolicyRuntime must
+# Check 5: map expression return type. Informational PolicyRuntime must
 # know whether decisions come back as dict or celtypes.MapType.
 try:
     p = env.program(env.compile('{"route": "TEST", "severity": "info"}'))

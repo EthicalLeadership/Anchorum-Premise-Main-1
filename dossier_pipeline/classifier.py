@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Deterministic Email Classifier
+Dossier DOSSIER-PIPELINE Deterministic Email Classifier
 Court-explainable actor and label detection using regex keyword lists.
 Quebec French + English terminology tuned for workplace/insurance/medical.
 """
@@ -16,7 +16,7 @@ from .contracts import (ActorType, ClassificationLabel, ClassificationResult,
 _classifier_registry = LockRegistry(scope="classifier")
 class EmailClassifier:
     """
-    Deterministic classifier — no ML, no opaque models.
+    Deterministic classifier no ML, no opaque models.
     Every decision is traceable to explicit rule hits.
     """
 
@@ -204,7 +204,7 @@ class EmailClassifier:
                 if actor_scores[detected_actor] == 0:
                     detected_actor = ActorType.UNKNOWN
                 else:
-                    # MD-01: Deterministic tie-breaking — if multiple actors share the top
+                    # MD-01: Deterministic tie-breaking if multiple actors share the top
                     # score, emit UNKNOWN rather than picking whichever dict iteration returns
                     # first (non-deterministic across Python versions/runs).
                     top_score = actor_scores[detected_actor]
@@ -213,7 +213,7 @@ class EmailClassifier:
                         detected_actor = ActorType.UNKNOWN
                         reasoning.append(
                             f"Actor tie ({[a.value for a in tied]}, score={top_score}) "
-                            f"\u2014 defaulting to UNKNOWN for determinism"
+                            f"defaulting to UNKNOWN for determinism"
                         )
                         rule_hits.append(f"tie-break:UNKNOWN:{[a.value for a in tied]}")
                         if ClassificationLabel.CONFLICT_MARKER not in labels:

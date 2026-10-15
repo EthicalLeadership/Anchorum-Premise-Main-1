@@ -12,7 +12,7 @@ dist/
 .venv/
 .venv_*/
 
-# Case data — must never enter this repo
+# Case data must never enter this repo
 config/actors.json
 config/case_*.json
 cases/

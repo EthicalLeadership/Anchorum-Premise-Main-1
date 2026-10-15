@@ -44,7 +44,7 @@ def render(report: PipelineReport) -> str:
 
     a("")
     a(_SEP)
-    a("  DOSSIER-PIPELINE — SELF-HEALING CI PIPELINE REPORT")
+    a("  DOSSIER-PIPELINE SELF-HEALING CI PIPELINE REPORT")
     a(_SEP)
 
     # Stage summary table
@@ -106,7 +106,7 @@ def render(report: PipelineReport) -> str:
         a("  FINAL VERDICT: ✅ DEPLOYABLE (HEALED)" if report.heal_cycles > 0
           else "  FINAL VERDICT: ✅ DEPLOYABLE")
     else:
-        a("  FINAL VERDICT: ❌ NON-DEPLOYABLE — human intervention required")
+        a("  FINAL VERDICT: ❌ NON-DEPLOYABLE human intervention required")
     a(_SEP)
     a("")
 
@@ -135,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
 
     memory_path = Path(args.memory_log) if args.memory_log else None
 
-    print(f"\n[CI] Executing pipeline — root: {args.project_root}")
+    print(f"\n[CI] Executing pipeline root: {args.project_root}")
     print("[CI] Entering pipeline execution...\n")
 
     report = run_pipeline(

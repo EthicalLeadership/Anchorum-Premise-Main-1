@@ -22,19 +22,19 @@ const routes: ShellBootstrap["routes"] = {
   administration: "#/admin",
   globalSection: (section) => {
     const paths = {
-      workspace: "/workspace",
-      cases: "/cases",
-      evidence: "/evidence",
-      missions: "/missions",
-      "legal-lens": "/legal-lens",
+      workspace: "#/workspace",
+      cases: "#/cases",
+      evidence: "#/evidence",
+      missions: "#/missions",
+      "legal-lens": "#/legal-lens",
       admin: "#/admin",
     };
     return paths[section];
   },
   caseSection: (caseId, section) =>
-    `/cases/${encodeURIComponent(caseId)}/${section}`,
+    `#/cases/${encodeURIComponent(caseId)}/${section}`,
   evidenceHolds: (caseId) =>
-    `/cases/${encodeURIComponent(caseId)}/evidence?filter=hold`,
+    `#/cases/${encodeURIComponent(caseId)}/evidence?filter=hold`,
 };
 
 export function App() {
@@ -43,7 +43,14 @@ export function App() {
       ? "fr"
       : "en";
 
-  const adapter = useMemo(() => createAdapter({ backend: null }), []);
+  const backendBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+  const adapter = useMemo(
+    () =>
+      createAdapter({
+        backend: backendBaseUrl ? { baseUrl: backendBaseUrl } : null,
+      }),
+    [backendBaseUrl],
+  );
   const [session, setSession] = useState<SessionUser | null>(null);
   const [sessionError, setSessionError] = useState(false);
   useEffect(() => {
@@ -101,6 +108,19 @@ export function App() {
     (caseLoad?.caseId !== activeCaseId || caseLoad.kind === "loading")
   ) {
     return <StateBlock locale={locale} kind="loading" />;
+  }
+  if (activeCaseId && caseLoad?.kind === "ready" && !caseLoad.value) {
+    return (
+      <StateBlock
+        locale={locale}
+        kind="error"
+        message={translate(locale, "error.not_found")}
+        action={{
+          label: translate(locale, "case.list.browse"),
+          href: "#/cases",
+        }}
+      />
+    );
   }
   const activeCase =
     activeCaseId && caseLoad?.caseId === activeCaseId && caseLoad.kind === "ready"

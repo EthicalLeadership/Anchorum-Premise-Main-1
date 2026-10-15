@@ -49,7 +49,7 @@ def collect(excluded_pids: Iterable[int], *, proc_root: pathlib.Path = PROC) -> 
     """Count background user-space processes.
 
     excluded_pids should include every PID that the harness considers
-    'ours' — the workload root PIDs and their descendants. The runner's
+    'ours' the workload root PIDs and their descendants. The runner's
     own ancestors are excluded automatically.
     """
     excluded = set(excluded_pids)

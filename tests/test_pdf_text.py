@@ -1,7 +1,7 @@
 """Pins for the PDF text connector and the submission dispatcher.
 
 The defect these exist to prevent: a PDF was read with
-``raw.decode("utf-8", errors="replace")``. That does not fail — it succeeds
+``raw.decode("utf-8", errors="replace")``. That does not fail it succeeds
 wrongly, filling the pipeline's input with U+FFFD where the document's words
 should be, so the control record attests to content nobody read. A test that
 only checked "processing returned a result" would have passed throughout.

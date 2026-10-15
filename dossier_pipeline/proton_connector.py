@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — ProtonMail Bridge IMAP Connector
+Dossier DOSSIER-PIPELINE ProtonMail Bridge IMAP Connector
 Read-only ingestion. Never marks emails as read or deletes.
 """
 

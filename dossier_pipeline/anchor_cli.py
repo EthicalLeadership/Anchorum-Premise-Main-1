@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Anchoring CLI
+Dossier DOSSIER-PIPELINE Anchoring CLI
 
 Commands:
   - anchor-now

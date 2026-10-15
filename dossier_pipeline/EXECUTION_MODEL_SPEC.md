@@ -100,19 +100,19 @@ Until a stronger partitioning system exists:
 
 ## Failure Atomicity Boundaries
 
-### Boundary 1 — receipt to claim
+### Boundary 1 receipt to claim
 Failure before claim means the message may be retried safely.
 
-### Boundary 2 — claim to classification
+### Boundary 2 claim to classification
 Failure after claim but before commit must not corrupt the seen registry.
 
-### Boundary 3 — classification to policy
+### Boundary 3 classification to policy
 Failure after classification but before policy evaluation must be replayable without changing output.
 
-### Boundary 4 — policy to commit
+### Boundary 4 policy to commit
 Rejected messages must terminate here. Allowed messages proceed to commit.
 
-### Boundary 5 — commit to anchor
+### Boundary 5 commit to anchor
 Commit must be durable before any final seen-state finalization. Anchoring may be performed later and must be derived from committed state.
 
 ## Idempotency Rules

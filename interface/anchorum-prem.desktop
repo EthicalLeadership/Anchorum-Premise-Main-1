@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Anchorum Prem Frontend
+Comment=Legal and Audit Toolkit - Dossier Processing & Contract Review
+Exec=/home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/run_frontend.sh
+Icon=/home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/public/icon.png
+Terminal=true
+Type=Application
+Categories=Development;Utility;
+StartupNotify=true
+MimeType=text/html;text/plain;
+Keywords=legal;audit;dossier;contract;anchorum;

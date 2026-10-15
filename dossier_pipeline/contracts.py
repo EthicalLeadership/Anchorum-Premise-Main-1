@@ -1,11 +1,11 @@
 """
-Dossier DOSSIER-PIPELINE — Shared Contracts
+Dossier DOSSIER-PIPELINE Shared Contracts
 Cross-cutting enums and dataclasses used across all pipeline layers.
 """
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 DECISION_TRACE_ALLOWED_MODES = {"ORCHESTRATED", "LEGACY_FALLBACK"}
 DECISION_TRACE_REQUIRED_KEYS = ("arbitration_mode", "trust_boundary_version", "divergence_reason")
@@ -73,6 +73,22 @@ class EmailEnvelope:
     original_message_id: str = ""
     ingest_timestamp: str = ""
 
+    # Identity of the submitted artifact, kept distinct from `raw_sha256`.
+    #
+    # `raw_sha256` is the hash of the bytes actually ingested, which is the
+    # transport envelope. For a real .eml that IS the artifact. For the document
+    # bridge the ingested bytes are a wrapper this system synthesised, so these
+    # fields carry what the submitter actually handed over. For an .eml the two
+    # hashes are equal and `transport == "email"`.
+    source_sha256: str = ""
+    source_bytes: int = 0
+    source_filename: str = ""
+    source_media_type: str = ""
+    transport: str = "email"
+    #: Envelope fields that were invented rather than observed. Named explicitly
+    #: so a reader of the signed record can tell them from observed values.
+    synthesised_fields: Tuple[str, ...] = ()
+
 
 @dataclass
 class ClassificationResult:
@@ -81,6 +97,10 @@ class ClassificationResult:
     actor: ActorType
     reasoning: List[str]
     rule_hits: List[str]
+    #: Set when the actor classification is scoped rather than observed. A
+    #: free-text `reasoning` line is not enough: `trace` is internal-only and is
+    #: stripped from exports, so the reason has to be a field to travel.
+    classification_scope_warning: str = ""
 
 
 @dataclass
@@ -110,6 +130,18 @@ class AdapterResult:
     message_id: str = ""
     message_key: str = ""
     original_message_id: str = ""
+
+    # Artifact identity, carried off the envelope so it reaches the committed
+    # record. Declared here, populated in `adapter.adapt`, committed in
+    # `control._build_execution_context`: all three, or it is absent from the
+    # signed record while still appearing in the pipeline's return value.
+    source_sha256: str = ""
+    source_bytes: int = 0
+    source_filename: str = ""
+    source_media_type: str = ""
+    transport: str = "email"
+    synthesised_fields: Tuple[str, ...] = ()
+    classification_scope_warning: str = ""
 
 
 @dataclass

@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Projection helpers
+Dossier DOSSIER-PIPELINE Projection helpers
 
 This module provides deterministic rebuild views for the auxiliary stores.
 The control plane remains the canonical history; these helpers derive

@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — OpenTimestamps Integration
+Dossier DOSSIER-PIPELINE OpenTimestamps Integration
 
 Best-effort Bitcoin-backed timestamp proof generation. This module is
 intentionally optional and degrades cleanly when the OpenTimestamps CLI or
@@ -69,7 +69,7 @@ def create_timestamp_request(
 
     Returns the path to the created file. If the OTS CLI is available,
     the file is a real .ots proof. If not, a JSON placeholder is written
-    with status PENDING_CONFIRMATION — verify_timestamp() on that file
+    with status PENDING_CONFIRMATION verify_timestamp() on that file
     returns TimestampStatus.PENDING, never VERIFIED.
     """
     source = Path(anchor_input_path)

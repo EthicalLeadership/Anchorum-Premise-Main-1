@@ -110,7 +110,7 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
       render: (entry) =>
         "at" in entry
           ? formatDateTime(locale, entry.at, audit.timeZone)
-          : "—",
+          : "",
     },
     {
       id: "actor",
@@ -134,7 +134,7 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
             )
           : "memberId" in entry
             ? entry.memberId
-            : "—",
+            : "",
     },
     {
       id: "chain",
@@ -143,7 +143,7 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
         <span className={`audit-chain audit-chain--${entry.chain}`}>
           {t(`chain.${entry.chain}`)}
           {"failingStep" in entry && entry.failingStep
-            ? ` — ${t(`reason.${entry.failingStep}`)}`
+            ? ` ${t(`reason.${entry.failingStep}`)}`
             : ""}
         </span>
       ),
@@ -219,7 +219,7 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
               <p id="export-blocked-help">
                 {t("export.blocked", {
                   gate: t(`export.gate.${failedGate?.id ?? "barreau"}`),
-                  item: failedGate?.failingItem ?? "—",
+                  item: failedGate?.failingItem ?? "",
                 })}
               </p>
             ) : null}

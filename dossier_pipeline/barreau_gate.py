@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Barreau Gate
+Dossier DOSSIER-PIPELINE Barreau Gate
 
 Credential gate that blocks API access unless the caller can present a valid
 Barreau membership credential. This is intentionally separate from JWT auth so

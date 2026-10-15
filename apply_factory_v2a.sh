@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# apply_factory_v2a.sh — factory infrastructure v2.
+# apply_factory_v2a.sh factory infrastructure v2.
 # Strict schema validation, lifecycle state machine, signed-optional
 # provenance, transactional gateway swap.
 # Idempotent; overwrites factory/{schema,provenance,lifecycle,writer}.py.
@@ -741,7 +741,7 @@ def _parse_manifest(data: Any, p: Path) -> Manifest:
     if m.signature is not None:
         if not verify_signature(m):
             raise ManifestError(
-                f"{p}: signature verification failed — the manifest has "
+                f"{p}: signature verification failed the manifest has "
                 f"been modified, or the signature block is corrupt"
             )
     return m
@@ -766,13 +766,13 @@ cat > "$REPO/factory/writer.py" <<'FILE_EOF'
 
 A write proceeds as:
 
-    1.  Ownership check     — does the destination exist? is it ours?
-    2.  Human-edit check    — any tracked file changed since last generation?
-    3.  Untracked-file check — any file present that we didn't create?
-    4.  Lifecycle check     — is the destination at or below DRAFT?
-    5.  Stage               — write everything to <name>.staging.<id>/
-    6.  Self-validate       — call load_gateway() against the staging dir
-    7.  Swap                — rename old aside, rename staging in, delete old
+    1.  Ownership check     does the destination exist? is it ours?
+    2.  Human-edit check    any tracked file changed since last generation?
+    3.  Untracked-file check any file present that we didn't create?
+    4.  Lifecycle check     is the destination at or below DRAFT?
+    5.  Stage               write everything to <name>.staging.<id>/
+    6.  Self-validate       call load_gateway() against the staging dir
+    7.  Swap                rename old aside, rename staging in, delete old
     8.  fsync
 
 If any step fails, the destination is unchanged.

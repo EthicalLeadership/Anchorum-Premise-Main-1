@@ -26,7 +26,7 @@ module refuses it (``NoTextFound``) rather than returning "". Refusing is the
 point: an empty extraction must never be mistaken for a document with no
 content. Callers that need OCR or exotic encodings (custom ``ToUnicode``
 CMaps over embedded subset fonts, encrypted PDFs) should install ``pypdf`` and
-use it — see ``extract_text`` for the preferred-order contract.
+use it see ``extract_text`` for the preferred-order contract.
 """
 from __future__ import annotations
 

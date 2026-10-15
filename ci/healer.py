@@ -1,5 +1,5 @@
 """
-Healing Engine — Constrained Autofix System
+Healing Engine Constrained Autofix System
 =============================================
 Each FailureCategory maps to a finite, ordered list of RepairActions.
 No free-form code generation. Every action is drawn from the closed repair set.
@@ -143,7 +143,7 @@ REPAIR_STRATEGIES: dict[FailureCategory, list[RepairAction]] = {
                                               RepairAction.INSTALL_MISSING_PACKAGE],
     FailureCategory.UNSAFE_CONFIG:           [RepairAction.NORMALIZE_ENV_VARS,
                                               RepairAction.RESTORE_DEFAULT_CONFIG],
-    # Structural — no strategy
+    # Structural no strategy
     FailureCategory.COMPILATION_ERROR:       [],
     FailureCategory.UNDEFINED_REFERENCE:     [],
     FailureCategory.TYPE_MISMATCH:           [],
@@ -211,7 +211,7 @@ class RepairExecutor:
         allowed_prefixes = ("pytest", "setuptools", "pip", "wheel",
                             "cryptography", "email", "imaplib")
         if not any(module.startswith(p) for p in allowed_prefixes):
-            return False, f"package '{module}' not in allowlist — escalate to human"
+            return False, f"package '{module}' not in allowlist escalate to human"
         rc, out = _run([sys.executable, "-m", "pip", "install", "--quiet", module],
                        cwd=str(self.root))
         return rc == 0, out[:300]
@@ -240,7 +240,7 @@ class RepairExecutor:
         if not example.exists():
             return False, "config_live.example.json not found"
         if target.exists():
-            return True, "config_live.json already exists — no restore needed"
+            return True, "config_live.json already exists no restore needed"
         import shutil
         shutil.copy(example, target)
         return True, f"restored config_live.json from {example.name}"
@@ -273,7 +273,7 @@ class RepairExecutor:
         # Strip any env vars that look like leaked secrets from .env if present
         dotenv = self.root / ".env"
         if not dotenv.exists():
-            return True, ".env not present — nothing to normalize"
+            return True, ".env not present nothing to normalize"
         lines = dotenv.read_text().splitlines()
         safe = [l for l in lines if not any(
             kw in l.upper() for kw in ("PASSWORD", "SECRET", "TOKEN", "API_KEY")
@@ -299,7 +299,7 @@ class RepairExecutor:
     def _rebuild_env(self) -> tuple[bool, str]:
         req = self.root / "requirements.txt"
         if not req.exists():
-            return True, "no requirements.txt — nothing to rebuild"
+            return True, "no requirements.txt nothing to rebuild"
         rc, out = _run(
             [sys.executable, "-m", "pip", "install", "--quiet",
              "--force-reinstall", "-r", str(req)],

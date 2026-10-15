@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Privacy Compliance Layer
+Dossier DOSSIER-PIPELINE Privacy Compliance Layer
 
 Fail-closed intake gate for declared legal basis, purpose specification,
 data minimization, retention scheduling, and access logging.

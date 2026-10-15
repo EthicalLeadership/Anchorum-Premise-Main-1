@@ -9,7 +9,7 @@ import { fixture } from "./fixtures/dupont-v-acme";
 
 // The adapter is explicitly configured with either a backend URL or null.
 const fixtureConfig: AdapterConfig = { backend: null };
-const liveConfig: AdapterConfig = { backend: { baseUrl: "http://localhost:8000" } };
+const liveConfig: AdapterConfig = { backend: { baseUrl: "http://127.0.0.1:1" } };
 
 describe("fixture adapter", () => {
   let adapter: ReturnType<typeof createAdapter>;
@@ -29,6 +29,35 @@ describe("fixture adapter", () => {
     expect(result.value.key).toBe("CASE-2024-018");
     expect(result.value.title).toBe("DUPONT v. ACME");
     expect(result.value.holdCount).toBe(1);
+    expect(result.value.jurisdiction).toBe("QC");
+    expect(result.value.integrityStatus).toBe("hold");
+  });
+
+  it("returns newly created case details accurately in fixture mode", async () => {
+    const created = await adapter.cases.create({
+      key: "CASE-ONTARIO-NEW",
+      title: "Ontario fixture case",
+      jurisdiction: "ON",
+      matterType: "civil",
+      timezone: "America/Toronto",
+      description: "",
+      memberIds: [],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const byId = await adapter.cases.get(created.value.id);
+    const byKey = await adapter.cases.get(created.value.key);
+    for (const result of [byId, byKey]) {
+      expect(result.ok).toBe(true);
+      if (!result.ok) continue;
+      expect(result.value.id).toBe(created.value.id);
+      expect(result.value.key).toBe("CASE-ONTARIO-NEW");
+      expect(result.value.jurisdiction).toBe("ON");
+      expect(result.value.timezone).toBe("America/Toronto");
+      expect(result.value.holdCount).toBe(0);
+      expect(result.value.integrityStatus).toBe("clear");
+    }
   });
 
   it("returns all six evidence items for the seeded case", async () => {

@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Integrated CLI Entry Point
+Dossier DOSSIER-PIPELINE Integrated CLI Entry Point
 
 Usage:
     python -m dossier_pipeline.main ingest-proton --limit 100
@@ -172,7 +172,7 @@ def cmd_audit_actors(args, config):
     ordered = sorted(summary.values(), key=lambda x: x["display"].lower())
 
     print("\n" + "=" * 78)
-    print(f"ACTOR RESPONSE AUDIT — {config['dossier_id']}")
+    print(f"ACTOR RESPONSE AUDIT {config['dossier_id']}")
     print("=" * 78)
     for item in ordered:
         status = "RESPONDED" if item["responded"] else "NO RESPONSE"
@@ -291,7 +291,7 @@ def load_config(config_path: str = None):
 def _resolve_output_dir(config: dict) -> Path:
     """Resolve the data directory to an absolute path and record the decision.
 
-    The default was the string ``"./output"`` — relative to whatever directory
+    The default was the string ``"./output"`` relative to whatever directory
     the process happened to start in. Two invocations of the same command from
     two different directories therefore wrote custody data to two different
     places, and nothing in the output said which. Resolving here does not move
@@ -570,7 +570,7 @@ Client Company Beverage Company
 
     msg2 = EmailMessage(policy=default)
     msg2["Message-ID"] = "<union-update-20260501@union501.ca>"
-    msg2["Subject"] = "Re: Your grievance file — next steps"
+    msg2["Subject"] = "Re: Your grievance file next steps"
     msg2["From"] = "Union 501 <delegate@union501.ca>"
     msg2["To"] = config["email"]
     msg2["Date"] = "Thu, 1 May 2026 14:30:00 -0400"
@@ -589,7 +589,7 @@ Union 501
 
     msg3 = EmailMessage(policy=default)
     msg3["Message-ID"] = "<medical-note-20260428@clinique.axion>"
-    msg3["Subject"] = "Medical certificate — follow-up"
+    msg3["Subject"] = "Medical certificate follow-up"
     msg3["From"] = "Dr. A. Médicale <dr.medicale@clinique.axion>"
     msg3["To"] = config["email"]
     msg3["Date"] = "Mon, 28 Apr 2026 10:00:00 -0400"
@@ -609,7 +609,7 @@ Clinique Axion
     labels = ["EMPLOYER PRESSURE", "UNION", "MEDICAL"]
 
     print("=" * 60)
-    print("DEMO RUN — Processing 3 simulated emails")
+    print("DEMO RUN Processing 3 simulated emails")
     print("=" * 60)
 
     for raw, label in zip(emails, labels):

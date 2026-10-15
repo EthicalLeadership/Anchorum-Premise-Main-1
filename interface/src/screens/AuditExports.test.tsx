@@ -17,13 +17,13 @@ describe("AuditExports", () => {
     );
 
     expect(await screen.findByRole("table", { name: "Audit log" })).toBeTruthy();
-    expect(screen.getByText("broken — Hash mismatch at readback")).toBeTruthy();
+    expect(screen.getByText("broken Hash mismatch at readback")).toBeTruthy();
     expect(container.querySelector(".audit-chain--broken")).toHaveTextContent(
-      "broken — Hash mismatch at readback",
+      "broken Hash mismatch at readback",
     );
     expect(container.querySelector(".audit-chain--linked")).toHaveTextContent("linked");
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Export blocked: Barreau check — E-1047",
+      "Export blocked: Barreau check E-1047",
     );
     expect(screen.getByRole("button", { name: "Export" })).toBeDisabled();
   });

@@ -86,8 +86,8 @@ class ControlAccessorTests(unittest.TestCase):
     def test_record_with_policy_not_allowed_is_still_returned(self) -> None:
         """Reconstruct the exact condition the removed filter keyed on.
 
-        ``policy_allowed is False`` is normally unreachable in this table —
-        a policy rejection writes no control record at all — so the old filter
+        ``policy_allowed is False`` is normally unreachable in this table
+        a policy rejection writes no control record at all so the old filter
         was dead code that only invited the behaviour to be re-derived. This
         test makes the condition live: it writes the flag into a committed
         payload and requires the accessor to keep returning the record.

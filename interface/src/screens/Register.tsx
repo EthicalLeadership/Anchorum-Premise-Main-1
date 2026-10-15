@@ -28,9 +28,28 @@ export function Register({ locale, adapter, caseId }: Props) {
 
   const t = (k: string) => translate(locale, k as never);
   const retry = { label: t("state.retry"), onClick: () => setAttempt((n) => n + 1) };
+  const caseNavigation = (
+    <nav aria-label={t("nav.evidence_actions")}>
+      <a href={`#/cases/${encodeURIComponent(caseId)}/overview`}>
+        {t("nav.overview")}
+      </a>
+      {" · "}
+      <a href="#/cases">{t("case.list.browse")}</a>
+    </nav>
+  );
 
-  if (load.kind === "loading") return <StateBlock locale={locale} kind="loading" />;
-  if (load.kind === "error") return <StateBlock locale={locale} kind="error" message={t(load.key)} action={retry} />;
+  if (load.kind === "loading") return (
+    <section className="register">
+      {caseNavigation}
+      <StateBlock locale={locale} kind="loading" />
+    </section>
+  );
+  if (load.kind === "error") return (
+    <section className="register">
+      {caseNavigation}
+      <StateBlock locale={locale} kind="error" message={t(load.key)} action={retry} />
+    </section>
+  );
 
   const rows = load.rows.filter((e) =>
     filter === "all" ? true : filter === "hold" ? e.status === "integrity_hold" : e.status === filter,
@@ -61,6 +80,7 @@ export function Register({ locale, adapter, caseId }: Props) {
   return (
     <section className="register">
       <h1>{t("evidence.register.title")}</h1>
+      {caseNavigation}
       <a href={`#/cases/${encodeURIComponent(caseId)}/intake`}>{t("evidence.intake.title")}</a>
       {" "}
       <a href={`#/cases/${encodeURIComponent(caseId)}/search`}>{t("search.title")}</a>

@@ -117,7 +117,7 @@ def test_cli_invocation_exception_is_failed(tmp_path, monkeypatch):
 def test_only_verified_is_truthy_verified(anchor_file, tmp_path, monkeypatch):
     """A caller that writes `if status is TimestampStatus.VERIFIED` gets
     the right answer. A caller doing `if status:` gets the wrong answer
-    for PENDING/UNAVAILABLE — that's why the docstring insists on identity
+    for PENDING/UNAVAILABLE that's why the docstring insists on identity
     comparison. This test pins the actual truthiness behaviour so a future
     reader can see it explicitly."""
     _no_ots(monkeypatch)

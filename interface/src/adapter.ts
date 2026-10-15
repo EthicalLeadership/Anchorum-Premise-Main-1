@@ -50,10 +50,18 @@ export interface IngestInput {
   bytes: ArrayBuffer;
 }
 export type IngestResult =
-  | { ok: true; value: { id: string; hash: string; duplicate: boolean } }
+  | {
+      ok: true;
+      value: {
+        id: string;
+        hash: string;
+        duplicate: boolean;
+        processingStatus?: "stored" | "indexed";
+      };
+    }
   | {
       ok: false;
-      error: "BACKEND_UNREACHABLE" | "NOT_FOUND";
+      error: string;
       failedStage?: "received" | "preserved" | "scanned" | "indexed";
     };
 const sessionEvidence: Array<Evidence & { hash: string }> = [];
@@ -179,6 +187,7 @@ export function createAdapter(config: AdapterConfig) {
       timezone: fixture.case.timezone,
     },
   ];
+  const sessionCaseDetails = new Map<string, CaseSummary>();
   const sessionMembers: AdminMember[] = fixture.members.map((member) => ({
     ...member,
     email: member.email,
@@ -288,19 +297,8 @@ export function createAdapter(config: AdapterConfig) {
         if (id === fixture.case.id || id === fixture.case.key) {
           return Promise.resolve(success<CaseSummary>(fixture.case));
         }
-        const created = sessionCases.find((c) => c.id === id || c.key === id);
-        return created
-          ? Promise.resolve(
-              success<CaseSummary>({
-                ...fixture.case,
-                id: created.id,
-                key: created.key,
-                title: created.title,
-                holdCount: 0,
-                integrityStatus: "clear" as const,
-              }),
-            )
-          : Promise.resolve(failure("NOT_FOUND"));
+        const created = sessionCaseDetails.get(id);
+        return Promise.resolve(created ? success(created) : failure("NOT_FOUND"));
       },
       async create(input: CreateCaseInput): Promise<CreateCaseResult> {
         if (config.backend) {
@@ -339,6 +337,19 @@ export function createAdapter(config: AdapterConfig) {
           lastActivity: new Date().toISOString(),
           timezone: input.timezone,
         });
+        const summary: CaseSummary = {
+          ...fixture.case,
+          id,
+          key: input.key,
+          title: input.title,
+          jurisdiction: input.jurisdiction,
+          timezone: input.timezone,
+          status: "open",
+          holdCount: 0,
+          integrityStatus: "clear",
+        };
+        sessionCaseDetails.set(id, summary);
+        sessionCaseDetails.set(input.key, summary);
         return { ok: true, value: { id, key: input.key } };
       },
     },
@@ -369,18 +380,29 @@ export function createAdapter(config: AdapterConfig) {
             );
             if (!response.ok) {
               const err = (await response.json().catch(() => ({}))) as {
+                error?: unknown;
                 failedStage?: "received" | "preserved" | "scanned" | "indexed";
               };
-              return { ok: false, error: "BACKEND_UNREACHABLE", failedStage: err.failedStage };
+              return {
+                ok: false,
+                error: namedError(err.error, `HTTP_${response.status}`),
+                failedStage: err.failedStage,
+              };
             }
             const body = (await response.json()) as {
               id: string;
               hash: string;
               duplicate?: boolean;
+              processingStatus?: "stored" | "indexed";
             };
             return {
               ok: true,
-              value: { id: body.id, hash: body.hash, duplicate: Boolean(body.duplicate) },
+              value: {
+                id: body.id,
+                hash: body.hash,
+                duplicate: Boolean(body.duplicate),
+                processingStatus: body.processingStatus,
+              },
             };
           } catch {
             return { ok: false, error: "BACKEND_UNREACHABLE" };
@@ -400,7 +422,10 @@ export function createAdapter(config: AdapterConfig) {
           duplicateCandidate: duplicate,
           hash,
         });
-        return { ok: true, value: { id, hash, duplicate } };
+        return {
+          ok: true,
+          value: { id, hash, duplicate, processingStatus: "indexed" },
+        };
       },
       get(id: string) {
         if (config.backend) {
@@ -410,6 +435,11 @@ export function createAdapter(config: AdapterConfig) {
           (item) => item.id === id,
         );
         return Promise.resolve(evidence ? success(evidence) : failure("NOT_FOUND"));
+      },
+      originalUrl(id: string): string | null {
+        return config.backend
+          ? `${config.backend.baseUrl.replace(/\/$/, "")}/evidence/${encodeURIComponent(id)}/download`
+          : null;
       },
       custody(id: string) {
         if (config.backend) {

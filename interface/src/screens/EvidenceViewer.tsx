@@ -51,10 +51,19 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
 
   const t = (k: string) => translate(locale, k as never);
   const back = (
-    <a href={`#/cases/${encodeURIComponent(caseId)}/register`}>{t("evidence.viewer.back")}</a>
+    <nav aria-label={t("nav.evidence_actions")}>
+      <a href={`#/cases/${encodeURIComponent(caseId)}/register`}>{t("evidence.viewer.back")}</a>
+      {" · "}
+      <a href="#/cases">{t("case.list.browse")}</a>
+    </nav>
   );
 
-  if (load.kind === "loading") return <StateBlock locale={locale} kind="loading" />;
+  if (load.kind === "loading") return (
+    <section className="evidence-viewer">
+      {back}
+      <StateBlock locale={locale} kind="loading" />
+    </section>
+  );
   if (load.kind === "error")
     return (
       <section className="evidence-viewer">
@@ -69,6 +78,7 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
     );
 
   const { evidence, custody, verification, timeZone } = load;
+  const originalUrl = adapter.evidence.originalUrl(evidenceId);
   const columns: Column<CustodyEntry>[] = [
     { id: "action", header: t("custody.column.action"), render: (r) => t(`custody.${r.action}`) },
     { id: "actor", header: t("custody.column.actor"), render: (r) => t(`custody.actor.${r.actor}`) },
@@ -87,6 +97,11 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
       {back}
       <h1>{t("evidence.viewer.title")}: {evidence.id}</h1>
       <p>{evidence.name}</p>
+      {originalUrl ? (
+        <p>
+          <a href={originalUrl}>{t("evidence.viewer.download_original")}</a>
+        </p>
+      ) : null}
       <p>
         {t(`evidence.status.${evidence.status}`)}
         {evidence.badges.length > 0 ? ` · ${evidence.badges.map((b) => t(`badge.${b}`)).join(", ")}` : ""}

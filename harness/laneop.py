@@ -71,7 +71,7 @@ def descendants(root_pids: Iterable[int],
     """Return root_pids plus every descendant of every root pid.
 
     Deterministic: reads /proc once to build the parent map, then walks it.
-    If a PID disappears during the scan, it is silently skipped — the
+    If a PID disappears during the scan, it is silently skipped the
     caller gets the set of live descendants at scan time.
     """
     roots = set(root_pids)

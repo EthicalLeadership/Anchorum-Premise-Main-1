@@ -5,10 +5,10 @@ Runtime assertion layer that is **immune to ``python -O``** and
 defaults to **failure-closed** (hard failure).
 
 Provides:
-- ``assert_that`` — general predicate assertions
-- ``invariant`` — structural/data invariants
-- ``precondition`` / ``postcondition`` — function entry/exit guards
-- ``AssertionRegistry`` — global tracking and audit logging
+- ``assert_that`` general predicate assertions
+- ``invariant`` structural/data invariants
+- ``precondition`` / ``postcondition`` function entry/exit guards
+- ``AssertionRegistry`` global tracking and audit logging
 
 All assertion failures raise descendants of ``AssertionError``
 (from ``exceptions``) and capture runtime context for forensic

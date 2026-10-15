@@ -30,7 +30,7 @@ this code merely calls. Both are called out below where they apply.
 | 1   | `classifier.py` (`_anthropic`)         | api.anthropic.com (SDK)                                                                            | active only if the anthropic backend is selected           | backend selection; `CLF_MODEL` (default `claude-3-5-haiku-latest`) | outbound request / inbound completion | the classified sentence and `classifier_prompt.txt`      |
 | 2   | `classifier.py` (`_openai`)            | api.openai.com (SDK)                                                                               | active only if the openai backend is selected              | backend selection; `CLF_MODEL` (default `gpt-4o-mini`)             | outbound / inbound                    | as above                                                 |
 | 3   | `classifier.py` (`_ollama`)            | `http://localhost:11434/api/generate`                                                              | **local**                                                  | `OLLAMA_URL`                                                       | outbound / inbound                    | as above; stays on-host unless `OLLAMA_URL` is repointed |
-| 4   | `classifier.py` (`_command`)           | _arbitrary_ — whatever the configured command contacts                                             | active only if the command backend is selected             | `_command(cmd)` executes a subprocess                              | **unbounded**                         | **unbounded**                                            |
+| 4   | `classifier.py` (`_command`)           | _arbitrary_ whatever the configured command contacts                                             | active only if the command backend is selected             | `_command(cmd)` executes a subprocess                              | **unbounded**                         | **unbounded**                                            |
 | 5   | `classify.py`                          | `http://127.0.0.1:8002/v1/chat/completions`                                                        | **local** (OpenAI-compatible local endpoint)               | `CLASSIFIER_URL` (also `CLASSIFIER_MODEL`, `CLASSIFIER_KEY`)       | outbound / inbound                    | one sentence                                             |
 | 6   | `dossier_pipeline/anchor_dnssec.py:41` | `https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records`                                 | **external, when invoked**                                 | Cloudflare credentials from the environment                        | outbound request / API response       | the anchor TXT record (a hash), zone id, API token       |
 | 7   | `dossier_pipeline/anchor_dnssec.py:77` | publishes a name under `chain.creovate.digital`                                                    | fixed default domain, overridable by the `domain` argument | caller argument                                                    | n/a (names the published record)      | the anchor record name                                   |
@@ -55,8 +55,8 @@ contact a remote LLM provider.
   (`SYSTEM_ARCHITECTURE.md` §10, "AI" gate).
 
 **Transitive dependency note.** `opentelemetry-api` is present in
-`requirements.lock`. Only the API package is present — there is no
-`opentelemetry-sdk` and no exporter in the closure — so it cannot transmit
+`requirements.lock`. Only the API package is present there is no
+`opentelemetry-sdk` and no exporter in the closure so it cannot transmit
 anything on its own. Adding an SDK or an exporter would introduce egress that
 this inventory does not cover, and that addition must be treated as a change to
 the egress surface.

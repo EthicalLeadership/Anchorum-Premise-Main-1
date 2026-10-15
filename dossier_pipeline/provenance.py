@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Provenance Curator
+Dossier DOSSIER-PIPELINE Provenance Curator
 Trace completeness analysis and thread detection.
 """
 

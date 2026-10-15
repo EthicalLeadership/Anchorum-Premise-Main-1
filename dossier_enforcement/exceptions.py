@@ -176,7 +176,7 @@ class GateCommitError(GateError):
 
 
 class RollbackError(GateError):
-    """Rollback itself failed — worst-case failure mode."""
+    """Rollback itself failed worst-case failure mode."""
     def __init__(self, gate_id: str, original_error: Optional[Exception] = None, **kwargs) -> None:
         super().__init__(
             f"Gate {gate_id!r} rollback failed (original={original_error!r})",

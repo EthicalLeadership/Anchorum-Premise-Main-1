@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Control Plane
+Dossier DOSSIER-PIPELINE Control Plane
 Hash-linked audit chain. Immutable records. Tribunal-ready integrity.
 """
 
@@ -470,7 +470,7 @@ class ControlPlane:
                     "found": stored_prev
                 })
 
-            # CF-01: Monotonic timestamp check — records must not be backdated.
+            # CF-01: Monotonic timestamp check records must not be backdated.
             if previous_timestamp is not None and ts < previous_timestamp:
                 mismatches.append({
                     "id": _id,

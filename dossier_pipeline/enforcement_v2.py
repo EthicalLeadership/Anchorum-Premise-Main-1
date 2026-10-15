@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Real Static Enforcement v2
+Dossier DOSSIER-PIPELINE Real Static Enforcement v2
 
 AST-based enforcement for forbidden control writes and mutator reachability.
 This implementation resolves imports, builds a light call graph, tracks aliases,

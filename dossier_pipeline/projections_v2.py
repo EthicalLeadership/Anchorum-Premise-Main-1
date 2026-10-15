@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Hardened Projection Layer v2
+Dossier DOSSIER-PIPELINE Hardened Projection Layer v2
 
 Projection helpers with deep immutability, schema validation, cross-store
 consistency checks, and drift detection.

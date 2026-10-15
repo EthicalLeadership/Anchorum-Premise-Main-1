@@ -58,8 +58,28 @@ describe("EvidenceIntake", () => {
 
     uploadFile();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Upload failed at Scanned",
+    expect(await screen.findByText("Upload failed at Scanned")).toHaveAttribute(
+      "role",
+      "alert",
+    );
+  });
+
+  it("explains when the connected API does not implement evidence intake", async () => {
+    const adapter = createAdapter({ backend: null });
+    vi.spyOn(adapter.evidence, "ingest").mockResolvedValue({
+      ok: false,
+      error: "FEATURE_UNAVAILABLE",
+    });
+    render(<EvidenceIntake locale="en" adapter={adapter} caseId="CASE-2024-018" />);
+
+    uploadFile();
+
+    expect(await screen.findByText(
+      "This feature is not available from the connected API yet.",
+    )).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Browse cases" })).toHaveAttribute(
+      "href",
+      "#/cases",
     );
   });
 });

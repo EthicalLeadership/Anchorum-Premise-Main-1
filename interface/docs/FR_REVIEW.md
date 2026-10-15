@@ -2,7 +2,7 @@
 
 Read the English and French together. When you flag a row, quote the English text so we can find it in the catalog.
 
-You may see values like “1 items” or “3 days” — those numbers come from the app at runtime. Don't correct the grammar of the number; the app handles it.
+You may see values like “1 items” or “3 days” those numbers come from the app at runtime. Don't correct the grammar of the number; the app handles it.
 
 ## Priority review
 
@@ -12,7 +12,7 @@ These terms have higher legal or domain significance. Please review the French w
 |---|---|---|
 | Anchored | Ancrée | Gender agreement. If the referent is a checkpoint: « ancré ». If a proof: « ancrée ». |
 | Quarantined | En quarantaine | Confirm the standard Quebec term, not just a literal translation. |
-| Integrity hold | Blocage d’intégrité | Reads as « integrity block ». Confirm it matches practice — not « suspension » or another term. |
+| Integrity hold | Blocage d’intégrité | Reads as « integrity block ». Confirm it matches practice not « suspension » or another term. |
 | Integrity hold: stored bytes no longer match the hash. | Blocage d’intégrité : les octets stockés ne correspondent plus à l’empreinte. | Same term as the badge. Keep the two consistent. |
 | Audit and exports | Vérification et exportations | Deliberate domain label, not a literal translation of « Audit and exports ». |
 | Barreau check | Vérification du Barreau | Confirm the firm's / Barreau's own wording. |
@@ -332,7 +332,7 @@ These terms have higher legal or domain significance. Please review the French w
 | Gate failed: signature | Échec de la porte : signature |
 | Download | Télécharger |
 | Export | Exporter |
-| Export blocked: signature — 1 item | Exportation bloquée : signature — 1 élément |
+| Export blocked: signature 1 item | Exportation bloquée : signature 1 élément |
 | Barreau check | Vérification du Barreau |
 | Disclaimer | Avis |
 | Fail | Échec |

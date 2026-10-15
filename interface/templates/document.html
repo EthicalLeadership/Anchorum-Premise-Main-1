@@ -18,14 +18,14 @@
   <h3>Result</h3>
   <dl class="kv">
     <dt>status</dt><dd>{{ result.status }}</dd>
-    <dt>actor</dt><dd>{{ result.actor or '—' }}</dd>
-    <dt>route</dt><dd>{{ result.route or '—' }}</dd>
-    <dt>reason</dt><dd>{{ result.reason or '—' }}</dd>
+    <dt>actor</dt><dd>{{ result.actor or '' }}</dd>
+    <dt>route</dt><dd>{{ result.route or '' }}</dd>
+    <dt>reason</dt><dd>{{ result.reason or '' }}</dd>
     <dt>message_key</dt><dd class="mono">{{ result.message_key }}</dd>
     <dt>message_id</dt><dd class="mono">{{ result.message_id }}</dd>
     <dt>raw_sha256</dt><dd class="mono">{{ result.raw_sha256 }}</dd>
-    <dt>record_hash</dt><dd class="mono">{{ result.record_hash or '—' }}</dd>
-    <dt>previous_hash</dt><dd class="mono">{{ result.previous_hash or '—' }}</dd>
+    <dt>record_hash</dt><dd class="mono">{{ result.record_hash or '' }}</dd>
+    <dt>previous_hash</dt><dd class="mono">{{ result.previous_hash or '' }}</dd>
     <dt>retryable</dt><dd>{{ result.retryable }}</dd>
   </dl>
 </div>

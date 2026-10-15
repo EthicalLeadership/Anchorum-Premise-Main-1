@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Write Authority Router
+Dossier DOSSIER-PIPELINE Write Authority Router
 
 Thin indirection layer for governed writes. In the initial refactor phase it
 simply centralizes the current legacy write paths so they can be inverted in

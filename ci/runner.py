@@ -45,7 +45,7 @@ class StageResult:
 
 class SystemState(Enum):
     HEALTHY = "HEALTHY"
-    DEGRADED = "DEGRADED"          # healed — all stages green
+    DEGRADED = "DEGRADED"          # healed all stages green
     UNSTABLE = "UNSTABLE"          # multiple heals applied
     BROKEN = "BROKEN"              # no recovery possible
 
@@ -124,7 +124,7 @@ def _stage_security(root: str) -> StageResult:
     root_path = Path(root)
 
     # 1. Secrets in config / .env
-    # Skip *.example.* and *.sample.* — those are intentional templates with placeholders
+    # Skip *.example.* and *.sample.* those are intentional templates with placeholders
     for candidate in root_path.glob("*.json"):
         if ".example." in candidate.name or ".sample." in candidate.name:
             continue
@@ -243,7 +243,7 @@ def run_pipeline(project_root: str, memory_path: Optional[Path] = None) -> Pipel
             sig = failure.signature()
 
             if memory.exhausted(sig):
-                # Same failure failed 3 times — locked
+                # Same failure failed 3 times locked
                 report.system_state = SystemState.BROKEN
                 report.deployable = False
                 report.finished_at = time.time()

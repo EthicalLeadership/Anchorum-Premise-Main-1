@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Runtime Assertion Engine
+Dossier DOSSIER-PIPELINE Runtime Assertion Engine
 
 Composable invariant registry with strict/warn behavior controlled by
 ASSERT_STRICT. Intended to be imported by pipeline stages and invariant

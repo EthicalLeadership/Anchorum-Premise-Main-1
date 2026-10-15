@@ -3,7 +3,7 @@
 `dossier_pipeline/registry/keys.py` used to carry a second revocation
 implementation: it appended signer IDs to a `revoked_keys.txt` file next to the
 key directory and offered `revoke`, `revoked_signers` and `is_revoked` to read
-it back. Nothing called it, nothing enforced it, and no test covered it — while
+it back. Nothing called it, nothing enforced it, and no test covered it while
 `registry/store.py` refused entries from a revoked signer on the basis of
 `anchor.revoked_at`, and `trust.revoke` was the operation that set it.
 

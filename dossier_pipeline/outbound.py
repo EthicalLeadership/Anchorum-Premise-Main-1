@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Outbound Send Tracker
+Dossier DOSSIER-PIPELINE Outbound Send Tracker
 
 Tracks litigation hold notices, demand letters, and formal replies.
 Integrates into the same hash-linked audit chain as inbound evidence.
@@ -27,7 +27,7 @@ from .control import ControlPlane
 
 
 class SendMethod(str, Enum):
-    BAILIFF = "bailiff"                           # Huissier — strongest proof
+    BAILIFF = "bailiff"                           # Huissier strongest proof
     REGISTERED_MAIL = "registered_mail"           # Lettre recommandée avec AR
     CERTIFIED_MAIL = "certified_mail"             # Lettre certifiée
     EMAIL_READ_RECEIPT = "email_read_receipt"     # Email with read receipt (weak)
@@ -441,7 +441,7 @@ class OutboundRegistry:
         )
         synthetic_policy = PolicyDecision(
             allowed=True,
-            reason=f"Outbound {outbox['document_type']} to {actor_normalized} — logged for audit",
+            reason=f"Outbound {outbox['document_type']} to {actor_normalized} logged for audit",
             quarantine=False
         )
 

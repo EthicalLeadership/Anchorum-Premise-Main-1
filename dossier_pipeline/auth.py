@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — JWT Auth
+Dossier DOSSIER-PIPELINE JWT Auth
 
 Simple JWT issuance and verification helpers for governed API access.
 """

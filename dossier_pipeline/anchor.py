@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Unified Anchoring Orchestrator
+Dossier DOSSIER-PIPELINE Unified Anchoring Orchestrator
 
 Coordinates control-chain anchoring, optional OpenTimestamps stamping, and
 optional Cloudflare TXT publication.

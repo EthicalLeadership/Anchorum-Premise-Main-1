@@ -1,4 +1,4 @@
-# ANCHORUM gateway — schema_version 1.1
+# ANCHORUM gateway schema_version 1.1
 #
 # Copy this directory to gateways/<your-vertical>/ and fill in each field.
 # Every field marked REQUIRED must be present or the loader rejects the file.

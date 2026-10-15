@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — DNSSEC TXT Anchoring
+Dossier DOSSIER-PIPELINE DNSSEC TXT Anchoring
 
 Cloudflare DNS TXT record publishing helper. This module keeps the public
 anchor surface small and deterministic.

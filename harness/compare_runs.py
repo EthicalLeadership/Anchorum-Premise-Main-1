@@ -25,9 +25,9 @@ from typing import Any
 
 
 # Metrics we care about; each has a "direction of goodness" for the summary.
-#   lower_better  — decrease is an improvement
-#   higher_better — increase is an improvement
-#   neutral       — direction not judged, delta reported as-is
+#   lower_better  decrease is an improvement
+#   higher_better increase is an improvement
+#   neutral       direction not judged, delta reported as-is
 METRIC_DIRECTIONS: dict[str, str] = {
     "cpu_util": "neutral",
     "main_cpu_sum_pct": "neutral",
@@ -217,9 +217,9 @@ def compare(baseline_dir: pathlib.Path,
     for col in sorted(per_metric):
         m = per_metric[col]
         def _f(v):
-            return "—" if v is None else f"{v:,.3f}"
+            return "" if v is None else f"{v:,.3f}"
         def _p(v):
-            return "—" if v is None else f"{v:+.2f}%"
+            return "" if v is None else f"{v:+.2f}%"
         md.append(
             f"| `{col}` | {m['direction']} | {_f(m['baseline']['median'])} | "
             f"{_f(m['blackstar']['median'])} | "

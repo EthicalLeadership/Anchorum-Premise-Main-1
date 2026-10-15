@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Assertion Reporting
+Dossier DOSSIER-PIPELINE Assertion Reporting
 
 Collects runtime invariant violations for structured audit output without
 introducing a persistence dependency into the assertion engine itself.

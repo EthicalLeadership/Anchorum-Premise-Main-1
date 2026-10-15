@@ -1,4 +1,4 @@
-# Discovery prompt — v0.1.0
+# Discovery prompt v0.1.0
 
 Produce a single JSON document describing a gateway for the ANCHORUM
 platform. Return JSON only. No prose, no markdown fences.

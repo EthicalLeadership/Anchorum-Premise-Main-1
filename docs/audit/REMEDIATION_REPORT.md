@@ -1,4 +1,4 @@
-# Remediation report — ANCH-2026-10-02-01
+# Remediation report ANCH-2026-10-02-01
 
 **Remediating audit:** `docs/audit/INDEPENDENT_BUILD_AUDIT.md` (ID **ANCH-2026-10-02-01**,
 defects F-01…F-19, HIGH = F-01…F-06).
@@ -48,7 +48,7 @@ addressed by that work (`.aider/`) and completed here (`REPO_MAP.md`).
 
 ## 3. Fixed findings
 
-### F-01 — Control-plane signing key (HIGH) — FIXED
+### F-01 Control-plane signing key (HIGH) FIXED
 
 `dossier_pipeline/control.py` no longer contains the string `gdc-dev-signing-key`.
 It reads the key and refuses to proceed without one:
@@ -64,13 +64,13 @@ rather than a code path nobody exercises.
 
 **Residual.** `control.py:127` still defaults the *key id*:
 `os.getenv("GDC_CONTROL_SIGNING_KEY_ID", "local-dev")`. This is a label attached
-to a signature, not key material, so it does not weaken the signature — but a
+to a signature, not key material, so it does not weaken the signature but a
 `local-dev` key id on a production chain is a provenance defect, and no test
 pins the intended behaviour. Recorded, not fixed, because choosing the policy
 (crash vs. warn vs. require an explicit id in non-dev profiles) is a product
 decision.
 
-### F-02 — Evidence signer unbound (HIGH) — FIXED
+### F-02 Evidence signer unbound (HIGH) FIXED
 
 `dossier_pipeline/evidence.py` has a dedicated failure type and no fallback:
 
@@ -81,16 +81,16 @@ decision.
 118:                "No evidence signing secret available. Set GDC_EVIDENCE_SECRET "
 ```
 
-The old `"unbound"` return is gone, so the empty-key mode — which signed with a
-key derivable by anyone — is no longer reachable. Asserted by
+The old `"unbound"` return is gone, so the empty-key mode which signed with a
+key derivable by anyone is no longer reachable. Asserted by
 `tests/test_signing_keys_fail_closed.py` (`EvidenceSignerFailClosedTests`).
 
-### F-03 — Audit log unsigned and unlocked (HIGH) — FIXED
+### F-03 Audit log unsigned and unlocked (HIGH) FIXED
 
 Both halves the finding asked for are present in
 `dossier_pipeline/registry/audit.py`.
 
-*Signing* — the module docstring is now "Hash-chained, **signed** audit log", and
+*Signing* the module docstring is now "Hash-chained, **signed** audit log", and
 the entry carries a signature and the key that made it:
 
 ```
@@ -103,7 +103,7 @@ The module documents why the signature is mandatory ("rather than quietly
 producing an unsigned chain") and states plainly that it is symmetric, so anyone
 holding the key can forge entries (see §7).
 
-*Locking* — the append takes an exclusive advisory file lock:
+*Locking* the append takes an exclusive advisory file lock:
 
 ```
 39:    import fcntl
@@ -119,36 +119,36 @@ lock is best-effort by design rather than silently absent. Coverage:
 a subprocess in `tests/test_verify_scripts.py`, so a third-party verifier that
 fails closed when the key is absent is exercised.
 
-The lock is now also exercised across **processes**, which is the real threat —
-two concurrent invocations — rather than only across threads:
+The lock is now also exercised across **processes**, which is the real threat
+two concurrent invocations rather than only across threads:
 `tests/test_control_record_integrity.py::AuditLockAcrossProcessesTests` forks six
 processes that append to one log, and requires the merged chain to be contiguous
 with no duplicate or missing sequence number.
 
-### F-04 — Anchor omitted rejected records (HIGH) — FIXED
+### F-04 Anchor omitted rejected records (HIGH) FIXED
 
 `ControlPlane.get_all_records()` no longer filters. It previously dropped records
 whose payload had `policy_allowed is False`, and because `export_anchor` and
 `verify_anchor` derive the Merkle root and record count from this accessor, the
-anchor covered a subset of the chain — a rejected-path record could be altered or
+anchor covered a subset of the chain a rejected-path record could be altered or
 deleted without the anchor noticing. The accessor now returns every committed
 record, and the docstring explains why filtering belongs to callers, so the old
 behaviour is not re-derived. The only remaining mentions of `policy_allowed` in
 the file are the payload write (`:259`) and that docstring (`:537`).
 
 Pinned by `tests/test_control_record_integrity.py::ControlAccessorTests`, which
-writes `policy_allowed: false` into a committed payload — the exact condition the
-old filter keyed on — and requires the accessor to keep returning it. Restoring
+writes `policy_allowed: false` into a committed payload the exact condition the
+old filter keyed on and requires the accessor to keep returning it. Restoring
 the filter fails that test; this was confirmed by doing it.
 
-### F-05 — Environment not reproducible (HIGH) — FIXED
+### F-05 Environment not reproducible (HIGH) FIXED
 
 `requirements.txt` had open `>=` ranges and no lock, so it resolved to ~185
 packages including torch and a full CUDA stack, and no two machines got the same
 environment. Now:
 
 - Floors kept, majors bounded (`SQLAlchemy>=2.0,<3`, `cryptography>=42.0,<51`, …).
-- `uvicorn` is declared — `interface/server.py` imports it and it was never
+- `uvicorn` is declared `interface/server.py` imports it and it was never
   listed, so a clean install could not run the server.
 - `pytest` moved to `requirements-dev.txt`, so a runtime install no longer pulls
   the test runner.
@@ -159,12 +159,12 @@ environment. Now:
 
 The heavyweight ML stack is no longer a dependency at all.
 
-### F-06 — Supply chain and egress unmanaged (HIGH) — FIXED
+### F-06 Supply chain and egress unmanaged (HIGH) FIXED
 
 - `docs/security/EGRESS_INVENTORY.md` enumerates all 8 first-party network call
   sites with their defaults and, critically, records the `grep` method and its
   limits so the list can be re-derived rather than trusted. It identifies the
-  `_command` classifier backend as unbounded egress — an arbitrary subprocess
+  `_command` classifier backend as unbounded egress an arbitrary subprocess
   invoked to obtain a classification.
 - `docs/security/SBOM.cdx.json` is a CycloneDX 1.5 SBOM generated from the
   lockfile by `scripts/generate_sbom.py`. That script doubles as a drift check
@@ -172,31 +172,31 @@ The heavyweight ML stack is no longer a dependency at all.
   than asserted in a README, and it honours `SOURCE_DATE_EPOCH` so the committed
   artifact does not churn on every regeneration.
 
-### F-07 — README false about dependencies (MEDIUM) — FIXED
+### F-07 README false about dependencies (MEDIUM) FIXED
 
 `dossier_pipeline/README.md:110` now states that core pipeline logic targets the
 standard library while "the project as a whole is **not** stdlib-only".
 
-### F-08 — Packaging excludes most packages (MEDIUM) — FIXED
+### F-08 Packaging excludes most packages (MEDIUM) FIXED
 
 `pyproject.toml` `[tool.setuptools.packages.find]` now includes
 `dossier_pipeline*`, `dossier_enforcement*`, `ci*`, `ccsp*`, `evals*`,
-`factory*`, `harness*`, `scripts*` — i.e. everything, not just the core.
+`factory*`, `harness*`, `scripts*` i.e. everything, not just the core.
 
 **Residual.** `scripts/` has no `__init__.py`, so the `scripts*` entry matches no
 package and is inert. Harmless, but it is a line that claims something it does
 not do.
 
-### F-09 — Missing lexicon artifact (MEDIUM) — RESOLVED
+### F-09 Missing lexicon artifact (MEDIUM) RESOLVED
 
 The finding asked for `lexicons/legal-v1.yaml` to be authored, or the
 default-loader expectation removed and the test un-skipped. The project took the
 second route: `lexicons/legal-v3.1.yaml` ships, and the suite now reports **0
 skipped** (was 1 skipped at `tests/test_semantic_adapter.py`). The test no longer
-depends on a missing default lexicon — it drives a stub engine and passes an
+depends on a missing default lexicon it drives a stub engine and passes an
 explicit `lexicon_hash`.
 
-### F-13 — Trusted-time not implemented (MEDIUM) — FIXED
+### F-13 Trusted-time not implemented (MEDIUM) FIXED
 
 `dossier_pipeline/control.py` now timestamps in UTC from a named source:
 
@@ -206,7 +206,7 @@ explicit `lexicon_hash`.
 ```
 
 Every timestamp carries which clock produced it, which is what the finding asked
-for — the audit's complaint was that a timestamp was recorded as if it were
+for the audit's complaint was that a timestamp was recorded as if it were
 trusted when nothing said where it came from.
 
 Pinned by `tests/test_control_record_integrity.py::RecordClockProvenanceTests`,
@@ -214,20 +214,20 @@ which requires the clock tag on every committed payload and an offset-aware
 timestamp. Deleting the `time_source` line fails that test; this was confirmed by
 doing it.
 
-### F-14 — Stray artifacts at repo root (LOW) — FIXED
+### F-14 Stray artifacts at repo root (LOW) FIXED
 
 `json`, `sys`, `time` and `uuid` (≈41 MB of ImageMagick PostScript dumps, all
 tracked) are gone from the tree and dropped from history on this branch. They are
 ignored by absolute root path in `.gitignore`. Verified: all four report `gone`,
 and none shadows the stdlib.
 
-### F-16 — No version control (LOW) — FIXED
+### F-16 No version control (LOW) FIXED
 
 Git is initialised; the audit is pinned against a commit. `.githooks/pre-commit`
 runs the integrity gate and `core.hooksPath` is set to `.githooks`, so the gate
 runs on commit rather than only in CI.
 
-### F-17 — SQLAlchemy divergence (LOW) — FIXED
+### F-17 SQLAlchemy divergence (LOW) FIXED
 
 `requirements.txt` bounds a single major (`SQLAlchemy>=2.0,<3`) and
 `requirements.lock` pins the exact version, so declared and installed cannot
@@ -236,11 +236,11 @@ diverge. `dossier_pipeline/schema.py` imports from `sqlalchemy` /
 
 ## 4. Partially addressed
 
-### F-19 — Repository state ambiguity (MEDIUM) — PARTIAL
+### F-19 Repository state ambiguity (MEDIUM) PARTIAL
 
 The repository itself is now unambiguous: git-initialised, one canonical branch,
 `docs/product` under version control. But the machine-level ambiguity the finding
-described is worse, not better — the project exists at many paths under
+described is worse, not better the project exists at many paths under
 `/home/kark`, including:
 
 ```
@@ -262,7 +262,7 @@ These findings were recorded as open or partial in the first pass of this report
 Each is closed here; the evidence of the old behaviour is kept above each
 resolution so the before-state stays on the record.
 
-### F-10 — Two revocation mechanisms, one orphaned (MEDIUM) — FIXED
+### F-10 Two revocation mechanisms, one orphaned (MEDIUM) FIXED
 
 `dossier_pipeline/registry/keys.py` still implements a file-based revocation
 list, still documents it, and is still exported and advertised:
@@ -283,9 +283,9 @@ dead but exported, and the next reader could not tell which was authoritative.
 module docstring no longer describes a mechanism that does not exist.
 
 Deletion was chosen over a deprecation marker because the anchor path is the
-live, tested, enforced one — `registry/store.py:7` already declares "Revocation
+live, tested, enforced one `registry/store.py:7` already declares "Revocation
 is a property of the anchor, not a separate file", `trust.revoke` sets a
-monotonic `revoked_at`, and `store.py:125`/`:199` enforce it — so a second
+monotonic `revoked_at`, and `store.py:125`/`:199` enforce it so a second
 importable implementation contradicted a live invariant. A dead alternative is
 what the next reader adopts by mistake, which is the same failure mode as F-04.
 
@@ -294,7 +294,7 @@ if the file-based API reappears, if the anchor API disappears, or if key
 generation starts writing a revocation file again. Deleting the dead code broke
 no test, which is itself the evidence that nothing depended on it.
 
-### F-18 — Weak JWT secrets padded, not strengthened (LOW) — FIXED
+### F-18 Weak JWT secrets padded, not strengthened (LOW) FIXED
 
 `auth.py` defined the policy but did not enforce it:
 
@@ -332,10 +332,10 @@ deployment that was doing the right thing.
 
 `tests/test_auth_secret_policy.py` (11 tests) covers the refusal, the boundary at
 exactly the minimum, the round-trip, and the adversarial case the old padding
-created — a token signed with the 15-character placeholder was verifiable by
+created a token signed with the 15-character placeholder was verifiable by
 anyone who knew it, and is now refused outright.
 
-### F-12 — Secret scanner not enforced (MEDIUM) — FIXED
+### F-12 Secret scanner not enforced (MEDIUM) FIXED
 
 The finding said a config is not enforcement. It was worse than that: the config
 could not even be loaded. `.gitleaks.toml` failed to parse for two independent
@@ -361,7 +361,7 @@ further defects were found by actually running it:
 
 Wire-up: `.githooks/pre-commit` now runs both the integrity gate and
 `gitleaks git --staged`, skipping the scan with an explicit notice when gitleaks
-is not installed — a missing optional tool must not block commits, but it must
+is not installed a missing optional tool must not block commits, but it must
 not pass silently either. CI runs `gitleaks dir` in the integrity job, before any
 dependency install, with the scanner version pinned so it cannot shift under the
 repository.
@@ -370,10 +370,10 @@ repository.
 random-looking AWS key was added, the scan was run, and the scan failed with
 exactly that finding; the probe was then deleted and the scan returned clean. The
 first probe used `AKIAIOSFODNN7EXAMPLE`, which gitleaks' built-in defaults
-allowlist as a published example and therefore detected nothing — a reminder that
+allowlist as a published example and therefore detected nothing a reminder that
 a probe which cannot fail proves nothing.
 
-### F-15 — Dev/tool artifacts in the tree (LOW) — FIXED
+### F-15 Dev/tool artifacts in the tree (LOW) FIXED
 
 `.aider/` was already gone. `REPO_MAP.md` (57 KB, generated by Aider, a tool no
 longer present in this repository) was still on disk: git-ignored, so it never
@@ -383,12 +383,12 @@ reached a clone, but still present in any naive copy or archive of the tree.
 were deliberately kept: they are harmless, and they stop the artifacts returning
 if that tool is ever run here again.
 
-### F-11 — CWD-relative persistence paths (MEDIUM) — FIXED
+### F-11 CWD-relative persistence paths (MEDIUM) FIXED
 
 The configurability the finding asked for was already in place: `OUTPUT_DIR`,
 `--output-dir` and the `output_dir` constructor argument. What remained was that
 the *default* was the string `"./output"`, resolved against whatever directory
-the process happened to start in — so the same command run twice from two places
+the process happened to start in so the same command run twice from two places
 wrote custody data to two different locations, and nothing in the output said
 which.
 
@@ -401,7 +401,7 @@ Data directory: /tmp/output
 ```
 
 Verified from two working directories: run from `/tmp` it reports `/tmp/output`;
-run from `/var/tmp` it reports `/var/tmp/output`. Nothing moved — the same
+run from `/var/tmp` it reports `/var/tmp/output`. Nothing moved the same
 destination is now stated rather than implied, and the resolved value is what
 every command receives.
 
@@ -410,11 +410,11 @@ that is belongs to the entry point, so `DossierPipeline`'s interface is
 unchanged and every existing test still passes an explicit directory.
 
 **Residual.** The default still *follows* the working directory instead of being
-an absolute data directory of its own. That is deliberate — changing it would
-move where existing deployments write — and the point of the fix is that the
+an absolute data directory of its own. That is deliberate changing it would
+move where existing deployments write and the point of the fix is that the
 choice is now visible on every run, which is the remedy the finding named.
 
-### Residual 8 — read-only commands required the evidence secret — FIXED
+### Residual 8 read-only commands required the evidence secret FIXED
 
 Recorded in the first pass as residual risk 8: because the entry point built the
 evidence store eagerly, `enforce`, `verify-chain` and `verify` all failed closed
@@ -430,13 +430,13 @@ no key, while a signature can only be checked with the key that made it. The
 structural path checks hash links, ordering and duplicate ids; `verify_signatures=True`
 (the default) fails closed without the key rather than downgrading silently.
 
-Signing is unaffected and still refuses without a key — `ingest`,
+Signing is unaffected and still refuses without a key `ingest`,
 `add_custody_event` and `export_bundle` all raise `EvidenceSignerUnbound`. The
 F-02 pin for `EvidenceSigner` is untouched and still passes.
 
 `cmd_verify` now calls `pipeline.evidence.verify()` explicitly, because opening
 the store no longer verifies signatures and the command claims to. Without the
-secret it prints which check could not run and exits 2 — a sentence, not a
+secret it prints which check could not run and exits 2 a sentence, not a
 traceback.
 
 Verified at the CLI, with `GDC_CONTROL_SIGNING_KEY` set and
@@ -444,7 +444,7 @@ Verified at the CLI, with `GDC_CONTROL_SIGNING_KEY` set and
 exit 2 with `Evidence integrity: NOT VERIFIED`. With the secret set, `verify`
 reports `Evidence integrity: PASS` and exits 0.
 
-The deferred check still catches tampering — pinned by
+The deferred check still catches tampering pinned by
 `tests/test_evidence_store_access.py` (12 tests), which forges a stored
 signature and requires the structural check to pass while the keyed check fails.
 That test exists to hold the limit honest: a structural result says nothing
@@ -456,16 +456,16 @@ Corruption was found in the tree that the audit did not report and that no test
 caught. It is recorded here because it is evidence about the process, and because
 two of the three are the direct subject of F-19.
 
-- **`interface/src/adapter.ts` was duplicated in place** — 1018 lines of which
+- **`interface/src/adapter.ts` was duplicated in place** 1018 lines of which
   lines 1–502 and 503–1004 were byte-identical, with the file's own first line
   spliced mid-expression at the seam. The build was broken (`tsc`: 8 errors
   including an unterminated template literal). Had to be reconstructed and
   verified by rebuilding: the restored CSS bundle hash matched the last
   pre-corruption build byte-for-byte.
-- **`dossier_pipeline/contracts.py` was duplicated whole** — size ratio exactly
+- **`dossier_pipeline/contracts.py` was duplicated whole** size ratio exactly
   2.0000, 17 top-level names declared twice. It still parsed, so Python and every
   test accepted it: two diverging copies of the contract types waiting to drift.
-- **`dossier_pipeline/pipeline.py` had an import spliced inside its docstring** —
+- **`dossier_pipeline/pipeline.py` had an import spliced inside its docstring**
   `from fpdf import FPDF` sat before the closing `"""`, so `FPDF` was never
   imported while `_generate_pdf` called it; and `_generate_pdf` was indented as a
   method of `IntakeError` instead of `DossierPipeline`. Both are repaired:
@@ -506,7 +506,7 @@ what makes the class of corruption detectable rather than merely repaired.
    packages but not the interpreter, so "same environment" is still only true
    down to the package layer.
 7. **`scripts*` in packaging is inert** (`F-08` residual).
-*(Item 8 of this list — the read-only command requirement — was closed after the
+*(Item 8 of this list the read-only command requirement was closed after the
 first pass and is recorded in §5 under "Residual 8" rather than left here as a
 risk that no longer exists.)*
 
@@ -521,7 +521,7 @@ Run against the tree with every fix above applied:
 | Secret scan (tree) | `gitleaks dir . --config .gitleaks.toml` | **0 findings** |
 | Secret scan (staged) | `gitleaks git --staged --config .gitleaks.toml` | **exit 0** |
 | Secret scan (probe) | planted AWS key in a scratch file | **detected, exit 1** |
-| Lock drift / SBOM | `python3 scripts/generate_sbom.py --check` | **OK — 41 packages, 0 drift** |
+| Lock drift / SBOM | `python3 scripts/generate_sbom.py --check` | **OK 41 packages, 0 drift** |
 | Python suite (committed tree) | `python3 -m pytest -q -p no:cacheprovider` in a worktree of the commit | **328 passed, 0 failed, 0 skipped** |
 | Python suite (working tree) | `python3 -m pytest -q -p no:cacheprovider` | **336 passed, 0 failed, 0 skipped** |
 | Type-check | `npx tsc --noEmit` (in `interface/`) | **exit 0** |
@@ -538,7 +538,7 @@ secret-policy tests (11), the F-10 revocation guard tests (6),
 mutation, not merely by passing.** Closing out this report showed that three of
 its own "fixed" claims were pinned by nothing that would fail if the fix were
 undone: the F-04 filter could be re-added, the F-13 clock tag deleted, and the
-F-03 lock — which had only ever been exercised by threads — removed, with every
+F-03 lock which had only ever been exercised by threads removed, with every
 existing test still green. Each was therefore mutated deliberately: the
 `policy_allowed` filter restored, the `time_source` line deleted, and the pins
 re-run. Exactly the two corresponding tests failed and the other three passed,
@@ -549,8 +549,8 @@ not evidence, and this report does not count it as such.
 **Why the Python suite is listed twice.** The counts differ, and the reason
 matters: `tests/test_interface_api.py` is not committed. It is untracked work
 belonging to a concurrent actor, so it runs in the working tree and is absent
-from the commit. Everything else in the table — the integrity gate, the secret
-scan, the SBOM check — is reproducible from this branch alone, and that is where
+from the commit. Everything else in the table the integrity gate, the secret
+scan, the SBOM check is reproducible from this branch alone, and that is where
 the committed numbers come from. A clean clone reports 328, not 336.
 
 The interface rows are in the same position: `tsc`, `vitest` and the production

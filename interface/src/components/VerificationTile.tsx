@@ -47,7 +47,7 @@ export function VerificationTile({ locale, timeZone, verification }: Props) {
             ),
           })}
           {verification.failingStep
-            ? ` — ${translate(locale, `reason.${verification.failingStep}` as never)}`
+            ? ` ${translate(locale, `reason.${verification.failingStep}` as never)}`
             : ""}
         </p>
       ) : null}

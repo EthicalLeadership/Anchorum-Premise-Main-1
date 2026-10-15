@@ -1,4 +1,4 @@
-# Resident AI — IA résidente déterministe (DOSSIER-PIPELINE)
+# Resident AI IA résidente déterministe (DOSSIER-PIPELINE)
 
 CLI interactive qui exécute un modèle de langage **local** (Blackstar) sur les preuves du dossier DOSSIER-PIPELINE, avec traçabilité et garde-fous déterministes.
 
@@ -66,9 +66,9 @@ Les prompts sont versionnés et hashés dans `prompts/v1/manifest.json`. Chaque 
 
 ## Fichiers de configuration
 
-- `config/resident_ai.json` — paramètres du modèle, chemins, chunking
-- `prompts/v1/*.txt` — prompts versionnés
-- `prompts/v1/manifest.json` — empreintes SHA-256 des prompts
+- `config/resident_ai.json` paramètres du modèle, chemins, chunking
+- `prompts/v1/*.txt` prompts versionnés
+- `prompts/v1/manifest.json` empreintes SHA-256 des prompts
 
 Les variables d’environnement suivantes peuvent surcharger `config/resident_ai.json` :
 
@@ -80,7 +80,7 @@ Les variables d’environnement suivantes peuvent surcharger `config/resident_ai
 
 Les variables suivantes contrôlent la connexion à Blackstar :
 
-- `BLACKSTAR_API_KEY` (obligatoire) — clé API 64 caractères hex
+- `BLACKSTAR_API_KEY` (obligatoire) clé API 64 caractères hex
 - `BLACKSTAR_BASE_URL` (défaut : `https://localhost:8443`)
 - `BLACKSTAR_CHAT_MODEL` (défaut : `qwen2.5-7b-instruct`)
 - `BLACKSTAR_VERIFY_SSL` (défaut : `false` pour le certificat auto-signé local)

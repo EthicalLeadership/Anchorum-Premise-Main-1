@@ -31,15 +31,15 @@ const bootstrap: ShellBootstrap = {
     canSeeGlobalSection: (section) => section === "evidence",
   },
   routes: {
-    cases: "/cases",
+    cases: "#/cases",
     signIn: "/auth/login",
     signOut: "/auth/signout",
     administration: "#/admin",
-    globalSection: (section) => `/${section}`,
+    globalSection: (section) => `#/${section}`,
     caseSection: (caseId, section) =>
-      `/cases/${encodeURIComponent(caseId)}/${section}`,
+      `#/cases/${encodeURIComponent(caseId)}/${section}`,
     evidenceHolds: (caseId) =>
-      `/cases/${encodeURIComponent(caseId)}/evidence?filter=hold`,
+      `#/cases/${encodeURIComponent(caseId)}/evidence?filter=hold`,
   },
 };
 
@@ -87,13 +87,13 @@ describe("AppShell", () => {
       ),
     ).toHaveAttribute(
       "href",
-      "/cases/case%2F42/evidence",
+      "#/cases/case%2F42/evidence",
     );
     expect(
       within(
         screen.getByRole("navigation", { name: "Primary navigation" }),
       ).getByRole("link", { name: "Evidence" }),
-    ).toHaveAttribute("href", "/evidence");
+    ).toHaveAttribute("href", "#/evidence");
     expect(
       within(
         screen.getByRole("navigation", { name: "Case navigation" }),
@@ -103,7 +103,7 @@ describe("AppShell", () => {
       screen.getByRole("link", {
         name: "1 item on hold",
       }),
-    ).toHaveAttribute("href", "/cases/case%2F42/evidence?filter=hold");
+    ).toHaveAttribute("href", "#/cases/case%2F42/evidence?filter=hold");
   });
 
   it("does not describe an unknown integrity state as clear", () => {

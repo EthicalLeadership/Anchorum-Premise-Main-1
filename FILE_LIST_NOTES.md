@@ -1,4 +1,4 @@
-# Anchorum-prem-main — File Inventory Notes
+# Anchorum-prem-main File Inventory Notes
 
 Complete list of files present under the project root when this document was updated. Hidden files and generated/cache files are included. Git internal metadata (`.git/`) is excluded. Paths are relative to the project root and sorted alphabetically.
 

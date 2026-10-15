@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# apply_corrections.sh — writes the corrected section 2, 3, 4 files into
+# apply_corrections.sh writes the corrected section 2, 3, 4 files into
 # the anchorum-prem repo, then runs the celpy probe. Idempotent.
 #
 # What it writes:
 #   evals/__init__.py
-#   evals/run.py                    (section 1 — metrics with no vacuous passes)
-#   dossier_pipeline/policy_runtime.py   (section 2 — pinned, validated, fail-closed)
-#   dossier_pipeline/gateway.py          (section 3 — strict loader with schema 1.0/1.1)
-#   dossier_pipeline/gateway_migrate.py  (section 3 — 1.0 -> 1.1 migration)
+#   evals/run.py                    (section 1 metrics with no vacuous passes)
+#   dossier_pipeline/policy_runtime.py   (section 2 pinned, validated, fail-closed)
+#   dossier_pipeline/gateway.py          (section 3 strict loader with schema 1.0/1.1)
+#   dossier_pipeline/gateway_migrate.py  (section 3 1.0 -> 1.1 migration)
 #   probe_celpy.py                        (4-check celpy compatibility probe)
-#   gateways/_template/gateway.yaml       (section 4 — schema 1.1 template)
+#   gateways/_template/gateway.yaml       (section 4 schema 1.1 template)
 #   gateways/_template/README.md          (schema documentation)
 #
 # What it does NOT touch:
@@ -974,15 +974,15 @@ echo "  wrote dossier_pipeline/policy_runtime.py"
 # File 4: dossier_pipeline/gateway.py (complete)
 # ---------------------------------------------------------------------------
 cat > "$REPO/dossier_pipeline/gateway.py" <<'FILE_EOF'
-"""Gateway loader — the only entry point for vertical configs.
+"""Gateway loader the only entry point for vertical configs.
 
 A "gateway" is a directory under `gateways/<name>/` containing:
-    gateway.yaml        — the contract (validated by this loader)
-    actors.json         — actor classification rules
-    policy.cel          — policy decision rules (CEL, rule-block format)
-    regulations.json    — citation library referenced by policy.cel
-    risk_patterns.json  — risk flag definitions
-    evals/golden/       — golden test set
+    gateway.yaml        the contract (validated by this loader)
+    actors.json         actor classification rules
+    policy.cel          policy decision rules (CEL, rule-block format)
+    regulations.json    citation library referenced by policy.cel
+    risk_patterns.json  risk flag definitions
+    evals/golden/       golden test set
 
 Schema versions
 ===============
@@ -1600,7 +1600,7 @@ echo "  wrote dossier_pipeline/gateway_migrate.py"
 # File 6: probe_celpy.py
 # ---------------------------------------------------------------------------
 cat > "$REPO/probe_celpy.py" <<'FILE_EOF'
-"""probe_celpy.py — verify the installed celpy supports the API we depend on.
+"""probe_celpy.py verify the installed celpy supports the API we depend on.
 
 Exit 0 = all checks passed. Any FAIL prints a specific message and exits
 non-zero. Run once per environment before deploying a PolicyRuntime change.
@@ -1664,7 +1664,7 @@ echo "  wrote probe_celpy.py"
 # File 7: gateways/_template/gateway.yaml
 # ---------------------------------------------------------------------------
 cat > "$REPO/gateways/_template/gateway.yaml" <<'FILE_EOF'
-# ANCHORUM gateway — schema_version 1.1
+# ANCHORUM gateway schema_version 1.1
 #
 # Copy this directory to gateways/<your-vertical>/ and fill in each field.
 # Every field marked REQUIRED must be present or the loader rejects the file.
@@ -1746,7 +1746,7 @@ echo "  wrote gateways/_template/gateway.yaml"
 # File 8: gateways/_template/README.md
 # ---------------------------------------------------------------------------
 cat > "$REPO/gateways/_template/README.md" <<'FILE_EOF'
-# Gateway schema — version 1.1
+# Gateway schema version 1.1
 
 A gateway is a self-contained directory under `gateways/<name>/` that
 configures the ANCHORUM pipeline for one industry vertical. The loader

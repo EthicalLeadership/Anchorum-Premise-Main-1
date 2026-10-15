@@ -98,12 +98,27 @@ def _parse_spec_fields(spec_path: Path) -> dict:
 
 
 def read_gric_diff() -> dict:
-    """Read drift table from CANONICAL.yaml and enrich with code/spec data."""
+    """Read drift table from CANONICAL.yaml and enrich with code/spec data.
+    
+    Fails closed if CANONICAL.yaml is missing (F-09b contract violation).
+    Returns error message in response for fail-closed behavior.
+    """
     import yaml
     from pathlib import Path
     
-    # Load canonical spec
+    # Load canonical spec - fail closed if missing
     canonical_path = Path(__file__).parent.parent / "contracts" / "CANONICAL.yaml"
+    if not canonical_path.exists():
+        return {
+            "error": "F-09b: CANONICAL.yaml missing - interface contract not established",
+            "rows": [],
+            "v10_present": False,
+            "v11_present": False,
+            "v10_status_line": None,
+            "v11_status_line": None,
+            "contracts_status_line": ""
+        }
+    
     with open(canonical_path) as f:
         canonical = yaml.safe_load(f)
     
@@ -128,8 +143,8 @@ def read_gric_diff() -> dict:
     v11_status_line = extract_status_line(v11_path)
 
     # Build rows from canonical spec + code enrichment
-    canonical_required = set(canonical["pipeline_result"]["required"])
-    canonical_forbidden = set(canonical["pipeline_result"]["forbidden"])
+    canonical_required = set(canonical["runtime"]["pipeline_result"]["required"])
+    canonical_forbidden = set(canonical["runtime"]["pipeline_result"]["forbidden"])
     
     rows = []
     all_fields = sorted(set(contracts_fields))

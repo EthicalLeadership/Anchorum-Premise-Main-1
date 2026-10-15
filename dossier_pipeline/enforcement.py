@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Mutation Lattice Enforcement
+Dossier DOSSIER-PIPELINE Mutation Lattice Enforcement
 
 Centralized forbidden-edge definitions and static guards for the write-path
 lattice. The intent is to make the architectural contract testable in CI.

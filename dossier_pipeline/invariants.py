@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Runtime Invariant Definitions
+Dossier DOSSIER-PIPELINE Runtime Invariant Definitions
 
 Registers the runtime invariants enforced by the assertion engine. The checks
 are intentionally pure so they can be used in both live execution and tests.

@@ -12,7 +12,7 @@ the store that refuses entries from a revoked signer.
 
 This module used to offer a second, contradictory mechanism as well: it
 appended signer IDs to a ``revoked_keys.txt`` beside the key directory. Nothing
-called it, nothing enforced it, and no test covered it — while ``store``
+called it, nothing enforced it, and no test covered it while ``store``
 rejected revoked signers on the basis of the anchor and not the file. A dead
 alternative to a live invariant is not harmless: it is what the next reader
 adopts by mistake. It was removed (audit finding F-10) and this comment is the

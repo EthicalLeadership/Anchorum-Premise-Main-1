@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Email Intake & Deduplication
+Dossier DOSSIER-PIPELINE Email Intake & Deduplication
 MIME parsing, attachment extraction, cryptographic fingerprinting.
 """
 
@@ -474,6 +474,18 @@ class EmailIntake:
             message_key=message_key,
             original_message_id=message_id,
             ingest_timestamp=datetime.datetime.now().isoformat(),
+
+            # For a real message the artifact IS the message: the bytes ingested
+            # and the bytes submitted are the same bytes, so the two hashes are
+            # equal and nothing about the envelope was invented. `transport`
+            # stays "email" and `synthesised_fields` stays empty. (A headerless
+            # message still gets a content-derived Message-ID above, which is a
+            # derived identity rather than an invented value.)
+            source_sha256=raw_sha256,
+            source_bytes=len(raw_bytes),
+            source_media_type="message/rfc822",
+            transport="email",
+            synthesised_fields=(),
         )
 
     def normalize(self, envelope: EmailEnvelope) -> Optional[EmailEnvelope]:

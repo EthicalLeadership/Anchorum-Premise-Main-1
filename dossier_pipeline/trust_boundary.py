@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Trust Boundary Contract
+Dossier DOSSIER-PIPELINE Trust Boundary Contract
 
 Defines the schema-level roles for fields that may appear in governed output.
 The goal is to make export eligibility deterministic instead of relying only on

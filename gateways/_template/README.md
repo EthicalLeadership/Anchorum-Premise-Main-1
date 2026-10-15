@@ -1,4 +1,4 @@
-# Gateway schema — version 1.1
+# Gateway schema version 1.1
 
 A gateway is a self-contained directory under `gateways/<name>/` that
 configures the ANCHORUM pipeline for one industry vertical. The loader

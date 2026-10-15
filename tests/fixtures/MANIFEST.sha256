@@ -1,0 +1,7 @@
+# MANIFEST.sha256 - Test fixtures
+396b94a7efaa6c14beb717e7b31896652fdd8d03075b09bf59c9b59ea5bdc421  contracts/CANONICAL.yaml
+58d5e973e569832ebcdf7717d10bec8015b972bb0ee8e3d73380d9965643b53d  interface/gric_server.py
+
+# Plane 1 (kernel/domain/application/governance): deterministic
+# No wall-clock imports. Fail closed.
+

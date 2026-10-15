@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Governance Adapter
+Dossier DOSSIER-PIPELINE Governance Adapter
 Bridges classification + provenance into a governed payload.
 """
 

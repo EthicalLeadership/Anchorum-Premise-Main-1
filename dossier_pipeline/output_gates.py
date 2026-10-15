@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Output Leakage Gates
+Dossier DOSSIER-PIPELINE Output Leakage Gates
 
 Post-processing controls for outward-facing text. These gates are applied at
 the final render boundary so internal reasoning can remain internal.

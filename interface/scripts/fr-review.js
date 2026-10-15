@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // scripts/fr-review.js
 //
-// Generates docs/FR_REVIEW.md — the French catalog review sheet sent to
+// Generates docs/FR_REVIEW.md the French catalog review sheet sent to
 // the Quebec lawyer.
 //
 // Do not regenerate while a review is in flight.
@@ -9,7 +9,7 @@
 // The sheet carries a catalog hash in its header. If you regenerate it after
 // sending, the file the lawyer is reading no longer matches the file on disk,
 // and their notes land against a stale version. The hash cannot protect
-// against this — it only reports it after the fact, and only if someone
+// against this it only reports it after the fact, and only if someone
 // compares.
 //
 // If you need to regenerate for an unrelated reason (catalog changed,
@@ -70,7 +70,7 @@ const screens = [
 const priority = [
   ["badge.anchored", "Gender agreement. If the referent is a checkpoint: « ancré ». If a proof: « ancrée »."],
   ["badge.quarantined", "Confirm the standard Quebec term, not just a literal translation."],
-  ["badge.integrity_hold", "Reads as « integrity block ». Confirm it matches practice — not « suspension » or another term."],
+  ["badge.integrity_hold", "Reads as « integrity block ». Confirm it matches practice not « suspension » or another term."],
   ["state.integrity_hold", "Same term as the badge. Keep the two consistent."],
   ["nav.audit", "Deliberate domain label, not a literal translation of « Audit and exports »."],
   ["export.gate.barreau", "Confirm the firm's / Barreau's own wording."],
@@ -177,7 +177,7 @@ lines.push(
   "",
   "Read the English and French together. When you flag a row, quote the English text so we can find it in the catalog.",
   "",
-  "You may see values like “1 items” or “3 days” — those numbers come from the app at runtime. Don't correct the grammar of the number; the app handles it.",
+  "You may see values like “1 items” or “3 days” those numbers come from the app at runtime. Don't correct the grammar of the number; the app handles it.",
   "",
   "## Priority review",
   "",

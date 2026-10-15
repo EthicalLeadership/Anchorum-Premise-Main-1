@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Deterministic Replay Log
+Dossier DOSSIER-PIPELINE Deterministic Replay Log
 
 Captures ordered pipeline transitions as canonical JSONL events so a run can be
 replayed or diffed against a later execution. The design is intentionally small:

@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Anchoring Core
+Dossier DOSSIER-PIPELINE Anchoring Core
 
 Merkle tree, hash utilities, and canonical payload construction for anchoring
 the audit chain tail and evidence checkpoints.

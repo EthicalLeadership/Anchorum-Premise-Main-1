@@ -12,6 +12,7 @@ interface Row {
   type: string;
   state: IntakeState;
   failedStage?: "received" | "preserved" | "scanned" | "indexed";
+  error?: string;
   duplicate: boolean;
   id?: string;
   hash?: string;
@@ -36,7 +37,7 @@ export function EvidenceIntake({ locale, adapter, caseId }: Props) {
       key: nextKey++,
       name: f.name,
       size: f.size,
-      type: f.type || "—",
+      type: f.type || "",
       state: "pending",
       duplicate: false,
     }));
@@ -53,7 +54,7 @@ export function EvidenceIntake({ locale, adapter, caseId }: Props) {
           });
           if (result.ok) {
             patch(row.key, {
-              state: "done",
+              state: result.value.processingStatus === "stored" ? "stored" : "done",
               id: result.value.id,
               hash: result.value.hash,
               duplicate: result.value.duplicate,
@@ -62,10 +63,11 @@ export function EvidenceIntake({ locale, adapter, caseId }: Props) {
             patch(row.key, {
               state: "failed",
               failedStage: result.failedStage,
+              error: result.error,
             });
           }
         } catch {
-          patch(row.key, { state: "failed" });
+          patch(row.key, { state: "failed", error: "BACKEND_UNREACHABLE" });
         }
       })();
     });
@@ -74,6 +76,13 @@ export function EvidenceIntake({ locale, adapter, caseId }: Props) {
   return (
     <section className="evidence-intake">
       <h1>{translate(locale, "evidence.intake.title")}</h1>
+      <nav aria-label={translate(locale, "nav.evidence_actions")}>
+        <a href={`#/cases/${encodeURIComponent(caseId)}/register`}>
+          {translate(locale, "evidence.register.title")}
+        </a>
+        {" · "}
+        <a href="#/cases">{translate(locale, "case.list.browse")}</a>
+      </nav>
       <p>
         {translate(locale, "evidence.intake.retention_policy", {
           policy: translate(locale, "evidence.intake.policy_default"),
@@ -102,6 +111,18 @@ export function EvidenceIntake({ locale, adapter, caseId }: Props) {
                     state={r.state}
                     failedStage={r.state === "failed" ? r.failedStage : undefined}
                   />
+                  {r.error ? (
+                    <p role="alert">
+                      {translate(
+                        locale,
+                        r.error === "FEATURE_UNAVAILABLE"
+                          ? "error.feature_unavailable"
+                          : r.error === "NOT_FOUND"
+                            ? "error.not_found"
+                            : "error.backend_unreachable",
+                      )}
+                    </p>
+                  ) : null}
                 </td>
                 <td>
                   {r.id && r.hash ? (

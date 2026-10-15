@@ -1,11 +1,11 @@
-# GRIC v1.0 — Governance ↔ Runtime Interface Contract
+# GRIC v1.0 Governance ↔ Runtime Interface Contract
 
 ## 0. Purpose
 
 This document defines the only permitted coupling boundary between:
 
-- **GOV** — Dossier Intake Source governance/specification layer
-- **RTM** — `dossier_pipeline` runtime execution layer
+- **GOV** Dossier Intake Source governance/specification layer
+- **RTM** `dossier_pipeline` runtime execution layer
 
 The contract is intentionally strict:
 
@@ -78,7 +78,7 @@ GOV may not receive:
 
 ## 3. Interface Objects
 
-## 3.1 `CaseSpec` — GOV → RTM
+## 3.1 `CaseSpec` GOV → RTM
 
 `CaseSpec` is the only accepted governance input object.
 
@@ -134,7 +134,7 @@ Defines:
 
 ---
 
-## 3.2 `PipelineResult` — RTM → GOV
+## 3.2 `PipelineResult` RTM → GOV
 
 `PipelineResult` is the primary execution output object.
 
@@ -178,7 +178,7 @@ GOV may use it for review and reporting, but may not use it to rewrite governanc
 
 ---
 
-## 3.3 `ErrorEvent` — RTM internal / optional export
+## 3.3 `ErrorEvent` RTM internal / optional export
 
 ### Schema
 
@@ -205,7 +205,7 @@ Error events are **diagnostic outputs**, not governance inputs.
 
 ---
 
-## 3.4 `OutboundEvent` — RTM → external system
+## 3.4 `OutboundEvent` RTM → external system
 
 ### Schema
 
@@ -383,19 +383,19 @@ All RTM outputs must be reproducible from:
 
 These rules prevent accidental collapse of the two-layer stack.
 
-### A1 — Governance does not execute
+### A1 Governance does not execute
 GOV defines constraints only.
 
-### A2 — Runtime does not govern
+### A2 Runtime does not govern
 RTM executes and reports only.
 
-### A3 — Identity may cross the boundary
+### A3 Identity may cross the boundary
 Case IDs, hashes, and artifact names may be shared.
 
-### A4 — Behavior may not cross the boundary
+### A4 Behavior may not cross the boundary
 Execution semantics, deduplication, quarantine, and transition logic may not be shared.
 
-### A5 — Derived outputs are not control inputs
+### A5 Derived outputs are not control inputs
 Reports are for review, not for redefining governance.
 
 ---

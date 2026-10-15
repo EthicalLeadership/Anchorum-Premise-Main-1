@@ -1,7 +1,7 @@
 """Turn an uploaded submission into plain text, by artifact type.
 
-Both document entry points — the GRIC inspector (``gric_server.py``) and the
-dossier bridge (``document.py``) — used to decide by extension and then, for
+Both document entry points the GRIC inspector (``gric_server.py``) and the
+dossier bridge (``document.py``) used to decide by extension and then, for
 everything that was not ``.eml``, do:
 
     body = raw.decode("utf-8", errors="replace")

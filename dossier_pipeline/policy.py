@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Policy Engine
+Dossier DOSSIER-PIPELINE Policy Engine
 Hard enforcement boundaries for governed execution.
 """
 
@@ -18,7 +18,7 @@ class PolicyEngine:
     Evaluates whether an adapted payload may proceed through the pipeline.
     Rules are ordered and mandatory. No exceptions.
 
-    Rule 1 (missing payload_hash) is a blocking hard error — the record
+    Rule 1 (missing payload_hash) is a blocking hard error the record
     cannot be processed without a cryptographic fingerprint.
 
     Rules 2–5 are non-short-circuiting: ALL matching rules are evaluated
@@ -35,10 +35,10 @@ class PolicyEngine:
         )
         with lock:
             with TransactionGate(f"policy-{adapter.message_key or adapter.message_id}", auto_commit=True) as gate:
-                # Rule 1: Cryptographic fingerprints are mandatory — hard block
+                # Rule 1: Cryptographic fingerprints are mandatory hard block
                 assert_that(
                     bool(adapter.payload_hash and adapter.raw_sha256),
-                    "Missing raw_sha256 or payload_hash — cryptographic fingerprint required",
+                    "Missing raw_sha256 or payload_hash cryptographic fingerprint required",
                     assertion_id="POL-PRE-001",
                     mode=FailureMode.HARD,
                     context={"message_id": adapter.message_id},
@@ -55,7 +55,7 @@ class PolicyEngine:
                     and ClassificationLabel.PRESSURE_TACTIC in adapter.classification.labels
                 ):
                     quarantine_reasons.append(
-                        "Employer pressure detected during disability leave — "
+                        "Employer pressure detected during disability leave "
                         "requires human review before any response"
                     )
                     operational_notes.append("pressure_tactic:employer")
@@ -63,7 +63,7 @@ class PolicyEngine:
                 # Rule 3: Conflict markers always quarantine
                 if ClassificationLabel.CONFLICT_MARKER in adapter.classification.labels:
                     quarantine_reasons.append(
-                        "Conflict marker detected — verify facts before action"
+                        "Conflict marker detected verify facts before action"
                     )
                     operational_notes.append("conflict_marker")
 
@@ -79,7 +79,7 @@ class PolicyEngine:
                 # Rule 5: Privileged content → quarantine for confidentiality protection
                 if ClassificationLabel.PRIVILEGED in adapter.classification.labels:
                     quarantine_reasons.append(
-                        "Privileged content detected — protect confidentiality"
+                        "Privileged content detected protect confidentiality"
                     )
                     operational_notes.append("privileged")
 
@@ -95,7 +95,7 @@ class PolicyEngine:
                 else:
                     decision = PolicyDecision(
                         allowed=True,
-                        reason="Clear path — no policy constraints triggered",
+                        reason="Clear path no policy constraints triggered",
                         quarantine=False
                     )
 

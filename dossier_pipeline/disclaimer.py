@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Output Disclaimer Generator
+Dossier DOSSIER-PIPELINE Output Disclaimer Generator
 
 Centralized footer for outward-facing artifacts. Kept versioned so that every
 rendered output can be traced to the exact disclaimer policy in effect.

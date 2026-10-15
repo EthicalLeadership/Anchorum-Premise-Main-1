@@ -2,7 +2,13 @@ import { translate } from "../i18n";
 import type { Locale } from "../types";
 
 export const INTAKE_STAGES = ["received", "preserved", "scanned", "indexed"] as const;
-export type IntakeState = "pending" | "active" | "done" | "failed" | "quarantined";
+export type IntakeState =
+  | "pending"
+  | "active"
+  | "stored"
+  | "done"
+  | "failed"
+  | "quarantined";
 
 interface Props {
   locale: Locale;
@@ -11,7 +17,16 @@ interface Props {
 }
 
 export function ProgressStrip({ locale, state, failedStage }: Props) {
-  const reached = state === "done" ? 4 : state === "pending" ? 0 : state === "active" ? 1 : 2;
+  const reached =
+    state === "done"
+      ? 4
+      : state === "stored"
+        ? 2
+        : state === "pending"
+          ? 0
+          : state === "active"
+            ? 1
+            : 2;
   const failedIndex = failedStage ? INTAKE_STAGES.indexOf(failedStage) : -1;
   return (
     <div className="progress-strip" data-state={state}>

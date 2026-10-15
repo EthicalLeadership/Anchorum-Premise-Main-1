@@ -1,9 +1,9 @@
-# Connector Audit — ingestion and analysis paths
+# Connector Audit ingestion and analysis paths
 
 **Audit id:** ANCH-2026-10-12-01
 **Date:** 2026-10-12
 **Branch:** `Anchorumzero_trust-on-Prem`
-**Test case:** `Angel v. Murray`, 322 A.2d 630 (R.I. 1974) — a contracts case brief submitted as a single PDF (`%PDF-1.7`, 149,819 bytes, SHA-256 `c58fcf248ab877e75975c04606ab60aca294c2f36d2930df858400b0b9c31830`).
+**Test case:** `Angel v. Murray`, 322 A.2d 630 (R.I. 1974) a contracts case brief submitted as a single PDF (`%PDF-1.7`, 149,819 bytes, SHA-256 `c58fcf248ab877e75975c04606ab60aca294c2f36d2930df858400b0b9c31830`).
 
 ## 1. Why this audit exists
 
@@ -14,7 +14,7 @@ it is made to reach it, the analysis stage has no vocabulary for it.
 
 This audit records what was measured, what was fixed, and what remains open. It is
 the companion to `docs/audit/REMEDIATION_REPORT.md`, which covers the
-ANCH-2026-10-02-01 findings; this document covers the *connectors* — the paths by
+ANCH-2026-10-02-01 findings; this document covers the *connectors* the paths by
 which a document enters the system and the paths by which it is analysed.
 
 ## 2. Method
@@ -48,7 +48,7 @@ One connector was missing outright and stopped the test case at the door. Four
 surface as the test case is pushed through further. One is a configuration
 requirement that is correct but invisible to an operator.
 
-## 4. C-1 — PDF document ingestion was not implemented (Critical, fixed)
+## 4. C-1 PDF document ingestion was not implemented (Critical, fixed)
 
 ### The contract
 
@@ -57,8 +57,8 @@ accepting artifacts of type `pdf | docx | eml | image | video | json | txt`.
 
 ### The implementation
 
-Only `.eml` was implemented. Both document entry points — the GRIC inspector
-(`interface/gric_server.py`) and the dossier bridge (`interface/document.py`) —
+Only `.eml` was implemented. Both document entry points the GRIC inspector
+(`interface/gric_server.py`) and the dossier bridge (`interface/document.py`)
 routed everything else through:
 
 ```python
@@ -80,7 +80,7 @@ Measured on the test case:
 | bytes in | 149,819 | 149,819 |
 | characters passed to the pipeline | 142,181 | 4,845 |
 | U+FFFD replacement characters | 59,630 (41.9%) | 0 |
-| printable ASCII | 43.5% | — |
+| printable ASCII | 43.5% | |
 | distinguishing terms found (of 14) | **0** | **14** |
 | `Maher` | 0 | 15 |
 | `Murray` | 0 | 10 |
@@ -96,15 +96,15 @@ The 14 terms searched were: `Maher`, `Murray`, `Newport`, `consideration`,
 
 Two new modules and a rewiring of both entry points.
 
-`interface/pdf_text.py` — a dependency-free PDF **text-layer** extractor. It
+`interface/pdf_text.py` a dependency-free PDF **text-layer** extractor. It
 handles uncompressed and Flate-compressed content streams, literal and hex
 strings, and the `Tj` / `TJ` / `'` / `"` text-showing operators, joining runs with
 a kerning heuristic. It is deliberately honest about its limits: it cannot recover
 text that is not there, so a scanned page raises `NoTextFound` rather than
-returning an empty string. Refusing is the point — an empty extraction must never
+returning an empty string. Refusing is the point an empty extraction must never
 be mistaken for a document with no content.
 
-`interface/submission.py` — one place that decides what an artifact is:
+`interface/submission.py` one place that decides what an artifact is:
 
 - content first, then name, because a mislabelled file is a real occurrence and
   the bytes are the authority;
@@ -139,7 +139,7 @@ U+FFFD        : 0
 The record now describes the document. Before the fix it described 59,630
 replacement characters.
 
-## 5. C-2 — the legal lexicon projects almost nothing (High, open)
+## 5. C-2 the legal lexicon projects almost nothing (High, open)
 
 ### What "analysed in all its scopes" resolves to
 
@@ -152,14 +152,14 @@ distinct scopes and each was projected.
 
 | scope | chars | concept_id | classification | matched concepts |
 |---|---|---|---|---|
-| CITATION | 29 | — | `canonical_projection_fallback` | none |
+| CITATION | 29 | | `canonical_projection_fallback` | none |
 | FACTS | 2,009 | `LEGAL_ALLEGATION` | `canonical_projection_insufficient` | 2 |
-| PROCEDURAL_POSTURE | 188 | — | `canonical_projection_fallback` | none |
-| ISSUE | 218 | — | `canonical_projection_fallback` | none |
-| RULE | 163 | — | `canonical_projection_fallback` | none |
-| REASONING | 1,495 | — | `canonical_projection_fallback` | none |
-| HOLDING | 137 | — | `canonical_projection_fallback` | none |
-| DISTILLED_RULES | 599 | — | `canonical_projection_fallback` | none |
+| PROCEDURAL_POSTURE | 188 | | `canonical_projection_fallback` | none |
+| ISSUE | 218 | | `canonical_projection_fallback` | none |
+| RULE | 163 | | `canonical_projection_fallback` | none |
+| REASONING | 1,495 | | `canonical_projection_fallback` | none |
+| HOLDING | 137 | | `canonical_projection_fallback` | none |
+| DISTILLED_RULES | 599 | | `canonical_projection_fallback` | none |
 
 Seven of eight scopes fall through to `canonical_projection_fallback` with
 `concept_distribution = {}`, `unmapped = 1`, and `admissible = false`. Only the
@@ -173,9 +173,9 @@ The whole document as a single submission behaves the same way:
 ### What this means
 
 This is the connector that produces the analysis, and on a real legal document it
-produces nothing. The brief is a contracts case brief — offer, acceptance,
+produces nothing. The brief is a contracts case brief offer, acceptance,
 consideration, contract modification, unforeseen circumstances, the
-pre-existing-duty rule, `Restatement (Second) of Contracts` — and the lexicon has
+pre-existing-duty rule, `Restatement (Second) of Contracts` and the lexicon has
 no vocabulary that matches how such a document is actually written.
 
 The failure is silent by design: `canonical_projection_fallback` is a legitimate
@@ -206,7 +206,7 @@ response should say so explicitly. Separately, the lexicon needs contract-format
 and contract-modification concepts before this class of document is analysable.
 Both are product decisions and are recorded here rather than made silently.
 
-## 6. C-3 — the dossier pipeline is mail-shaped (High, open)
+## 6. C-3 the dossier pipeline is mail-shaped (High, open)
 
 ### Observed
 
@@ -218,7 +218,7 @@ Every stage of the run is email semantics:
 {"event": "classification", "result": "insurer", "stage": "classification", ...}
 {"event": "provenance", "result": "complete", "stage": "provenance", ...}
 {"event": "adapter", "result": "adapted", "stage": "adapter", ...}
-{"event": "policy", "reason": "Clear path — no policy constraints triggered", "result": "allowed", ...}
+{"event": "policy", "reason": "Clear path no policy constraints triggered", "result": "allowed", ...}
 {"event": "control", "result": "committed", "stage": "control", ...}
 ```
 
@@ -233,7 +233,7 @@ Two problems:
    It has a `message_id`, a `sender`, a `recipient`, a `date`, an
    `attachment_count` and a `missing_fields` list, all synthesised by the
    connector. The payload records `sender: "interface@localhost"` and
-   `recipient: "user@protonmail.com"` — values the connector invented and which
+   `recipient: "user@protonmail.com"` values the connector invented and which
    now sit inside a committed, signed custody record as if they described the
    submission.
 
@@ -266,7 +266,7 @@ model, or record explicitly in the payload that the email fields are synthesised
 and carry no evidentiary weight. The current payload does not distinguish
 invented values from observed ones.
 
-## 7. C-4 — the product API never analyses evidence (High, open)
+## 7. C-4 the product API never analyses evidence (High, open)
 
 ### Method
 
@@ -316,22 +316,22 @@ GET /evidence/{id}/custody -> [{"actor":"system","action":"uploaded",
                                 "chain":"not_checked"}]
 ```
 
-`chain: "not_checked"` — the custody chain for the evidence is not walked.
+`chain: "not_checked"` the custody chain for the evidence is not walked.
 
 Every analysis and query surface is declared unavailable:
 
 | route | result |
 |---|---|
-| `GET /cases/{id}/timeline` | 501 `FEATURE_UNAVAILABLE` `timeline` — "Case chronology extraction and query are not implemented." |
-| `GET /cases/{id}/search?q=` | 501 `case_search` — "Case-scoped full-text search is not implemented." |
-| `GET /cases/{id}/audit` | 501 `case_audit` — "Case-scoped audit projections are not implemented." |
-| `POST /cases/{id}/export?type=pdf` | 501 `case_export` — "Case-scoped gated export generation is not implemented." |
-| `POST /cases/{id}/exports/preview?type=pdf` | 501 `export_preview` — "The product export gates and Barreau validation are not implemented." |
-| `GET /admin/members` | 501 `member_administration` — "Member management is not implemented." |
+| `GET /cases/{id}/timeline` | 501 `FEATURE_UNAVAILABLE` `timeline` "Case chronology extraction and query are not implemented." |
+| `GET /cases/{id}/search?q=` | 501 `case_search` "Case-scoped full-text search is not implemented." |
+| `GET /cases/{id}/audit` | 501 `case_audit` "Case-scoped audit projections are not implemented." |
+| `POST /cases/{id}/export?type=pdf` | 501 `case_export` "Case-scoped gated export generation is not implemented." |
+| `POST /cases/{id}/exports/preview?type=pdf` | 501 `export_preview` "The product export gates and Barreau validation are not implemented." |
+| `GET /admin/members` | 501 `member_administration` "Member management is not implemented." |
 
 ### Assessment
 
-These are honest refusals — 501 with a named feature, not a silent empty list or a
+These are honest refusals 501 with a named feature, not a silent empty list or a
 500. The API does not pretend to do work it has not done. The finding is that the
 *analysis* half of the product does not exist behind this API at all, while the
 analysis engine that does exist (`interface/document.py`, the dossier pipeline,
@@ -348,7 +348,7 @@ Wire the upload route to the document connector that now exists
 the evidence record, so `processingStatus` can advance past `"stored"`. Until
 that happens, `timeline` and `case_search` have nothing to search.
 
-## 8. C-5 — custody does not bind the submitted artifact (Medium, open)
+## 8. C-5 custody does not bind the submitted artifact (Medium, open)
 
 ### Observed
 
@@ -385,19 +385,19 @@ function of when the ingestion ran, not of what was ingested.
 ### Not fixed here
 
 Making `raw_sha256` a function of the submission requires deciding what the record
-should bind to — the derived text, the original artifact, or both — and that
+should bind to the derived text, the original artifact, or both and that
 changes what a signed custody record attests to. That is the owner's decision, not
 a connector defect with one implementation. The two candidate repairs are:
 
 1. carry the submitted artifact's SHA-256 into the record alongside the wrapper
    hash, so both are present and distinguishable; or
 2. derive the synthetic `Message-ID` (and pin the synthetic `Date`) from the
-   content, making `raw_sha256` deterministic — which also restores dedup.
+   content, making `raw_sha256` deterministic which also restores dedup.
 
 Option 2 is contained within the connector and needs no schema change, but it
 changes dedup semantics, so it is recorded rather than applied.
 
-## 9. C-6 — the evidence signing key is a hard prerequisite (by design)
+## 9. C-6 the evidence signing key is a hard prerequisite (by design)
 
 ### Observed
 
@@ -432,11 +432,11 @@ README's local-run recipe.
 
 | file | change |
 |---|---|
-| `interface/pdf_text.py` | new — dependency-free PDF text-layer extractor |
-| `interface/submission.py` | new — single artifact-type dispatcher for both entry points |
+| `interface/pdf_text.py` | new dependency-free PDF text-layer extractor |
+| `interface/submission.py` | new single artifact-type dispatcher for both entry points |
 | `interface/document.py` | dispatch by artifact type; PDFs parsed rather than decoded |
 | `interface/gric_server.py` | same, via `interface/submission` |
-| `tests/test_pdf_text.py` | new — 26 pins |
+| `tests/test_pdf_text.py` | new 26 pins |
 
 `tests/test_pdf_text.py` pins the defect rather than only the fix: it asserts that
 decoding a synthetic PDF as UTF-8 loses its text, and that the extractor then
@@ -444,8 +444,8 @@ finds it. That is a test that fails if the decode-everything behaviour returns.
 
 Also pinned: refused binary types, refusal-before-decode ordering, `NoTextFound`
 for a document with no text layer, escaped parentheses, hex strings, kerning word
-gaps, and — guarded by a file-existence check so it does not fail on a machine
-without the sample — the real brief's distinguishing terms and a zero U+FFFD
+gaps, and guarded by a file-existence check so it does not fail on a machine
+without the sample the real brief's distinguishing terms and a zero U+FFFD
 count.
 
 ## 11. Gates
@@ -461,8 +461,8 @@ count.
 | `pytest tests/test_pdf_text.py` | 26 passed |
 
 Both figures are given because they are different claims. The working tree carries
-uncommitted work from a concurrent actor — a modified front end and an untracked
-`tests/test_interface_api.py` — and those 8 tests account for the difference. Only
+uncommitted work from a concurrent actor a modified front end and an untracked
+`tests/test_interface_api.py` and those 8 tests account for the difference. Only
 the committed figure travels with a clone; it was re-run in a detached worktree of
 `0e9c273`, untouched by the concurrent edits, where the integrity gate, secret
 scan and SBOM check also pass.
@@ -507,7 +507,7 @@ means the product API does not analyse it at all, and C-2 means the engine that
 would do the analysing has no vocabulary for it.
 
 Those two are the remaining blockers to the original request, and neither is a
-connector that can be repaired in isolation — C-4 needs the analysis path wired
+connector that can be repaired in isolation C-4 needs the analysis path wired
 into the API, and C-2 needs the lexicon extended for contract and case-brief
 language. Both are recorded here with the evidence needed to decide them rather
 than changed silently.

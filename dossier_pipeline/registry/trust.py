@@ -1,4 +1,4 @@
-"""Cryptographically anchored signer authorization — v3 (Design D).
+"""Cryptographically anchored signer authorization v3 (Design D).
 
 The trust anchor is a monotonic, versioned, signed state machine. It is
 the sole authority for which signers may produce registry entries and

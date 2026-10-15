@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Decision Engine (Silence Matrix)
+Dossier DOSSIER-PIPELINE Decision Engine (Silence Matrix)
 Label-to-route derivation with reasoning traces.
 """
 
@@ -59,12 +59,12 @@ class DecisionEngine:
                         route_candidate = RouteAction.QUARANTINE_REVIEW
                         interpretation.append(
                             "SILENCE MATRIX [EMPLOYER+REQUIRES_RESPONSE]: Employer demands "
-                            "response — legal review mandatory before any reply."
+                            "response legal review mandatory before any reply."
                         )
                     else:
                         route_candidate = RouteAction.ARCHIVE
                         interpretation.append(
-                            "SILENCE MATRIX [EMPLOYER]: Informational — archive and monitor."
+                            "SILENCE MATRIX [EMPLOYER]: Informational archive and monitor."
                         )
 
                 # ---- INSURER ----
@@ -78,7 +78,7 @@ class DecisionEngine:
                     else:
                         route_candidate = RouteAction.ARCHIVE
                         interpretation.append(
-                            "SILENCE MATRIX [INSURER]: Routine — archive."
+                            "SILENCE MATRIX [INSURER]: Routine archive."
                         )
 
                 # ---- UNION ----
@@ -102,7 +102,7 @@ class DecisionEngine:
                     else:
                         route_candidate = RouteAction.ARCHIVE
                         interpretation.append(
-                            "SILENCE MATRIX [MEDICAL]: Routine — archive."
+                            "SILENCE MATRIX [MEDICAL]: Routine archive."
                         )
 
                 # ---- PSYCHOLOGIST ----
@@ -124,14 +124,14 @@ class DecisionEngine:
                 elif actor == ActorType.SELF:
                     route_candidate = RouteAction.QUARANTINE_REVIEW
                     interpretation.append(
-                        "SILENCE MATRIX [SELF]: Outgoing — manual review required."
+                        "SILENCE MATRIX [SELF]: Outgoing manual review required."
                     )
 
                 # ---- UNKNOWN ----
                 else:
                     route_candidate = RouteAction.QUARANTINE_REVIEW
                     interpretation.append(
-                        "SILENCE MATRIX [UNKNOWN]: Actor unrecognised — manual review required."
+                        "SILENCE MATRIX [UNKNOWN]: Actor unrecognised manual review required."
                     )
 
                 invariant(

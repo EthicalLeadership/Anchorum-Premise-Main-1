@@ -1,4 +1,4 @@
-# Quickstart — Anchoring DOSSIER-PIPELINE
+# Quickstart Anchoring DOSSIER-PIPELINE
 
 ## What this adds
 - A local anchor file derived from the control-chain tail hash

@@ -1,4 +1,4 @@
-# Dossier DOSSIER-PIPELINE — Evidence Governance Pipeline
+# Dossier DOSSIER-PIPELINE Evidence Governance Pipeline
 
 Local, audit-grade evidence ingestion and classification system for the Client workplace/medical/insurance case.
 
@@ -8,7 +8,7 @@ Local, audit-grade evidence ingestion and classification system for the Client w
 - **Fingerprints** every email with SHA-256 cryptographic hashes
 - **Classifies** by actor: Employer, Insurer, Union, Medical, Psychologist, Legal, Self, Unknown
 - **Labels** legal risk: URGENT, LEGAL_SIGNIFICANT, PRESSURE_TACTIC, CONFLICT_MARKER, PRIVILEGED, etc.
-- **Enforces** the Silence Matrix — auto-quarantines employer pressure during protected leave
+- **Enforces** the Silence Matrix auto-quarantines employer pressure during protected leave
 - **Chains** every decision into an immutable, hash-linked audit trail (SQLite)
 - **Exports** tribunal-ready JSON + counsel-ready Markdown
 
@@ -38,14 +38,14 @@ The system uses a **control-plane canonical commit** model:
 
 ## Architecture (8 Layers)
 
-1. **Intake** — MIME parsing, deduplication, cryptographic fingerprinting
-2. **Classify** — Deterministic actor/label detection (Quebec French + English)
-3. **Provenance** — Completeness checks, thread detection
-4. **Adapt** — Governance payload assembly with payload hash
-5. **Policy** — Hard enforcement boundaries (employer pressure → quarantine)
-6. **Decide** — Silence Matrix route derivation
-7. **Control** — Hash-linked audit chain (`previous_hash` → `record_hash`)
-8. **Export** — JSON manifest + Markdown summary
+1. **Intake** MIME parsing, deduplication, cryptographic fingerprinting
+2. **Classify** Deterministic actor/label detection (Quebec French + English)
+3. **Provenance** Completeness checks, thread detection
+4. **Adapt** Governance payload assembly with payload hash
+5. **Policy** Hard enforcement boundaries (employer pressure → quarantine)
+6. **Decide** Silence Matrix route derivation
+7. **Control** Hash-linked audit chain (`previous_hash` → `record_hash`)
+8. **Export** JSON manifest + Markdown summary
 
 ## Setup
 
@@ -173,7 +173,7 @@ python -m dossier_pipeline.main export-md
 | Insurer + LEGAL_SIGNIFICANT | QUARANTINE_REVIEW | Counsel review before disclosure. |
 | Union | FORWARD_UNION | Forward to delegate and archive. |
 | Medical + PRIVILEGED | QUARANTINE_REVIEW | Protect confidentiality. |
-| Psychologist | QUARANTINE_REVIEW | High sensitivity — review first. |
+| Psychologist | QUARANTINE_REVIEW | High sensitivity review first. |
 | Legal | ESCALATE_LEGAL | Immediate counsel escalation. |
 
 ## Deterministic Guarantee
@@ -185,7 +185,7 @@ This system uses **only** regex keyword matching and explicit heuristics. No mac
 - **Read-only**: Never marks emails as read, never deletes, never sends replies.
 - **Local-only**: No cloud dependencies. No Kafka, Neo4j, Redis.
 - **Encrypted at rest**: SQLite databases stored locally with filesystem permissions.
-- **Hash-linked**: Tampering with any record breaks the chain — verifiable via `verify-chain`
+- **Hash-linked**: Tampering with any record breaks the chain verifiable via `verify-chain`
 
 ## License
 

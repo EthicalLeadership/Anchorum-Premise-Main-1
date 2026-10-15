@@ -2,7 +2,7 @@
 Failure Classification Engine
 ==============================
 Every failure is classified into an exact category from the closed taxonomy.
-No fuzzy or ML-based classification — pattern matching + traceback parsing only.
+No fuzzy or ML-based classification pattern matching + traceback parsing only.
 """
 from __future__ import annotations
 

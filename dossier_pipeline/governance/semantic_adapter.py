@@ -7,15 +7,15 @@ returns an object with those attributes.
 
 So this adapter is intentionally thin. Its value is *scoping*: it binds a
 lexicon, a vertical identity, and a configured engine into a single object
-that the flow can consume without further ceremony — and it exposes the
+that the flow can consume without further ceremony and it exposes the
 lexicon hash so callers can register it alongside the projection config.
 
 Two entry points:
 
-  * ``SemanticEngineAdapter`` — wraps an already-constructed engine.
+  * ``SemanticEngineAdapter`` wraps an already-constructed engine.
     Use this if you want to share one engine across many decisions.
 
-  * ``build_for_vertical`` — convenience: loads a YAML lexicon, constructs
+  * ``build_for_vertical`` convenience: loads a YAML lexicon, constructs
     an engine scoped to a vertical, and returns the adapter. Raises
     ``ImportError`` if the ``ccsp`` package is not importable.
 

@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Transaction / Rollback Layer
+Dossier DOSSIER-PIPELINE Transaction / Rollback Layer
 
 Provides a unit-of-work envelope across the pipeline's SQLite stores. The
 implementation is intentionally conservative: it coordinates BEGIN/COMMIT/

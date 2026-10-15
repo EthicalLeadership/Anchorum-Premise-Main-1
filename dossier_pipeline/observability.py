@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Lightweight Structured Logging
+Dossier DOSSIER-PIPELINE Lightweight Structured Logging
 
 Provides a minimal JSON line logger for operational visibility without adding
 third-party dependencies. The logger is intentionally simple and local-first so

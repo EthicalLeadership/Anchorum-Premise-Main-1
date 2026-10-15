@@ -1,12 +1,12 @@
-"""Gateway loader — the only entry point for vertical configs.
+"""Gateway loader the only entry point for vertical configs.
 
 A "gateway" is a directory under `gateways/<name>/` containing:
-    gateway.yaml        — the contract (validated by this loader)
-    actors.json         — actor classification rules
-    policy.cel          — policy decision rules (CEL, rule-block format)
-    regulations.json    — citation library referenced by policy.cel
-    risk_patterns.json  — risk flag definitions
-    evals/golden/       — golden test set
+    gateway.yaml        the contract (validated by this loader)
+    actors.json         actor classification rules
+    policy.cel          policy decision rules (CEL, rule-block format)
+    regulations.json    citation library referenced by policy.cel
+    risk_patterns.json  risk flag definitions
+    evals/golden/       golden test set
 
 Schema versions
 ===============

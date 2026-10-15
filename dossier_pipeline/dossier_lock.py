@@ -1,5 +1,5 @@
 """
-Dossier DOSSIER-PIPELINE — Dossier-Scoped Execution Lock
+Dossier DOSSIER-PIPELINE Dossier-Scoped Execution Lock
 
 Provides a coarse-grained SQLite-backed mutual exclusion primitive that
 serializes pipeline execution per dossier across processes and workers.

@@ -1,4 +1,178 @@
-# Anchorum interface shell
+#!/usr/bin/env python3
+# /home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/create_icon.py
+
+from PIL import Image, ImageDraw, ImageFont
+
+def create_anchorum_icon():
+    # Create 512x512 icon
+    size = 512
+    img = Image.new('RGB', (size, size), color='#1a365d')  # Professional blue
+    
+    draw = ImageDraw.Draw(img)
+    
+    # Draw a simple legal scale icon
+    center_x = size // 2
+    center_y = size // 2
+    
+    # Scale base
+    draw.rectangle([center_x - 80, center_y - 10, center_x + 80, center_y + 10], 
+                   outline='#f6ad55', width=8)
+    
+    # Scale pans
+    draw.line([center_x - 70, center_y - 10, center_x - 40, center_y - 60], fill='#f6ad55', width=8)
+    draw.line([center_x + 70, center_y - 10, center_x + 40, center_y - 60], fill='#f6ad55', width=8)
+    
+    # Save as PNG
+    img.save('/home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/public/icon.png')
+    print("Icon created successfully!")
+
+if __name__ == "__main__":
+    create_anchorum_icon()#!/usr/bin/env python3
+# /home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/create_icon.py
+
+from PIL import Image, ImageDraw, ImageFont
+
+def create_anchorum_icon():
+    # Create 512x512 icon
+    size = 512
+    img = Image.new('RGB', (size, size), color='#1a365d')  # Professional blue
+    
+    draw = ImageDraw.Draw(img)
+    
+    # Draw a simple legal scale icon
+    center_x = size // 2
+    center_y = size // 2
+    
+    # Scale base
+    draw.rectangle([center_x - 80, center_y - 10, center_x + 80, center_y + 10], 
+                   outline='#f6ad55', width=8)
+    
+    # Scale pans
+    draw.line([center_x - 70, center_y - 10, center_x - 40, center_y - 60], fill='#f6ad55', width=8)
+    draw.line([center_x + 70, center_y - 10, center_x + 40, center_y - 60], fill='#f6ad55', width=8)
+    
+    # Save as PNG
+    img.save('/home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/public/icon.png')
+    print("Icon created successfully!")
+
+if __name__ == "__main__":
+    create_anchorum_icon()#!/usr/bin/env python3
+# /home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/create_icon.py
+
+from PIL import Image, ImageDraw, ImageFont
+
+def create_anchorum_icon():
+    # Create 512x512 icon
+    size = 512
+    img = Image.new('RGB', (size, size), color='#1a365d')  # Professional blue
+    
+    draw = ImageDraw.Draw(img)
+    
+    # Draw a simple legal scale icon
+    center_x = size // 2
+    center_y = size // 2
+    
+    # Scale base
+    draw.rectangle([center_x - 80, center_y - 10, center_x + 80, center_y + 10], 
+                   outline='#f6ad55', width=8)
+    
+    # Scale pans
+    draw.line([center_x - 70, center_y - 10, center_x - 40, center_y - 60], fill='#f6ad55', width=8)
+    draw.line([center_x + 70, center_y - 10, center_x + 40, center_y - 60], fill='#f6ad55', width=8)
+    
+    # Save as PNG
+    img.save('/home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/public/icon.png')
+    print("Icon created successfully!")
+
+if __name__ == "__main__":
+    create_anchorum_icon()#!/usr/bin/env python3
+# /home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/create_icon.py
+
+from PIL import Image, ImageDraw, ImageFont
+
+def create_anchorum_icon():
+    # Create 512x512 icon
+    size = 512
+    img = Image.new('RGB', (size, size), color='#1a365d')  # Professional blue
+    
+    draw = ImageDraw.Draw(img)
+    
+    # Draw a simple legal scale icon
+    center_x = size // 2
+    center_y = size // 2
+    
+    # Scale base
+    draw.rectangle([center_x - 80, center_y - 10, center_x + 80, center_y + 10], 
+                   outline='#f6ad55', width=8)
+    
+    # Scale pans
+    draw.line([center_x - 70, center_y - 10, center_x - 40, center_y - 60], fill='#f6ad55', width=8)
+    draw.line([center_x + 70, center_y - 10, center_x + 40, center_y - 60], fill='#f6ad55', width=8)
+    
+    # Save as PNG
+    img.save('/home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/public/icon.png')
+    print("Icon created successfully!")
+
+if __name__ == "__main__":
+    create_anchorum_icon()#!/usr/bin/env python3
+# /home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/create_icon.py
+
+from PIL import Image, ImageDraw, ImageFont
+
+def create_anchorum_icon():
+    # Create 512x512 icon
+    size = 512
+    img = Image.new('RGB', (size, size), color='#1a365d')  # Professional blue
+    
+    draw = ImageDraw.Draw(img)
+    
+    # Draw a simple legal scale icon
+    center_x = size // 2
+    center_y = size // 2
+    
+    # Scale base
+    draw.rectangle([center_x - 80, center_y - 10, center_x + 80, center_y + 10], 
+                   outline='#f6ad55', width=8)
+    
+    # Scale pans
+    draw.line([center_x - 70, center_y - 10, center_x - 40, center_y - 60], fill='#f6ad55', width=8)
+    draw.line([center_x + 70, center_y - 10, center_x + 40, center_y - 60], fill='#f6ad55', width=8)
+    
+    # Save as PNG
+    img.save('/home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/public/icon.png')
+    print("Icon created successfully!")
+
+if __name__ == "__main__":
+    create_anchorum_icon()#!/usr/bin/env python3
+# /home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/create_icon.py
+
+from PIL import Image, ImageDraw, ImageFont
+
+def create_anchorum_icon():
+    # Create 512x512 icon
+    size = 512
+    img = Image.new('RGB', (size, size), color='#1a365d')  # Professional blue
+    
+    draw = ImageDraw.Draw(img)
+    
+    # Draw a simple legal scale icon
+    center_x = size // 2
+    center_y = size // 2
+    
+    # Scale base
+    draw.rectangle([center_x - 80, center_y - 10, center_x + 80, center_y + 10], 
+                   outline='#f6ad55', width=8)
+    
+    # Scale pans
+    draw.line([center_x - 70, center_y - 10, center_x - 40, center_y - 60], fill='#f6ad55', width=8)
+    draw.line([center_x + 70, center_y - 10, center_x + 40, center_y - 60], fill='#f6ad55', width=8)
+    
+    # Save as PNG
+    img.save('/home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/public/icon.png')
+    print("Icon created successfully!")
+
+if __name__ == "__main__":
+    create_anchorum_icon()# Anchorum interface shell
 
 This package contains the Anchorum Prem Main React/TypeScript shell and its
 FastAPI entry point. The API currently provides a local/test session,
@@ -42,7 +216,7 @@ Accepted artifact types: `.eml` (the native path), `.pdf` (text layer extracted)
 and the plain-text formats `.txt .md .json .csv .xml .html .yaml .log .rst .ini
 .cfg .toml`. Binary types named in the GRIC manifest but not implemented
 (`docx`, `odt`, images, video) are **refused with a message naming the type**
-rather than decoded as text — decoding binary as text succeeds wrongly and puts
+rather than decoded as text decoding binary as text succeeds wrongly and puts
 the result into a signed record. A PDF with no text layer (a scan) is refused for
 the same reason.
 

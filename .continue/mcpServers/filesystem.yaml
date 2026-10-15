@@ -1,0 +1,11 @@
+name: Anchorum workspace filesystem
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: Anchorum workspace filesystem
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-filesystem"
+      - "/home/kark/anchorum-prem-main(1)/anchorum-prem-main"
+    env: {}
