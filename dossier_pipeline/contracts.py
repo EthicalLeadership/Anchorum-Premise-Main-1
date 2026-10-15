@@ -22,6 +22,13 @@ class ActorType(str, Enum):
     UNKNOWN = "unknown"
 
 
+#: Classification confidence below which a human must look at the item. Shared
+#: deliberately by `ProvenanceCurator.curate`, which sets the review flag, and by
+#: `inv_008`, which requires it: one threshold, so the two cannot disagree and
+#: abort a run between them.
+LOW_CLASSIFICATION_CONFIDENCE = 0.6
+
+
 class ClassificationLabel(str, Enum):
     URGENT = "urgent"
     LEGAL_SIGNIFICANT = "legal_significant"

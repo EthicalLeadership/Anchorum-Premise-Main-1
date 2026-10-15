@@ -26,7 +26,7 @@ this table as what is on the tree.
 | `W2` | `C-3` | Implemented. A non-email transport records `actor = unknown` with `classification_scope_warning` on the committed record, and a synthesised envelope field no longer counts towards provenance completeness. | `tests/test_control_record_integrity.py::ArtifactIdentityInCommittedRecordTests::test_record_does_not_invent_an_actor_for_a_document` |
 | `W3` | `C-4` | Implemented. `interface/analysis.py` reads, segments and projects a stored artifact; `GET /evidence/{id}/analysis` and `POST /evidence/{id}/analyse` serve it; the item's status advances and carries an analysis block; custody entries state whether a chain was checked. | `tests/test_analysis.py`, `tests/test_evidence_analysis_api.py` |
 | `W4` | `C-2` (a) | Implemented. Coverage is computed, and a majority-fallback or zero-match document carries an explicit warning instead of reading as "no legal concepts here". | `tests/test_analysis.py::test_uncovered_language_is_surfaced_as_a_warning` |
-| `W5` | `C-2` (b) | **Open.** The lexicon still covers 1 of the brief's 8 scopes. | |
+| `W5` | `C-2` (b) | Implemented. `lexicons/legal-doctrine-v1.yaml` (12 concepts, 42 patterns) bound through a second engine; 9 of 12 concepts fire on the brief; `DOCTRINE_OFFER` is a near miss asserted in the suite. The risk register is unchanged and the C2 warning stays at 1 of 8 -- that is the risk register's coverage, not the doctrine lexicon's. | `tests/test_doctrine_lexicon.py`, `tests/test_acceptance_brief.py::test_a5_doctrine_projection`, `::test_a6_analysis_record_carries_doctrine_block`, `::test_a6_doctrine_block_does_not_overwrite_risk_projection`, `::test_c7_api_analysis_returns_doctrine_block` |
 | `W6` | `C-6` | Verify only; not re-checked in this pass. | |
 
 Verification measured on this tree: the acceptance run in §3 is green, both as a
@@ -533,7 +533,17 @@ count as provenance.
       `_build_execution_context` (rule 4.1), and add it to
       `exportable_fields`.
 
-- [ ] **2.5 record the finding about `check_inv_008`.** In
+- [x] **2.5 record the finding about `check_inv_008`.** **Resolved** (see below). The
+      dead branch was fixed in `dossier_pipeline/invariants.py`, paired with the
+      curator change described above; `ProvenanceCurator.curate` now sets
+      `human_review_required` for an unrecognised actor, so the fixed check does
+      not abort the run on real mail. The two new tests in
+      `tests/test_assertions.py` isolate the actor branch specifically -- the
+      existing low-confidence test fires on the confidence branch and would have
+      passed with the bug present. This is D-6, and it is closed; the historical
+      note follows for the record.
+
+      The original text: In
       `dossier_pipeline/invariants.py`:
 
       ```python
@@ -1264,7 +1274,7 @@ gets repeated. Record the decision in the commit message or in this document.
 | D-3 | `W3`: the scope model | the eight IRAC scopes from the audit's probe, or something else | Confirm the eight before `scopes.py` becomes a pin | Product owner |
 | D-4 | `W3`: the tier split | analysis key-free / commit keyed, or everything behind the secret | **Key-free analysis, keyed commit.** Otherwise nothing is analysable on a machine without signing material | Product owner |
 | D-5 | `W3`: the evidence-item `status` | advance it (`received` → `processed`), or keep `received` and carry analysis state only in the new block | **Advance it** the finding names the frozen status but this is a UI contract change, so the frontend owner must agree | Frontend owner |
-| D-6 | `W2`: `check_inv_008`'s dead branch | fix the case mismatch (needs 2.2), or record it and leave it | **Fix it**, with 2.2 in the same change, because a check that cannot fire should not be counted as coverage | Pipeline owner |
+| D-6 | `W2`: `check_inv_008`'s dead branch | fix the case mismatch (needs 2.2), or record it and leave it | **Fixed.** The comparison uses `ActorType.UNKNOWN.value` and normalises the input; the paired curator change landed in `provenance.py` so the check does not fail closed on real mail. Two tests isolate the actor branch. The redundant `provenance["confidence"] < 0.5` check was dropped as subsumed. | Pipeline owner (done) |
 | D-7 | `W1`: what `text=` submissions bind to | hash of the UTF-8 text, or refuse `text=` on the document path | **Hash the UTF-8 text and label it `text/plain`.** Refusing would break the GRIC inspector's `project_submit` path | Pipeline owner |
 | D-8 | `W3`: the size ceiling | 25 MB (mirrors `ARCHIVE_MAX_BYTES`), or lower | **25 MB**, stated in the README | Interface owner |
 | D-9 | `W2`: the classifier's confidence formula | leave `0.3 + 0.15 × hits`, or give the classifier a model that can express uncertainty | **Leave it in this pass.** The actor and the scope warning carry the honesty signal; changing the formula touches `policy.py`'s F-16 note | Product owner |
