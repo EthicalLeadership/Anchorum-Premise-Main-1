@@ -67,6 +67,7 @@ data/
 .idea/
 *.swp
 *.bak
+*.bak-*
 *.tmp
 logger.mjs
 tmp_audit_disk.bin

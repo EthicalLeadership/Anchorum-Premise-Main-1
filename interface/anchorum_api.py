@@ -589,6 +589,18 @@ def create_app(
                 "warning": None,
             },
             "scopes": [],
+            # W5: the doctrine block is present on both branches of the
+            # response, so a consumer reading the key does not need to know
+            # whether analysis has run yet.
+            "doctrine": {
+                "conceptDistribution": {},
+                "scopesMatched": 0,
+                "engineVersion": "",
+                "lexiconHash": "",
+                "configHash": "",
+                "classification": "",
+                "fallbackReason": None,
+            },
             "analysedAt": (
                 _datetime_text(document.analysed_at) if document.analysed_at else None
             ),

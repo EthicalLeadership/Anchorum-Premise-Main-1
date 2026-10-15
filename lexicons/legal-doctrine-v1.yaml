@@ -1,0 +1,408 @@
+version: legal-doctrine-v1
+
+# D-1 Option A. Confirmed empirically at Phase 0.1 AND at the engine layer
+# by tests/test_doctrine_lexicon.py::test_engine_fires_on_descriptive_concept
+# and ::test_negation_is_not_applied_to_descriptive_concepts.
+#
+# Descriptive lexicon. Answers "what area of contract law does this text
+# discuss?", not "may this be relied on?".
+#
+# ENGINE NOTE (measured, not assumed):
+#   The production engine is ccsp.verify.Engine, reached via
+#   interface.engine.engine_doctrine(). That engine reads `concepts`,
+#   `lexicon`, `version` and nothing else. It does NOT read the `runtime`
+#   block. Specifically:
+#     - No negation is applied to any concept, regardless of `forbidden`
+#       or `negatable_default`. A concept fires wherever its pattern
+#       matches. This is why "The Pre-Existing Duty rule does not apply"
+#       fires DOCTRINE_PRE_EXISTING_DUTY -- not because a flag was honoured.
+#     - span_splitting is not consulted. The `\u2014` and `\n` entries are
+#       inert for this engine. They are present because the risk register
+#       declares them; keep them for schema parity, do not rely on them.
+#   The runtime block is read by `run_legal_v31.py`, a standalone script
+#   not on the production path. It is documentation here.
+#
+# DOCTRINE_CITATION_REPORTER deliberately absent: citations belong to the
+# extractor's CITATION scope, not to a doctrine lexicon. No duplication.
+runtime:
+  matching:
+    granularity: span
+    default_action: allow
+    span_splitting:
+      hard:
+      - ;
+      - .
+      - '?'
+      - '!'
+      - "\u2014"
+      - --
+      - "\n"
+      - ','
+      soft:
+      - '\band\b'
+      - '\bbut\b'
+      - '\bor\b'
+  # NOTE: for ccsp.verify.Engine (the production path), this key is inert --
+  # that engine does no negation. It is read by run_legal_v31.py, a standalone
+  # script not on the production path. The setting is kept for schema parity
+  # with legal-v3.1.yaml. If the production engine ever gains negation logic,
+  # this value becomes load-bearing and MUST be re-evaluated at that point.
+  negatable_default: false
+
+concepts:
+- id: DOCTRINE_OFFER
+  scope: [legal]
+  forbidden: false
+  strength: descriptive
+- id: DOCTRINE_ACCEPTANCE
+  scope: [legal]
+  forbidden: false
+  strength: descriptive
+- id: DOCTRINE_CONSIDERATION
+  scope: [legal]
+  forbidden: false
+  strength: descriptive
+- id: DOCTRINE_CONTRACT_MODIFICATION
+  scope: [legal]
+  forbidden: false
+  strength: descriptive
+- id: DOCTRINE_PRE_EXISTING_DUTY
+  scope: [legal]
+  forbidden: false
+  strength: descriptive
+- id: DOCTRINE_UNANTICIPATED_CIRCUMSTANCES
+  scope: [legal]
+  forbidden: false
+  strength: descriptive
+- id: DOCTRINE_BENEFIT_CONFERRED
+  scope: [legal]
+  forbidden: false
+  strength: descriptive
+- id: DOCTRINE_CHARTER_PROVISION
+  scope: [legal]
+  forbidden: false
+  strength: descriptive
+- id: DOCTRINE_CLAUSE_RESTATEMENT
+  scope: [legal]
+  forbidden: false
+  strength: descriptive
+- id: DOCTRINE_PROCEDURAL_POSTURE
+  scope: [legal]
+  forbidden: false
+  strength: descriptive
+- id: DOCTRINE_ISSUE_FRAMING
+  scope: [legal]
+  forbidden: false
+  strength: descriptive
+- id: DOCTRINE_HOLDING
+  scope: [legal]
+  forbidden: false
+  strength: descriptive
+
+# Schema constraint (documented here, may be enforced by the loader):
+#   forbidden: false + strength: descriptive  -- this file. Descriptive only.
+#   forbidden: true  + strength: assertion    -- legal-v3.1.yaml. Risk only.
+# The mixed combinations are reserved and are not used by either lexicon.
+
+lexicon:
+
+# --- DOCTRINE_OFFER ----------------------------------------------------------
+# provenance: legal-doctrine draft (Angel v. Murray brief, 8-scope analysis)
+- pattern: '\b(?:made|makes?|make|extended|extends?|constituted?|constitutes?)\s+an?\s+(?:binding\s+)?offer\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_OFFER
+- pattern: '\boffered\s+to\s+(?:continue|do|perform|provide|supply|enter|undertake|make|accept|pay|sell|buy|deliver|render)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_OFFER
+- pattern: '\ban?\s+(?:binding\s+)?offer\s+(?:was\s+|is\s+)?(?:made|extended|constituted|communicated)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_OFFER
+
+# --- DOCTRINE_ACCEPTANCE -----------------------------------------------------
+# positives revised (Phase 0.2 accepted): genuine assent shapes
+- pattern: '\baccepted\s+(?:the\s+|his\s+|her\s+|their\s+|its\s+|this\s+|that\s+)?(?:offer|terms|proposal|contract|agreement|bid|tender)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_ACCEPTANCE
+- pattern: '\bacceptance\s+of\s+(?:the\s+|his\s+|her\s+|their\s+|its\s+|this\s+|that\s+)?(?:offer|terms|proposal|contract|agreement)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_ACCEPTANCE
+- pattern: '\bagreed\s+to\s+(?:the\s+|his\s+|her\s+|their\s+|its\s+|this\s+|that\s+)?(?:terms|proposal|offer|contract|agreement)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_ACCEPTANCE
+- pattern: '\bassented\s+to\s+(?:the\s+|his\s+|her\s+|their\s+|its\s+|this\s+|that\s+)?(?:offer|terms|proposal|contract|agreement)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_ACCEPTANCE
+
+# --- DOCTRINE_CONSIDERATION --------------------------------------------------
+- pattern: '\b(?:lack|want|absence)\s+of\s+(?:proper\s+|new\s+|additional\s+|valuable\s+)?consideration\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CONSIDERATION
+- pattern: '\bwithout\s+(?:new\s+|additional\s+|proper\s+)?consideration\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CONSIDERATION
+- pattern: '\b(?:requires?|needs?|needed|required)\s+(?:new\s+|additional\s+|fresh\s+|valuable\s+)?consideration\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CONSIDERATION
+- pattern: '\b(?:sufficient|insufficient|inadequate|adequate|valuable|good|proper|new|additional|fresh)\s+consideration\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CONSIDERATION
+- pattern: '\bconsideration\s+(?:for|of)\s+(?:the\s+)?(?:contract|agreement|promise|modification|amendment)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CONSIDERATION
+- pattern: '\bsupported\s+by\s+(?:new\s+|additional\s+|fresh\s+)?consideration\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CONSIDERATION
+
+# --- DOCTRINE_CONTRACT_MODIFICATION ------------------------------------------
+- pattern: '\bcontract\s+modifications?\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CONTRACT_MODIFICATION
+- pattern: '\bmodif(?:y|ies|ied|ication|ications)\s+(?:the|a|an|this|that|his|her|their|our|its)\s+(?:existing\s+|original\s+|written\s+)?(?:contract|agreement)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CONTRACT_MODIFICATION
+- pattern: '\bmodif(?:ication|ications|ying)\s+(?:to|of)\s+(?:the\s+|a\s+|an\s+)?(?:existing\s+|original\s+|written\s+)?(?:contract|agreement)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CONTRACT_MODIFICATION
+- pattern: '\bmodifying\s+(?:a|the|this|that|an)\s+(?:existing\s+|original\s+|written\s+)?(?:contract|agreement)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CONTRACT_MODIFICATION
+
+# --- DOCTRINE_PRE_EXISTING_DUTY (narrow reading) -----------------------------
+# Pattern 2 of the previous revision (\bpre-?existing\s+(?:legal\s+)?duty\b)
+# was DROPPED: it fired on "the pre-existing duty to maintain the premises",
+# a general pre-existing duty, not the rule. The narrow reading is about the
+# RULE, so the pattern must require "rule" or "doctrine".
+#
+# The brief's own sentence is "The Pre-Existing Duty rule does not apply".
+# ccsp.verify.Engine applies no negation, so the "does not" does not suppress
+# the match. This is proven at the engine layer in
+# tests/test_doctrine_lexicon.py::test_negation_is_not_applied_to_descriptive_concepts.
+# The runtime `negatable_default: false` key is inert for this engine (see
+# header ENGINE NOTE); the behaviour is a property of the engine, not the flag.
+- pattern: '\bpre-?existing\s+duty\s+(?:rule|doctrine)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_PRE_EXISTING_DUTY
+
+# --- DOCTRINE_UNANTICIPATED_CIRCUMSTANCES ------------------------------------
+- pattern: '\b(?:unanticipated|unforeseen|unexpected|unforeseeable)\s+(?:increase|upsurge|rise|jump|change|event|circumstance|cost|expense|shortage|disruption|difficulty|burden|obstacle|impediment)s?\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_UNANTICIPATED_CIRCUMSTANCES
+- pattern: '\bcircumstances?\s+(?:unanticipated|unforeseen|unexpected)\s+by\s+(?:both\s+|either\s+|the\s+)?part(?:y|ies)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_UNANTICIPATED_CIRCUMSTANCES
+- pattern: '\b(?:unanticipated|unforeseen|unexpected)\s+by\s+both\s+part(?:y|ies)\s+at\s+(?:the\s+)?(?:contracts?|agreements?)'
+  flags: IGNORECASE
+  concept: DOCTRINE_UNANTICIPATED_CIRCUMSTANCES
+- pattern: '\b(?:impracticab(?:le|ility)|frustrat(?:ed|ion)|commercial\s+impracticability)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_UNANTICIPATED_CIRCUMSTANCES
+
+# --- DOCTRINE_BENEFIT_CONFERRED ----------------------------------------------
+- pattern: '\bconfer(?:red|s|ring)?\s+(?:a\s+|an\s+|the\s+)?(?:benefit|advantage|economic\s+benefit)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_BENEFIT_CONFERRED
+- pattern: '\b(?:received|obtained|accepted)\s+(?:a\s+|an\s+|the\s+)?benefit\s+(?:from|under)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_BENEFIT_CONFERRED
+- pattern: '\bbenefit\s+(?:conferred|received|bestowed)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_BENEFIT_CONFERRED
+- pattern: '\bbenefit\s+(?:to|on|upon)\s+(?:the\s+|his\s+|her\s+|their\s+|its\s+)?(?:plaintiff|defendant|party|promisor|promisee)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_BENEFIT_CONFERRED
+
+# --- DOCTRINE_CHARTER_PROVISION ----------------------------------------------
+- pattern: '\bmunicipal\s+charters?\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CHARTER_PROVISION
+- pattern: '\bcity\s+charter\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CHARTER_PROVISION
+- pattern: '\bcharter\s+(?:requirements?|provisions?|restrictions?|limitations?|constraints?)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CHARTER_PROVISION
+- pattern: '\bcharter\s+(?:restricted|limits?|prohibits?|requires?)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CHARTER_PROVISION
+
+# --- DOCTRINE_CLAUSE_RESTATEMENT ---------------------------------------------
+- pattern: '\bRestatement\s+(?:Second|Third|\(Second\)|\(Third\)|2d|3d)?\s*(?:of\s+)?(?:the\s+)?(?:Law\s+)?of\s+(?:Contracts|Torts|Judgments|Restitution|Agency)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CLAUSE_RESTATEMENT
+- pattern: '\bRestatement\s+(?:Second|Third|\(Second\)|\(Third\))\s+of\s+Contracts\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_CLAUSE_RESTATEMENT
+
+# --- DOCTRINE_PROCEDURAL_POSTURE ---------------------------------------------
+- pattern: '\b(?:Superior|District|Circuit|Appellate|Supreme|Federal|County)\s+Court\s+(?:justice|judge|panel|bench)\s+(?:heard|tried|ruled|decided|held|determined|found|ordered)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_PROCEDURAL_POSTURE
+- pattern: '\b(?:appealed|appeals)\s+(?:the\s+|this\s+|that\s+)?(?:decision|judgment|ruling|order|verdict|award)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_PROCEDURAL_POSTURE
+- pattern: '\b(?:reversed|affirmed|remanded|vacated|dismissed)\s+the\s+(?:lower\s+|trial\s+|appellate\s+)?(?:courts?|judgments?|decisions?|rulings?|orders?|verdicts?)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_PROCEDURAL_POSTURE
+- pattern: '\b(?:judgment|verdict|ruling|order)s?\s+(?:was\s+|is\s+)?(?:entered|issued|rendered|granted|denied)\s+(?:for|against|in\s+favor\s+of)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_PROCEDURAL_POSTURE
+
+# --- DOCTRINE_ISSUE_FRAMING --------------------------------------------------
+# Pattern 3: requires the framing party (court/tribunal/judge/justice/
+# panel) to appear anywhere in the same string (positive lookahead). This
+# satisfies both "the Superior Court...whether..." and the positive test
+# shape "...by the Rhode Island Supreme Court", where the court follows
+# the whether clause. The "was/were + adverb" requirement distinguishes
+# framing ("was unlawfully dispensed") from declination ("takes no
+# position on whether X was lawful") without relying on word order.
+- pattern: '\b(?:issue|dispute|question|controversy|matter)\s+(?:centers?|centred|centered|concerns?|turns?|turned)\s+on\s+\S'
+  flags: IGNORECASE
+  concept: DOCTRINE_ISSUE_FRAMING
+- pattern: '\bthe\s+(?:issue|question)\s+(?:is|was|before\s+the\s+court\s+is)\s+whether\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_ISSUE_FRAMING
+- pattern: '(?=.*\b(?:court|tribunal|judge|justice|panel)\b)\bwhether\b.{1,300}?\b(?:was|were)\s+(?:unlawfully|lawfully|validly|properly|legally|in\s+violation|in\s+breach)\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_ISSUE_FRAMING
+
+# --- DOCTRINE_HOLDING (disposition + rule paired) ----------------------------
+# Patterns 1 and 2 tightened: anchored on a court/tribunal/judge/justice/panel
+# subject (or the first-person "we"). Previously \bheld\s+that\b fired on
+# "the meeting was held that afternoon". The over-fire is fixed, not deferred.
+- pattern: '\b(?:court|tribunal|panel|judge|justice)\b.{0,150}?(?:held|holds|decided|decides|determined|determines|ruled|rules)\s+that\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_HOLDING
+- pattern: '\bwe\s+(?:hold|find|conclude|decide)\s+that\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_HOLDING
+- pattern: '\bcourt\s+(?:concluded|concludes|found|finds|determined|determines)\s+that\b'
+  flags: IGNORECASE
+  concept: DOCTRINE_HOLDING
+
+tests:
+  DOCTRINE_OFFER:
+    positive:
+    - Maher offered to continue the refuse-collection service for a further five years.
+    negative:
+    - Counsel offered no authority for the proposition.
+    - The respondent offered no evidence of mitigation.
+  DOCTRINE_ACCEPTANCE:
+    positive:
+    - Buyer accepted the offer by signing and returning the duplicate original.
+    - The seller agreed to the terms of the contract on April 1.
+    - The offeree assented to the proposal before it lapsed.
+    negative:
+    - The Court of Appeal allowed the appeal.
+    - The tribunal accepted the respondent's account of the meeting.
+  DOCTRINE_CONSIDERATION:
+    positive:
+    - The issue centered on whether this extra payment was illegal due to lack of proper consideration.
+    - A contract modification only requires consideration if it is fair and equitable.
+    negative:
+    - The Court took the matter under consideration.
+    - Whether there is a prima facie case is a matter for the hearing panel.
+    - The Commission is currently reviewing the submissions of both parties.
+  DOCTRINE_CONTRACT_MODIFICATION:
+    positive:
+    - A contract modification only requires consideration if it is fair and equitable.
+    - Contract modifications are enforceable without new consideration if they address unanticipated circumstances.
+    - The Supreme Court decided that unforeseen circumstances justified the contract modification.
+    negative:
+    - The parties agreed to settle the matter without admission of liability.
+  DOCTRINE_PRE_EXISTING_DUTY:
+    positive:
+    - The Pre-Existing Duty rule does not apply when there are reasonable grounds for modifying a contract.
+    - The pre-existing duty doctrine was argued by the plaintiff.
+    negative:
+    - The pre-existing duty to maintain the premises was assigned to the tenant.
+  DOCTRINE_UNANTICIPATED_CIRCUMSTANCES:
+    positive:
+    - He faced an unanticipated upsurge in costs due to a sudden increase of 400 new dwelling units.
+    - Maher faced considerably higher operational costs because of this unexpected jump in new dwellings.
+    - Circumstances unanticipated by both parties at the contracts inception.
+    - Unforeseen increases in housing units.
+    negative:
+    - The inquiry has not yet concluded.
+    - The respondent's explanation does not survive contact with the documentary record.
+  DOCTRINE_BENEFIT_CONFERRED:
+    positive:
+    - The plaintiff conferred a benefit on the defendant by paying the property taxes.
+    - The defendant received a benefit from the plaintiff under the contract.
+    negative:
+    - Damages of $20,000 were awarded.
+    - Any fair reading of the file places the respondent in an unenviable position.
+  DOCTRINE_CHARTER_PROVISION:
+    positive:
+    - Contrary to municipal charter requirements.
+    - The city charter restricted the councils power by requiring a written recommendation from the city manager.
+    - Municipal charters should not be interpreted to restrict city council powers.
+    negative:
+    - The Commission's reasons will be released at a later date.
+    - The interpretation of section 12.
+  DOCTRINE_CLAUSE_RESTATEMENT:
+    positive:
+    - The court applied Restatement Second of the Law of Contracts section 89D(a).
+    negative:
+    - The parties agree with the restatement of the facts in the agreed statement of facts.
+  DOCTRINE_PROCEDURAL_POSTURE:
+    positive:
+    - A Superior Court justice heard the case without a jury and ruled in favor of the plaintiffs.
+    - Maher appealed the decision to the Rhode Island Supreme Court.
+    - The Rhode Island Supreme Court reversed the lower courts decision.
+    negative:
+    - The applicant seeks judicial review of the decision below.
+    - The tribunal will hear argument on the merits in due course.
+  DOCTRINE_ISSUE_FRAMING:
+    positive:
+    - Whether the $20,000 paid additionally to Maher was unlawfully dispensed without proper consideration by the Rhode Island Supreme Court.
+    - The issue centered on whether this extra payment was illegal.
+    - The dispute centered on incremental payments made mid-contract.
+    negative:
+    - Whether there is a prima facie case is a matter for the hearing panel.
+    - Whether the conduct constitutes a violation remains to be determined.
+    - The Commission takes no position on whether the conduct was lawful or unlawful.
+  DOCTRINE_HOLDING:
+    positive:
+    - The Rhode Island Supreme Court reversed the lower courts decision and held that Maher was not required to repay the $20,000.
+    - The Supreme Court decided that unforeseen circumstances justified the contract modification.
+    negative:
+    - The Court of Appeal allowed the appeal and remitted the matter for reconsideration.
+    - The regulator's preliminary assessment did not identify any concerns.
+    - The meeting was held that afternoon at the courthouse.
+
+# -----------------------------------------------------------------------------
+# QUALITY BAR (Phase 0.6)
+# -----------------------------------------------------------------------------
+# Method: single-annotator measurement against the Angel v. Murray brief,
+# with the annotator blind to the lexicon. Annotator marks every passage in
+# the 8-scope brief where a doctrine concept in this lexicon is discussed.
+# Recall = (annotator-marked passages where at least one lexicon pattern
+# fires) / (total annotator-marked passages).
+# Precision = (spans where a pattern fires AND the annotator agrees) /
+# (total spans where any pattern fires).
+# Numbers are recorded in ratification.metrics at Phase 4 (acceptance run).
+# Gate: recall < 0.60 on the brief blocks the acceptance run and forces
+# a lexicon revision before the coverage warning is allowed to clear.
+# The number is measured, not asserted, in Phase 4.
+#
+# HASH CONVENTION: rules_hash is the sha256 of this file with
+# rules_hash and config_hash blanked to empty strings. This is the
+# standard 'sign with the signature line empty' rule; it has no
+# fixed-point problem. To verify:
+#   import hashlib, re
+#   s = open('lexicons/legal-doctrine-v1.yaml').read()
+#   s = re.sub(r'rules_hash:\s*"[0-9a-f]*"', 'rules_hash: "40524576ac2a71cae22f23c772755411255c2b02daedd0746b6188ba3c7314ca"', s)
+#   s = re.sub(r'config_hash:\s*"[0-9a-f]*"', 'config_hash: ""', s)
+#   assert hashlib.sha256(s.encode()).hexdigest() == '<recorded value>'
+ratification:
+  contract_id: anchorum.lexicon.legal-doctrine-v1
+  ratified_by: ["<Chair name>", "<Compliance Officer (Contracts) name>"]
+  ratified_at_sequence: null   # fill from the journal when signed
+  rules_hash: "443aa2af17129766c377fdb8e10b12a2144d60cb972efefe30991377f5721137"
+  config_hash: "0cf0b2eb885e98fbea4e2406ed7f445c6936af97ae354ddb0fdac4d1941e7952"
+  scope: "U.S./Restatement (Second) of Contracts, formation-and-modification, jurisdiction-agnostic v1"
+  metrics:
+    recall_on_angel_v_murray: null     # to be measured; gate is >= 0.60
+    precision_on_angel_v_murray: null  # to be measured
+    annotator: "single"
+    measured_at_phase: 4

@@ -176,6 +176,7 @@ def analyse(
         engine_version: str = "",
         lexicon_hash: str = "",
         config_hash: str = "",
+        doctrine: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         scope_records = records or []
         return {
@@ -195,6 +196,19 @@ def analyse(
             },
             "coverage": _coverage(scope_records, len(text)),
             "scopes": scope_records,
+            # W5: the doctrine projection is additive. It sits beside the
+            # risk projection; it never replaces or reshapes it. Every
+            # record carries the key, so a consumer can read it without
+            # branching on whether analysis ran (Shape 2, Phase 0.4).
+            "doctrine": doctrine or {
+                "conceptDistribution": {},
+                "scopesMatched": 0,
+                "engineVersion": "",
+                "lexiconHash": "",
+                "configHash": "",
+                "classification": "",
+                "fallbackReason": None,
+            },
         }
 
     if len(data) > max_bytes:
@@ -237,6 +251,45 @@ def analyse(
 
     projections = [engine.project_text(scope.text.strip()) for scope in segmented if scope.text.strip()]
     first = projections[0] if projections else None
+
+    # W5: parallel doctrine projection. Separate engine, separate lexicon,
+    # aggregated to one document-level distribution. Failure of the doctrine
+    # projection must not fail the whole analysis -- the risk projection is
+    # the primary record, and a doctrine outage is reported as a reason on
+    # the doctrine block, not as a 500 on the route.
+    try:
+        doctrine_projections = [
+            engine.project_doctrine(scope.text.strip())
+            for scope in segmented
+            if scope.text.strip()
+        ]
+    except Exception as exc:  # noqa: BLE001 - recorded on the block, not swallowed
+        doctrine_block: dict[str, Any] = {
+            "conceptDistribution": {},
+            "scopesMatched": 0,
+            "engineVersion": "",
+            "lexiconHash": "",
+            "configHash": "",
+            "classification": "unavailable",
+            "fallbackReason": f"{type(exc).__name__}: {exc}",
+        }
+    else:
+        dfirst = doctrine_projections[0] if doctrine_projections else None
+        aggregate: dict[str, int] = {}
+        for p in doctrine_projections:
+            for k, v in (p.concept_distribution or {}).items():
+                aggregate[k] = aggregate.get(k, 0) + v
+        matched_scopes = sum(1 for p in doctrine_projections if p.concept_distribution)
+        doctrine_block = {
+            "conceptDistribution": aggregate,
+            "scopesMatched": matched_scopes,
+            "engineVersion": dfirst.engine_version if dfirst else "",
+            "lexiconHash": dfirst.rules_hash if dfirst else "",
+            "configHash": dfirst.config_hash if dfirst else "",
+            "classification": dfirst.classification if dfirst else "",
+            "fallbackReason": dfirst.fallback_reason if dfirst else None,
+        }
+
     return result(
         STATUS_PROCESSED,
         EXTRACT_EXTRACTED,
@@ -245,4 +298,5 @@ def analyse(
         engine_version=first.engine_version if first else "",
         lexicon_hash=first.rules_hash if first else "",
         config_hash=first.config_hash if first else "",
+        doctrine=doctrine_block,
     )

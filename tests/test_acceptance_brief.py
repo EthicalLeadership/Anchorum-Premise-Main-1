@@ -299,3 +299,157 @@ def test_c6_custody_says_what_was_and_was_not_checked(uploaded) -> None:
         # never happened.
         assert entry["chain"] == "not_checked"
         assert entry["chainDetail"]
+
+
+# --- Track A5 the doctrine projection (W5) ----------------------------------
+
+
+def test_a5_doctrine_projection(brief_text: str) -> None:
+    """The doctrine lexicon covers the brief without firing on the near miss.
+
+    The doctrine projection is separate from the risk-register projection in
+    test_a2. Its purpose is to answer "what area of contract law does this
+    brief discuss?" -- a different question than "may these assertions be
+    relied on?" (see D-1 Option A).
+
+    Measured 2026-10-15: 9 of 12 concepts fire on the brief. The gate below
+    is set one below that so a regression of one concept fails the test,
+    while adding a concept that fires legitimately does not.
+    """
+    from interface.engine import project_doctrine
+
+    proj = project_doctrine(brief_text)
+    data = proj.model_dump() if hasattr(proj, "model_dump") else dict(proj)
+    dist = data.get("concept_distribution", {})
+
+    # --- Near miss: DOCTRINE_OFFER must NOT fire ---------------------------
+    # The brief describes concluded contracts, not an offer. If DOCTRINE_OFFER
+    # fires, the pattern is too loose (see the "offered no authority" trap).
+    assert "DOCTRINE_OFFER" not in dist, (
+        "DOCTRINE_OFFER fired on a brief that describes concluded contracts"
+    )
+
+    # --- Coverage: at least 9 of 12 concepts fire --------------------------
+    fired = sorted(dist.keys())
+    assert len(fired) >= 9, (
+        f"only {len(fired)} concepts fired on the brief (expected >= 9): {fired}"
+    )
+
+    # --- Load-bearing concepts that must fire ------------------------------
+    for concept in [
+        "DOCTRINE_CONSIDERATION",      # the sharpest trap (bare noun must not fire)
+        "DOCTRINE_PRE_EXISTING_DUTY",  # the narrow reading ("does not apply" is the mention)
+        "DOCTRINE_ISSUE_FRAMING",      # the tightened pattern (framing party required)
+        "DOCTRINE_HOLDING",            # disposition + rule paired
+        "DOCTRINE_PROCEDURAL_POSTURE", # disposition below
+        "DOCTRINE_CHARTER_PROVISION",  # the case's distinctive issue
+    ]:
+        assert concept in dist, (
+            f"{concept} must fire on the brief but did not; the concept has "
+            f"lost coverage in a revision"
+        )
+
+    # --- Recall cost of Phase 0.2 (documented, not asserted) ---------------
+    # DOCTRINE_ACCEPTANCE and DOCTRINE_BENEFIT_CONFERRED do NOT fire on this
+    # brief. Their revised positives ("accepted the offer", "conferred a
+    # benefit on") are semantically correct but the brief uses weaker
+    # phrasings ("the city council obliged his requests", "he requested an
+    # additional $10,000"). This is the recall cost of the revision accepted
+    # at Phase 0.2, and it is why the quality bar measures recall rather
+    # than assuming it.
+
+
+# --- Track A6 / C7 the doctrine block on the record and the route -----------
+
+
+def test_a6_analysis_record_carries_doctrine_block(brief: bytes) -> None:
+    """The document-level analysis record has a doctrine block.
+
+    Additive (Shape 2, Phase 0.4). The block sits beside `projection`,
+    `coverage`, and `scopes`; it does not reshape them.
+    """
+    from interface import analysis
+
+    record = analysis.analyse(brief, BRIEF.name, "application/pdf")
+    assert record["status"] == "processed"
+
+    block = record.get("doctrine")
+    assert block is not None, "the record has no doctrine block"
+
+    for key in (
+        "conceptDistribution",
+        "scopesMatched",
+        "engineVersion",
+        "lexiconHash",
+        "configHash",
+        "classification",
+        "fallbackReason",
+    ):
+        assert key in block, f"doctrine block missing key: {key}"
+
+    fired = block["conceptDistribution"]
+    assert len(fired) >= 9, (
+        f"only {len(fired)} concepts fired on the brief (expected >= 9): "
+        f"{sorted(fired)}"
+    )
+    assert block["scopesMatched"] >= 1
+    assert block["lexiconHash"], "doctrine lexicon hash is empty"
+
+
+def test_a6_doctrine_block_does_not_overwrite_risk_projection(brief: bytes) -> None:
+    """Shape 2 means the risk projection keys are untouched. The doctrine
+    block is *additional*, not a replacement of `projection`, `coverage`,
+    or `scopes`."""
+    from interface import analysis
+
+    record = analysis.analyse(brief, BRIEF.name, "application/pdf")
+
+    # The risk-register keys still exist and still hold their own values.
+    assert "projection" in record
+    assert "coverage" in record
+    assert "scopes" in record
+
+    # The risk projection's own engine version and lexicon hash are the
+    # risk register's, not the doctrine lexicon's.
+    risk_proj = record["projection"]
+    doctrine = record["doctrine"]
+    assert risk_proj["lexiconHash"] != doctrine["lexiconHash"], (
+        "risk and doctrine projections report the same lexicon hash -- "
+        "one of them is reporting the wrong lexicon"
+    )
+
+
+def test_c7_api_analysis_returns_doctrine_block(uploaded) -> None:
+    """The analysis route surfaces the doctrine block to API consumers.
+
+    The `uploaded` fixture has already put the brief through the product
+    API and produced the analysis record. This test reads the route.
+    """
+    app, _, evidence = uploaded
+
+    # GET the analysis record -- the shape consumers read.
+    get = request(app, "GET", f"/evidence/{evidence['id']}/analysis")
+    assert get.status_code == 200, get.body
+    body = get.json()
+
+    assert "doctrine" in body, "the analysis route response has no doctrine block"
+    block = body["doctrine"]
+    for key in ("conceptDistribution", "scopesMatched", "lexiconHash", "configHash"):
+        assert key in block, f"doctrine block from route missing key: {key}"
+    assert len(block["conceptDistribution"]) >= 9, (
+        f"only {len(block['conceptDistribution'])} concepts on the route"
+    )
+    assert block["lexiconHash"], "doctrine lexiconHash is empty on the route"
+
+    # POST /analyse re-runs analysis and must return the same block shape.
+    reanalyse = request(app, "POST", f"/evidence/{evidence['id']}/analyse")
+    assert reanalyse.status_code == 200, reanalyse.body
+    again = reanalyse.json()
+    assert "doctrine" in again
+    assert again["doctrine"]["lexiconHash"] == block["lexiconHash"], (
+        "re-analysis reports a different doctrine lexiconHash for the same "
+        "lexicon -- the hash is not deterministic"
+    )
+    assert again["doctrine"]["configHash"] == block["configHash"], (
+        "re-analysis reports a different configHash for the same engine config"
+    )
