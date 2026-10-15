@@ -1,0 +1,48 @@
+# One matter. Fill the placeholders. The point of writing this down is to
+# discover what a real matter needs that a schema sketch didn't anticipate.
+# Do not tidy it before pasting -- the rough edges are the information.
+
+matter:
+  id: "2026-001"             # e.g. "2026-001" or initials
+  title: "<style of cause>"               # redact if you prefer
+  domain: ""                              # legal.insurance | legal.employment |
+                                          # legal.contracts | mix (see notes below)
+  jurisdiction: ""                        # ON | QC | BC | US-NY | ...
+  court: ""                               # Ontario Superior Court of Justice | ...
+  position: ""                            # plaintiff | defendant | appellant | respondent
+  filed: ""                               # date pleading was filed, or "pre-filing"
+  next_deadline: ""                       # the nearest hard date
+  notes: ""                               # one line of what the matter is about
+
+  # What you actually expect to receive. Be honest -- if you don't have
+  # invoices, don't list them.
+  document_types:
+    - correspondence      # letters, emails
+    - filing              # court documents
+    - record              # medical, employment
+    - contract            # policy, agreement
+    - report              # expert reports, IMEs
+    # - invoice
+    # - media
+    # - other
+
+  # The tools the router should invoke for this matter. Start with what
+  # exists today; add new ones when the handler is written.
+  handlers:
+    - id: pdf_text
+      domains: [legal, accounting, ops]
+    - id: email_parser
+      domains: [legal]
+    # - id: docx_reader
+    #   domains: [legal, accounting, ops]
+    # - id: image_ocr
+    #   domains: [legal, accounting, ops]
+    # - id: doctrine_contracts
+    #   domains: [legal]
+    # - id: risk_register
+    #   domains: [legal]
+
+  # Optional: what does "done" look like for this matter?
+  # Example: "every claim element has at least one exhibit"
+  success_criteria: ""
+

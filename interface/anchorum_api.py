@@ -74,6 +74,7 @@ ANALYSIS_STATUS = {
 TIMELINE_EVENTS = {
     "evidence_verified": "evidence_verified",
     "evidence_analysed": "evidence_analysed",
+    "evidence_reanalysed": "evidence_reanalysed",
 }
 
 #: This API slice has no control plane, so no chain is ever walked here. The
@@ -91,6 +92,7 @@ CUSTODY_ACTIONS = {
     "evidence_uploaded": "uploaded",
     "evidence_verified": "verified",
     "evidence_analysed": "analysed",
+    "evidence_reanalysed": "reanalysed",
 }
 
 
@@ -986,7 +988,7 @@ def create_app(
             db,
             case_id=document.case_id,
             evidence_id=document.document_key,
-            action="evidence_analysed",
+            action="evidence_reanalysed",
         )
         db.commit()
         return analysis_response(document)

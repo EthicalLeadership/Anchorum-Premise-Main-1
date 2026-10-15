@@ -821,8 +821,11 @@ leaving a bare `not_checked` for a reader to interpret.
   where an index is expected but is not ready.
 - [ ] **`GET /cases/{id}/timeline`** → implement from the data that exists:
   `audit_logs` (case-scoped, ordered) plus document `created_at`. Event kinds:
-  `case_created`, `evidence_uploaded`, `evidence_verified`, `evidence_analysed`.
-  Add `evidence_analysed` to the `_custody_log` call in the upload path.
+  `case_created`, `evidence_uploaded`, `evidence_verified`, `evidence_analysed`
+  (auto-analysis on upload), `evidence_reanalysed` (explicit
+  `POST /evidence/{id}/analyse`). Add `evidence_analysed` to the
+  `_custody_log` call in the upload path; the manual re-run route logs
+  `evidence_reanalysed` so the two are distinguishable in custody.
 
   Each row must match the `TimelineEvent` the renderer already expects
   (`components/TimelineItem.tsx`): `id`, `event`, `date` (nullable), `precision`,

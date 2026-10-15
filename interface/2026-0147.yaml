@@ -1,0 +1,25 @@
+matter:
+  id: "2026-0147"
+  title: "Cardinal v. Northwind Mutual Insurance Co."
+  domain: "legal.insurance"
+  jurisdiction: "ON"
+  court: "Ontario Superior Court of Justice"
+  position: "plaintiff"
+  filed: "2026-03-14"
+  next_deadline: "2026-05-02"
+  notes: "LTD denial at 24-month change-of-definition; mental health claim; no independent medical exam yet."
+
+  document_types:
+    - correspondence
+    - filing
+    - record
+    - contract
+    - report
+
+  handlers:
+    - id: pdf_text
+      domains: [legal, accounting, ops]
+    - id: email_parser
+      domains: [legal]
+
+  success_criteria: "every claim element (disability, cessation, bad faith) has at least one exhibit"

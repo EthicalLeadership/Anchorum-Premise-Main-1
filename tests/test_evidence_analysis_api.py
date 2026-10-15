@@ -116,7 +116,12 @@ def test_analysis_route_is_idempotent_and_reasks_on_demand(tmp_path):
     assert _without_timestamp(first.json()) == _without_timestamp(second.json())
 
     custody = request(app, "GET", f"/evidence/{evidence['id']}/custody").json()
-    assert [entry["action"] for entry in custody].count("analysed") == 3
+    # Three analysis rows accumulate: the auto-analysis that runs inside the
+    # upload (``analysed``) and the two explicit re-runs (``reanalysed``).
+    # The names are distinct so a reader can tell which call produced which
+    # row without inspecting timestamps.
+    actions = [entry["action"] for entry in custody]
+    assert actions == ["uploaded", "analysed", "reanalysed", "reanalysed"]
     assert request(app, "GET", f"/cases/{case_id}/evidence").json()[0][
         "duplicateCandidate"
     ] is False
@@ -211,3 +216,29 @@ def test_timeline_is_an_allowlist_of_events(tmp_path):
         }
         assert event["precision"] in {"exact", "range", "approximate", "unknown"}
         assert event["people"] == ["system"]
+
+
+def test_reanalysis_is_a_distinct_custody_action(tmp_path):
+    """The manual re-run is not the same event as the auto-analysis.
+
+    Both write a row, but a reader looking at custody has to be able to tell
+    the automatic pass (which runs inside the upload) from the explicit
+    `POST /analyse` re-run. Before this, both appeared as `analysed` and the
+    second was only distinguishable by timestamp.
+    """
+    app = app_for(tmp_path / "api.db", evidence_directory=tmp_path / "evidence")
+    case_id = _case(app, key="CASE-REANALYSE-DISTINCT")
+    evidence = _upload(app, case_id)
+
+    # At this point the auto-analysis has run: uploaded, analysed.
+    before = request(app, "GET", f"/evidence/{evidence['id']}/custody").json()
+    assert [e["action"] for e in before] == ["uploaded", "analysed"]
+
+    # The manual re-run adds a distinct action.
+    rerun = request(app, "POST", f"/evidence/{evidence['id']}/analyse")
+    assert rerun.status_code == 200
+
+    after = request(app, "GET", f"/evidence/{evidence['id']}/custody").json()
+    assert [e["action"] for e in after] == ["uploaded", "analysed", "reanalysed"]
+    # The two analysed rows have distinct display words on the wire.
+    assert after[1]["action"] != after[2]["action"]
