@@ -469,10 +469,12 @@ class DossierPipeline:
                 "confidence": classification.confidence,
                 "actor": classification.actor.value,
             },
-            provenance={
-                "confidence": classification.confidence,
-                "missing_fields": provenance.missing_fields,
-            },
+            # Only what the check reads. It used to be handed the
+            # classification's confidence under a `provenance` name, which made
+            # the check look like it tested two independent signals when it
+            # tested one twice, at a threshold the stricter test above it already
+            # covered.
+            provenance={"missing_fields": provenance.missing_fields},
             output={"human_review_required": provenance.human_review_required},
         )
         self.logger.emit(

@@ -1,178 +1,4 @@
-#!/usr/bin/env python3
-# /home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/create_icon.py
-
-from PIL import Image, ImageDraw, ImageFont
-
-def create_anchorum_icon():
-    # Create 512x512 icon
-    size = 512
-    img = Image.new('RGB', (size, size), color='#1a365d')  # Professional blue
-    
-    draw = ImageDraw.Draw(img)
-    
-    # Draw a simple legal scale icon
-    center_x = size // 2
-    center_y = size // 2
-    
-    # Scale base
-    draw.rectangle([center_x - 80, center_y - 10, center_x + 80, center_y + 10], 
-                   outline='#f6ad55', width=8)
-    
-    # Scale pans
-    draw.line([center_x - 70, center_y - 10, center_x - 40, center_y - 60], fill='#f6ad55', width=8)
-    draw.line([center_x + 70, center_y - 10, center_x + 40, center_y - 60], fill='#f6ad55', width=8)
-    
-    # Save as PNG
-    img.save('/home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/public/icon.png')
-    print("Icon created successfully!")
-
-if __name__ == "__main__":
-    create_anchorum_icon()#!/usr/bin/env python3
-# /home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/create_icon.py
-
-from PIL import Image, ImageDraw, ImageFont
-
-def create_anchorum_icon():
-    # Create 512x512 icon
-    size = 512
-    img = Image.new('RGB', (size, size), color='#1a365d')  # Professional blue
-    
-    draw = ImageDraw.Draw(img)
-    
-    # Draw a simple legal scale icon
-    center_x = size // 2
-    center_y = size // 2
-    
-    # Scale base
-    draw.rectangle([center_x - 80, center_y - 10, center_x + 80, center_y + 10], 
-                   outline='#f6ad55', width=8)
-    
-    # Scale pans
-    draw.line([center_x - 70, center_y - 10, center_x - 40, center_y - 60], fill='#f6ad55', width=8)
-    draw.line([center_x + 70, center_y - 10, center_x + 40, center_y - 60], fill='#f6ad55', width=8)
-    
-    # Save as PNG
-    img.save('/home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/public/icon.png')
-    print("Icon created successfully!")
-
-if __name__ == "__main__":
-    create_anchorum_icon()#!/usr/bin/env python3
-# /home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/create_icon.py
-
-from PIL import Image, ImageDraw, ImageFont
-
-def create_anchorum_icon():
-    # Create 512x512 icon
-    size = 512
-    img = Image.new('RGB', (size, size), color='#1a365d')  # Professional blue
-    
-    draw = ImageDraw.Draw(img)
-    
-    # Draw a simple legal scale icon
-    center_x = size // 2
-    center_y = size // 2
-    
-    # Scale base
-    draw.rectangle([center_x - 80, center_y - 10, center_x + 80, center_y + 10], 
-                   outline='#f6ad55', width=8)
-    
-    # Scale pans
-    draw.line([center_x - 70, center_y - 10, center_x - 40, center_y - 60], fill='#f6ad55', width=8)
-    draw.line([center_x + 70, center_y - 10, center_x + 40, center_y - 60], fill='#f6ad55', width=8)
-    
-    # Save as PNG
-    img.save('/home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/public/icon.png')
-    print("Icon created successfully!")
-
-if __name__ == "__main__":
-    create_anchorum_icon()#!/usr/bin/env python3
-# /home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/create_icon.py
-
-from PIL import Image, ImageDraw, ImageFont
-
-def create_anchorum_icon():
-    # Create 512x512 icon
-    size = 512
-    img = Image.new('RGB', (size, size), color='#1a365d')  # Professional blue
-    
-    draw = ImageDraw.Draw(img)
-    
-    # Draw a simple legal scale icon
-    center_x = size // 2
-    center_y = size // 2
-    
-    # Scale base
-    draw.rectangle([center_x - 80, center_y - 10, center_x + 80, center_y + 10], 
-                   outline='#f6ad55', width=8)
-    
-    # Scale pans
-    draw.line([center_x - 70, center_y - 10, center_x - 40, center_y - 60], fill='#f6ad55', width=8)
-    draw.line([center_x + 70, center_y - 10, center_x + 40, center_y - 60], fill='#f6ad55', width=8)
-    
-    # Save as PNG
-    img.save('/home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/public/icon.png')
-    print("Icon created successfully!")
-
-if __name__ == "__main__":
-    create_anchorum_icon()#!/usr/bin/env python3
-# /home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/create_icon.py
-
-from PIL import Image, ImageDraw, ImageFont
-
-def create_anchorum_icon():
-    # Create 512x512 icon
-    size = 512
-    img = Image.new('RGB', (size, size), color='#1a365d')  # Professional blue
-    
-    draw = ImageDraw.Draw(img)
-    
-    # Draw a simple legal scale icon
-    center_x = size // 2
-    center_y = size // 2
-    
-    # Scale base
-    draw.rectangle([center_x - 80, center_y - 10, center_x + 80, center_y + 10], 
-                   outline='#f6ad55', width=8)
-    
-    # Scale pans
-    draw.line([center_x - 70, center_y - 10, center_x - 40, center_y - 60], fill='#f6ad55', width=8)
-    draw.line([center_x + 70, center_y - 10, center_x + 40, center_y - 60], fill='#f6ad55', width=8)
-    
-    # Save as PNG
-    img.save('/home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/public/icon.png')
-    print("Icon created successfully!")
-
-if __name__ == "__main__":
-    create_anchorum_icon()#!/usr/bin/env python3
-# /home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/create_icon.py
-
-from PIL import Image, ImageDraw, ImageFont
-
-def create_anchorum_icon():
-    # Create 512x512 icon
-    size = 512
-    img = Image.new('RGB', (size, size), color='#1a365d')  # Professional blue
-    
-    draw = ImageDraw.Draw(img)
-    
-    # Draw a simple legal scale icon
-    center_x = size // 2
-    center_y = size // 2
-    
-    # Scale base
-    draw.rectangle([center_x - 80, center_y - 10, center_x + 80, center_y + 10], 
-                   outline='#f6ad55', width=8)
-    
-    # Scale pans
-    draw.line([center_x - 70, center_y - 10, center_x - 40, center_y - 60], fill='#f6ad55', width=8)
-    draw.line([center_x + 70, center_y - 10, center_x + 40, center_y - 60], fill='#f6ad55', width=8)
-    
-    # Save as PNG
-    img.save('/home/kark/anchorum-prem-main(1)/anchorum-prem-main/interface/public/icon.png')
-    print("Icon created successfully!")
-
-if __name__ == "__main__":
-    create_anchorum_icon()# Anchorum interface shell
+# Anchorum interface shell
 
 This package contains the Anchorum Prem Main React/TypeScript shell and its
 FastAPI entry point. The API currently provides a local/test session,
@@ -242,10 +68,53 @@ fixture adapter. `ANCHORUM_LOCAL_USER_NAME`, `ANCHORUM_LOCAL_USER_ID`, and
 stored in SQLite; original evidence files are stored under `output/evidence`
 (override with `ANCHORUM_EVIDENCE_DIRECTORY`). Evidence verification checks the
 stored bytes against their SHA-256 digest. Custody events are local audit rows
-whose chain is explicitly marked unchecked; this does not provide immutable
-storage, cryptographic custody guarantees, malware scanning, or indexing.
-Timeline, search, exports, and member administration remain unavailable and
-return a named `FEATURE_UNAVAILABLE` response.
+whose chain is explicitly marked unchecked, and each entry carries a
+`chainDetail` that says so; this does not provide immutable storage,
+cryptographic custody guarantees, malware scanning, or indexing.
+
+### Reading an artifact
+
+Reading a stored artifact is separate from committing one, and the two tiers have
+different requirements.
+
+**Reading needs no signing material.** `GET /evidence/{id}/analysis` extracts the
+text, splits it into its IRAC scopes and projects each scope through the lexicon.
+That path is pure and deterministic, so it runs on a host with no keys
+configured. `POST /evidence/{id}/analyse` re-runs it on demand, which is what a
+lexicon change needs: re-uploading evidence to re-analyse it would destroy the
+meaning of its custody chain. Re-analysis is idempotent and records
+`analysedAt` each time.
+
+**Committing still requires keys** and still fails closed, as above.
+
+The extracted text is written beside the stored bytes as `<storage_key>.txt` and
+never into the database or the analysis record, so search has something to search
+without case content riding along in an export. Extraction is bounded at 25 MB:
+above that ceiling the analysis is recorded as `skipped_oversize` rather than
+attempted, because extraction runs synchronously inside the upload request, and an
+unbounded parse of a hostile upload is a denial of service on a single-process
+local API.
+
+The analysis record reports, per scope, the concepts that matched or an explicit
+statement that the lexicon covered nothing there, plus a `coverage` block. That
+block is the point: the engine reporting `canonical_projection_fallback` means "no
+match", which is a legitimate outcome, and without the coverage summary seven
+empty scopes read as "this document contains no legal concepts". A document whose
+language the lexicon does not cover says so instead.
+
+What this is **not**: it describes the document's language. It is not a statement
+that the evidence is authentic, admissible or unaltered, and it is not malware
+scanning. It reports what the lexicon matched; a reviewer decides what that means.
+
+`GET /cases/{id}/search?q=` and `GET /cases/{id}/timeline` are implemented over
+that stored text and the API's own audit rows. Search returns a bare array of
+`{id, excerpt}` and reports which matcher ran in the `X-Anchorum-Search-Method`
+response header, because substring matching is not token matching and the
+difference has to stay visible. The timeline is an allowlist of the case's own
+events (`case_created`, `evidence_uploaded`, `evidence_verified`,
+`evidence_analysed`); chronology extracted from a document's *content* is a
+different feature and is not provided. Exports and member administration remain
+unavailable and return a named `FEATURE_UNAVAILABLE` response.
 
 `AppShell` accepts a typed bootstrap object and route builders. A FastAPI
 application can supply those values through its page bootstrap or a versioned
