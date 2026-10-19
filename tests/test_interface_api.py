@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 
 from sqlalchemy import create_engine, inspect, select
 
-from dossier_pipeline.schema import Document, init_schema
+from dossier_pipeline.schema import AuditLog, Case, Document, init_schema
 from interface.server import create_app
 
 
@@ -98,14 +98,33 @@ def app_for(path, *, local_api_mode=True, evidence_directory=None):
     )
 
 
-def multipart_file(filename, content, *, content_type="text/plain"):
+def multipart_file(filename, content, *, content_type="text/plain", extra_fields=None):
+    """A one-file multipart body, optionally with additional text parts.
+
+    `extra_fields` exists for the optional form fields on the evidence upload
+    (`category`, `source`). Their values are sent as plain text parts, which is
+    what `Form(None)` on the route reads.
+    """
     boundary = "anchorum-test-boundary"
-    body = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
-        f"Content-Type: {content_type}\r\n\r\n"
-    ).encode() + content + f"\r\n--{boundary}--\r\n".encode()
-    return body, f"multipart/form-data; boundary={boundary}"
+    parts = [
+        (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+            f"Content-Type: {content_type}\r\n\r\n"
+        ).encode()
+        + content
+        + b"\r\n"
+    ]
+    for name, value in (extra_fields or {}).items():
+        parts.append(
+            (
+                f"--{boundary}\r\n"
+                f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+                f"{value}\r\n"
+            ).encode()
+        )
+    parts.append(f"--{boundary}--\r\n".encode())
+    return b"".join(parts), f"multipart/form-data; boundary={boundary}"
 
 
 def test_health_and_local_session(tmp_path):
@@ -381,17 +400,291 @@ def test_unimplemented_product_routes_fail_explicitly(tmp_path):
         },
     ).json()
     case_id = case["id"]
+    body, ct = multipart_file("a.txt", b"hello")
+    upload = request(
+        app, "POST", f"/cases/{case_id}/evidence", raw_body=body, content_type=ct,
+    ).json()
+    evidence_id = upload["id"]
 
-    # `timeline` and `search` are implemented now and are covered by the route
-    # tests that assert their real responses; this list holds only the routes
-    # that are still unavailable, so it keeps failing if one silently returns
-    # an empty success instead.
-    calls = [
-        ("POST", f"/cases/{case_id}/export?type=evidence_index"),
-        ("POST", f"/cases/{case_id}/exports/preview?type=evidence_index"),
-        ("GET", "/admin/members"),
-    ]
-    for method, path in calls:
-        response = request(app, method, path)
-        assert response.status_code == 501
-        assert response.json()["error"] == "FEATURE_UNAVAILABLE"
+    # The only intentional stub left is Saul: it should fail closed with 501.
+    response = request(app, "POST", f"/evidence/{evidence_id}/consult")
+    assert response.status_code == 501
+    assert response.json()["error"] == "FEATURE_UNAVAILABLE"
+
+def test_upload_appends_to_existing_case(tmp_path):
+    app = app_for(tmp_path / "api.db")
+    request(app, "GET", "/health")
+
+    with app.state.db_sessions() as session:
+        session.add(
+            Case(case_key="TEST-001", title="Test case", jurisdiction="QC")
+        )
+        session.commit()
+
+    body, content_type = multipart_file("note.txt", b"hello\n")
+    upload = request(
+        app,
+        "POST",
+        "/cases/TEST-001/evidence",
+        raw_body=body,
+        content_type=content_type,
+    )
+    assert upload.status_code == 201, upload.body
+    created = upload.json()
+    assert created["id"].startswith("E-")
+
+    listed = request(app, "GET", "/cases/TEST-001/evidence")
+    assert listed.status_code == 200
+    rows = listed.json()
+    assert len(rows) == 1
+    assert rows[0]["id"] == created["id"]
+
+
+def test_delete_removes_evidence_and_bytes(tmp_path):
+    evidence_root = tmp_path / "evidence"
+    app = app_for(tmp_path / "api.db", evidence_directory=evidence_root)
+    request(app, "GET", "/health")
+
+    with app.state.db_sessions() as session:
+        session.add(
+            Case(case_key="TEST-002", title="Delete case", jurisdiction="QC")
+        )
+        session.commit()
+
+    body, content_type = multipart_file("gone.txt", b"goodbye\n")
+    upload = request(
+        app,
+        "POST",
+        "/cases/TEST-002/evidence",
+        raw_body=body,
+        content_type=content_type,
+    )
+    assert upload.status_code == 201, upload.body
+    evidence_id = upload.json()["id"]
+
+    assert len(list(evidence_root.glob("*.bin"))) == 1
+
+    deleted = request(app, "DELETE", f"/evidence/{evidence_id}")
+    assert deleted.status_code == 200, deleted.body
+
+    listed = request(app, "GET", "/cases/TEST-002/evidence")
+    assert listed.status_code == 200
+    assert listed.json() == []
+
+    with app.state.db_sessions() as session:
+        from dossier_pipeline.schema import Document as _Doc
+        assert session.query(_Doc).count() == 0
+
+    assert list(evidence_root.glob("*.bin")) == []
+    assert list(evidence_root.glob("*.txt")) == []
+def test_init_schema_adds_category_and_source_to_a_legacy_documents_table(tmp_path):
+    """The migration is the `document_additions` loop, so prove it runs.
+
+    A legacy table is built by hand without either column, a row is inserted,
+    and `init_schema` is then expected to add both while leaving the row intact
+    with NULL values.
+    """
+    engine = create_engine(f"sqlite:///{tmp_path / 'legacy-intake.db'}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE cases (
+                id INTEGER PRIMARY KEY,
+                case_key VARCHAR(128) NOT NULL UNIQUE,
+                title VARCHAR(255) NOT NULL,
+                jurisdiction VARCHAR(64) NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE documents (
+                id INTEGER PRIMARY KEY,
+                case_id INTEGER NOT NULL,
+                document_key VARCHAR(128) NOT NULL UNIQUE,
+                filename VARCHAR(255) NOT NULL,
+                content_hash VARCHAR(64) NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO documents "
+            "(id, case_id, document_key, filename, content_hash, created_at) "
+            "VALUES (1, 1, 'E-legacy', 'old.txt', 'deadbeef', '2026-01-01 00:00:00')"
+        )
+
+    init_schema(engine)
+    columns = {column["name"] for column in inspect(engine).get_columns("documents")}
+    assert {"category", "source"} <= columns
+
+    with engine.connect() as connection:
+        row = connection.exec_driver_sql(
+            "SELECT category, source FROM documents WHERE id = 1"
+        ).fetchone()
+    # The migration adds columns; it does not invent values for existing rows.
+    assert row == (None, None)
+
+    # Running it again must be a no-op rather than a second ALTER TABLE.
+    init_schema(engine)
+    assert {column["name"] for column in inspect(engine).get_columns("documents")} == columns
+    engine.dispose()
+
+
+def _case_with_evidence_directory(tmp_path, key="CASE-INTAKE"):
+    evidence_directory = tmp_path / "evidence"
+    app = app_for(tmp_path / "api.db", evidence_directory=evidence_directory)
+    case = request(
+        app,
+        "POST",
+        "/cases",
+        {
+            "key": key,
+            "title": "Intake metadata",
+            "jurisdiction": "QC",
+            "matterType": "labour",
+            "timezone": "America/Montreal",
+            "description": "",
+            "memberIds": [],
+        },
+    ).json()
+    return app, case, evidence_directory
+
+
+def test_upload_stores_category_and_source(tmp_path):
+    app, case, _ = _case_with_evidence_directory(tmp_path, "CASE-CATEGORY")
+    body, content_type = multipart_file(
+        "clinic-note.pdf",
+        b"clinic note body",
+        extra_fields={"category": "medical", "source": "clinic"},
+    )
+    uploaded = request(
+        app,
+        "POST",
+        f"/cases/{case['id']}/evidence",
+        raw_body=body,
+        content_type=content_type,
+    )
+    assert uploaded.status_code == 201, uploaded.body
+    payload = uploaded.json()
+    assert payload["category"] == "medical"
+    assert payload["source"] == "clinic"
+
+    # `_evidence_item` backs both routes, so both must report the same values.
+    for path in (
+        f"/cases/{case['id']}/evidence",
+        f"/evidence/{payload['id']}",
+    ):
+        response = request(app, "GET", path)
+        assert response.status_code == 200
+        item = response.json()
+        if isinstance(item, list):
+            item = item[0]
+        assert item["category"] == "medical"
+        assert item["source"] == "clinic"
+
+
+def test_upload_without_category_or_source_store_null(tmp_path):
+    app, case, _ = _case_with_evidence_directory(tmp_path, "CASE-NO-METADATA")
+    body, content_type = multipart_file("plain.txt", b"plain body")
+    uploaded = request(
+        app,
+        "POST",
+        f"/cases/{case['id']}/evidence",
+        raw_body=body,
+        content_type=content_type,
+    )
+    assert uploaded.status_code == 201, uploaded.body
+    payload = uploaded.json()
+    assert payload["category"] is None
+    assert payload["source"] is None
+
+    item = request(app, "GET", f"/cases/{case['id']}/evidence").json()[0]
+    assert item["category"] is None
+    assert item["source"] is None
+
+
+def test_upload_treats_empty_and_whitespace_values_as_unset(tmp_path):
+    app, case, _ = _case_with_evidence_directory(tmp_path, "CASE-BLANK-METADATA")
+    body, content_type = multipart_file(
+        "blank.txt",
+        b"blank metadata",
+        extra_fields={"category": "   ", "source": ""},
+    )
+    uploaded = request(
+        app,
+        "POST",
+        f"/cases/{case['id']}/evidence",
+        raw_body=body,
+        content_type=content_type,
+    )
+    assert uploaded.status_code == 201, uploaded.body
+    # A blank part means "no answer", which is NULL rather than an empty string.
+    assert uploaded.json()["category"] is None
+    assert uploaded.json()["source"] is None
+
+
+def test_upload_trims_surrounding_whitespace(tmp_path):
+    app, case, _ = _case_with_evidence_directory(tmp_path, "CASE-TRIM-METADATA")
+    body, content_type = multipart_file(
+        "trim.txt",
+        b"trim metadata",
+        extra_fields={"category": "  payroll  ", "source": " employer "},
+    )
+    uploaded = request(
+        app,
+        "POST",
+        f"/cases/{case['id']}/evidence",
+        raw_body=body,
+        content_type=content_type,
+    )
+    assert uploaded.status_code == 201, uploaded.body
+    assert uploaded.json()["category"] == "payroll"
+    assert uploaded.json()["source"] == "employer"
+
+
+def test_upload_rejects_a_category_outside_the_allowlist(tmp_path):
+    app, case, evidence_directory = _case_with_evidence_directory(tmp_path, "CASE-BAD-CATEGORY")
+    body, content_type = multipart_file(
+        "bad.txt",
+        b"bad category body",
+        extra_fields={"category": "taxes"},
+    )
+    rejected = request(
+        app,
+        "POST",
+        f"/cases/{case['id']}/evidence",
+        raw_body=body,
+        content_type=content_type,
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["error"] == "INVALID_CATEGORY"
+
+    # Rejected before any bytes reached their final path, and before a row existed.
+    assert list(evidence_directory.glob("*.bin")) == []
+    assert list(evidence_directory.glob(".upload-*")) == []
+    with app.state.db_sessions() as session:
+        assert session.query(Document).count() == 0
+        assert [row.action for row in session.query(AuditLog).all()] == [
+            "evidence_upload_rejected"
+        ]
+
+
+def test_upload_rejects_a_source_outside_the_allowlist(tmp_path):
+    app, case, evidence_directory = _case_with_evidence_directory(tmp_path, "CASE-BAD-SOURCE")
+    body, content_type = multipart_file(
+        "bad.txt",
+        b"bad source body",
+        extra_fields={"source": "neighbour"},
+    )
+    rejected = request(
+        app,
+        "POST",
+        f"/cases/{case['id']}/evidence",
+        raw_body=body,
+        content_type=content_type,
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["error"] == "INVALID_SOURCE"
+    assert list(evidence_directory.glob("*.bin")) == []

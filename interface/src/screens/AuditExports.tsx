@@ -31,6 +31,9 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
   const [preview, setPreview] = useState<PreviewLoad>({ kind: "loading" });
   const [exportType, setExportType] = useState<ExportType>(exportTypes[0]);
   const [attempt, setAttempt] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportSuccess, setExportSuccess] = useState<string | null>(null);
   const t = (
     key: string,
     parameters?: Record<string, string | number>,
@@ -155,6 +158,28 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
       ? preview.gates.find((gate) => gate.result === "fail")
       : undefined;
 
+  async function onExport() {
+    setExporting(true);
+    setExportError(null);
+    setExportSuccess(null);
+    const result = await adapter.exports.generate(caseId);
+    setExporting(false);
+    if (!result.ok) {
+      setExportError(t(`error.${result.error.toLowerCase()}`));
+      return;
+    }
+    const url = URL.createObjectURL(result.value.blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = result.value.filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setExportSuccess(result.value.filename);
+    setAttempt((n) => n + 1);
+  }
+
   return (
     <section className="audit-exports" aria-labelledby="audit-title">
       <h1 id="audit-title">{t("audit.title")}</h1>
@@ -210,11 +235,18 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
             <button
               type="button"
               className="btn btn--primary"
-              disabled={preview.blocked}
+              disabled={preview.blocked || exporting}
+              onClick={onExport}
               aria-describedby={preview.blocked ? "export-blocked-help" : undefined}
             >
-              {t("export.action.export")}
+              {exporting ? "Exporting…" : t("export.action.export")}
             </button>
+            {exportError ? (
+              <p role="alert" className="form-error">{exportError}</p>
+            ) : null}
+            {exportSuccess ? (
+              <p role="status">Downloaded {exportSuccess}</p>
+            ) : null}
             {preview.blocked ? (
               <p id="export-blocked-help">
                 {t("export.blocked", {

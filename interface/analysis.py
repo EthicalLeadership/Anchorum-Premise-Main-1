@@ -22,6 +22,7 @@ from typing import Any
 
 from interface import engine, scopes, submission
 from interface.pdf_text import PdfTextError
+from interface.classifier import classify_text, extract_metadata
 
 #: Extraction ceiling. The same figure `intake.EmailIntake.ARCHIVE_MAX_BYTES`
 #: uses. Above it extraction is recorded as skipped rather than attempted, so a
@@ -176,8 +177,7 @@ def analyse(
         engine_version: str = "",
         lexicon_hash: str = "",
         config_hash: str = "",
-        doctrine: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+        doctrine: dict[str, Any] | None = None, document_type: str = "unknown", metadata: dict | None = None, ) -> dict[str, Any]:
         scope_records = records or []
         return {
             "status": status,
@@ -209,7 +209,9 @@ def analyse(
                 "classification": "",
                 "fallbackReason": None,
             },
-        }
+                    "documentType": document_type,
+        "metadata": metadata or {},
+}
 
     if len(data) > max_bytes:
         return result(
@@ -299,4 +301,7 @@ def analyse(
         lexicon_hash=first.rules_hash if first else "",
         config_hash=first.config_hash if first else "",
         doctrine=doctrine_block,
+        document_type=classify_text(text),
+        metadata=extract_metadata(text),
+    
     )

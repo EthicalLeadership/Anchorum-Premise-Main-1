@@ -21,6 +21,8 @@ type Load =
 export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
+  const [consulting, setConsulting] = useState(false);
+  const [consultError, setConsultError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -50,6 +52,18 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
   }, [adapter, caseId, evidenceId, attempt]);
 
   const t = (k: string) => translate(locale, k as never);
+  async function onConsult() {
+    setConsulting(true);
+    setConsultError(null);
+    const r = await adapter.evidence.consult(evidenceId);
+    setConsulting(false);
+    if (!r.ok) {
+      setConsultError(t(r.error === "FEATURE_UNAVAILABLE" ? "evidence.viewer.ask_saul_unavailable" : "error.generic"));
+      return;
+    }
+    setAttempt((n) => n + 1); // Refetch evidence to pick up the new consultation.
+  }
+
   const back = (
     <nav aria-label={t("nav.evidence_actions")}>
       <a href={`#/cases/${encodeURIComponent(caseId)}/register`}>{t("evidence.viewer.back")}</a>
@@ -113,7 +127,27 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
       ) : (
         <DataTable caption={t("evidence.viewer.custody")} columns={columns} rows={custody} rowKey={(r) => r.id} />
       )}
-      <h2>{t("evidence.viewer.verification")}</h2>
+      {evidence.analysis?.documentType === "unknown" ? (
+        <div className="ask-saul">
+          {evidence.consultation ? (
+            <div>
+              <h3>{t("evidence.viewer.consultation_label")}</h3>
+              <pre className="consultation-text">{evidence.consultation}</pre>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={onConsult}
+              disabled={consulting}
+            >
+              {consulting ? t("evidence.viewer.ask_saul_loading") : t("evidence.viewer.ask_saul")}
+            </button>
+          )}
+          {consultError ? <p role="alert" className="form-error">{consultError}</p> : null}
+        </div>
+      ) : null}
+            <h2>{t("evidence.viewer.verification")}</h2>
       {verification ? (
         <VerificationTile locale={locale} timeZone={timeZone} verification={verification} />
       ) : (

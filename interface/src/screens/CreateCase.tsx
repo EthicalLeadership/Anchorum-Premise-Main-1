@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import type { createAdapter } from "../adapter";
 import { FileDropZone } from "../components/FileDropZone";
+import { CaseTreePanel } from "../components/CaseTreePanel";
 import { FormField } from "../components/FormField";
 import { translate } from "../i18n";
 import type { Locale } from "../types";
@@ -173,13 +174,14 @@ export function CreateCase({ locale, adapter }: CreateCaseProps) {
 
   return (
     <section className="create-case">
-      <h1>{t("case.create.title")}</h1>
-      {banner ? (
-        <div className="create-case__banner" role="alert">
-          {banner}
-        </div>
-      ) : null}
-      <form noValidate aria-label={t("case.create.title")} onSubmit={submit}>
+      <div className="create-case__form">
+        <h1>{t("case.create.title")}</h1>
+        {banner ? (
+          <div className="create-case__banner" role="alert">
+            {banner}
+          </div>
+        ) : null}
+        <form noValidate aria-label={t("case.create.title")} onSubmit={submit}>
         <FormField
           id="case-key"
           label={t("case.create.field.key")}
@@ -287,6 +289,10 @@ export function CreateCase({ locale, adapter }: CreateCaseProps) {
           </a>
         </div>
       </form>
+      </div>
+      <div className="create-case__tree">
+        <CaseTreePanel locale={locale} adapter={adapter} />
+      </div>
     </section>
   );
 }

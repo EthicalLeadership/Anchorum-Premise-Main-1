@@ -52,6 +52,16 @@ describe("App session seam", () => {
     ).toHaveAttribute("href", "#/cases");
   });
 
+  it("runs against the fixture adapter, not an ambient backend", () => {
+    // Vite loads dotenv files for the `test` mode as well, so a developer's
+    // `.env.local` pointing the dev UI at a local API used to redirect the whole
+    // suite to the network adapter, where it failed against an unreachable host
+    // and `App` rendered its not-found state. `vite.config.ts` blanks the
+    // variable for the test mode; this pin names the cause if that override is
+    // ever dropped, instead of leaving four unrelated-looking failures.
+    expect(import.meta.env.VITE_API_BASE_URL ?? "").toBe("");
+  });
+
   it("offers a cases-list return link when a case is missing", async () => {
     window.location.hash = "#/cases/missing-case/evidence";
     render(<App />);

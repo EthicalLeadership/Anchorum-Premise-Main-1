@@ -71,6 +71,17 @@ export type EvidenceAnalysis = {
   scopesMatched: number;
   warning: string | null;
   analysedAt: string | null;
+  documentType?: string | null;
+  metadata?: { date?: string | null; author?: string | null; issuer?: string | null } | null;
+};
+
+export type EvidenceFilters = {
+  status?: string;
+  category?: string;
+  source?: string;
+  documentType?: string;
+  author?: string;
+  date?: string;
 };
 
 export type Evidence = {
@@ -85,12 +96,17 @@ export type Evidence = {
   quarantinedReason: string | null;
   holdReason: string | null;
   duplicateCandidate: boolean;
+  category?: string | null;
+  source?: string | null;
+  consultation?: string | null;
 };
 export interface IngestInput {
   name: string;
   size: number;
   type: string;
   bytes: ArrayBuffer;
+  category?: string | null;
+  source?: string | null;
 }
 export type IngestResult =
   | {
@@ -102,6 +118,8 @@ export type IngestResult =
         duplicate: boolean;
         processingStatus?: ExtractStatus;
         analysis?: EvidenceAnalysis | null;
+        category?: string | null;
+        source?: string | null;
       };
     }
   | {
@@ -240,6 +258,9 @@ export function createAdapter(config: AdapterConfig) {
   }));
   const sessionAudit: AuditEntry[] = [];
   let sequence = 0;
+  // Per-adapter set of removed ids, so `list` and `get` stay consistent
+  // in mock mode and never leak across adapter instances.
+  const sessionRemovedIds = new Set<string>();
   const requestJson = <T>(path: string, init?: RequestInit) => {
     if (!config.backend) {
       return Promise.resolve(failure("BACKEND_UNREACHABLE"));
@@ -345,6 +366,23 @@ export function createAdapter(config: AdapterConfig) {
         const created = sessionCaseDetails.get(id);
         return Promise.resolve(created ? success(created) : failure("NOT_FOUND"));
       },
+      async update(caseId: string, body: { status?: string }): Promise<AdapterResult<CaseSummary>> {
+        if (config.backend) {
+          return requestJson<CaseSummary>(
+            `/cases/${encodeURIComponent(caseId)}`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            },
+          );
+        }
+        const c = sessionCaseDetails.get(caseId);
+        if (!c) return failure("NOT_FOUND");
+        if (body.status) c.status = body.status as any;
+        return Promise.resolve(success(c));
+      },
+
       async create(input: CreateCaseInput): Promise<CreateCaseResult> {
         if (config.backend) {
           const result = await requestJson<{ id: string; key: string }>("/cases", {
@@ -399,26 +437,57 @@ export function createAdapter(config: AdapterConfig) {
       },
     },
     evidence: {
-      list(caseId: string) {
+      list(caseId: string, filters?: EvidenceFilters) {
         if (config.backend) {
+          const params = new URLSearchParams();
+          if (filters?.status) params.set("status", filters.status);
+          if (filters?.category) params.set("category", filters.category);
+          if (filters?.source) params.set("source", filters.source);
+          if (filters?.documentType) params.set("document_type", filters.documentType);
+          if (filters?.author) params.set("author", filters.author);
+          if (filters?.date) params.set("date", filters.date);
+          const qs = params.toString();
           return requestJson<readonly Evidence[]>(
-            `/cases/${encodeURIComponent(caseId)}/evidence`,
+            `/cases/${encodeURIComponent(caseId)}/evidence${qs ? `?${qs}` : ""}`,
           );
         }
-        return caseId === fixture.case.id
-          ? Promise.resolve(
-              success<readonly Evidence[]>([
-                ...(fixture.evidence as readonly Evidence[]),
-                ...sessionEvidence,
-              ]),
-            )
-          : Promise.resolve(failure("NOT_FOUND"));
+        if (caseId !== fixture.case.id) {
+          return Promise.resolve(failure("NOT_FOUND"));
+        }
+        const all: readonly Evidence[] = [
+          ...(fixture.evidence as readonly Evidence[]).filter(
+            (row) => !sessionRemovedIds.has(row.id),
+          ),
+          ...sessionEvidence.filter((row) => !sessionRemovedIds.has(row.id)),
+        ];
+        const matched = all.filter((row) => {
+          if (filters?.status === "hold" && row.status !== "integrity_hold") return false;
+          if (filters?.status && filters.status !== "hold" && row.status !== filters.status) return false;
+          if (filters?.category && row.category !== filters.category) return false;
+          if (filters?.source && row.source !== filters.source) return false;
+          if (filters?.documentType) {
+            if (row.analysis?.documentType !== filters.documentType) return false;
+          }
+          if (filters?.author) {
+            const a = row.analysis?.metadata?.author;
+            if (!a || !a.toLowerCase().includes(filters.author.toLowerCase())) {
+              return false;
+            }
+          }
+          if (filters?.date) {
+            if (row.analysis?.metadata?.date !== filters.date) return false;
+          }
+          return true;
+        });
+        return Promise.resolve(success(matched));
       },
       async ingest(caseId: string, input: IngestInput): Promise<IngestResult> {
         if (config.backend) {
           try {
             const form = new FormData();
             form.append("file", new Blob([input.bytes], { type: input.type }), input.name);
+            if (input.category) form.append("category", input.category);
+            if (input.source) form.append("source", input.source);
             const response = await fetch(
               `${config.backend.baseUrl}/cases/${encodeURIComponent(caseId)}/evidence`,
               { method: "POST", body: form },
@@ -441,6 +510,8 @@ export function createAdapter(config: AdapterConfig) {
               duplicate?: boolean;
               processingStatus?: ExtractStatus;
               analysis?: EvidenceAnalysis | null;
+              category?: string | null;
+              source?: string | null;
             };
             return {
               ok: true,
@@ -454,6 +525,8 @@ export function createAdapter(config: AdapterConfig) {
                 duplicate: Boolean(body.duplicate),
                 processingStatus: body.processingStatus,
                 analysis: body.analysis ?? null,
+                category: body.category ?? null,
+                source: body.source ?? null,
               },
             };
           } catch {
@@ -475,6 +548,8 @@ export function createAdapter(config: AdapterConfig) {
           holdReason: null,
           duplicateCandidate: duplicate,
           hash,
+          category: input.category ?? null,
+          source: input.source ?? null,
         });
         return {
           ok: true,
@@ -485,6 +560,8 @@ export function createAdapter(config: AdapterConfig) {
             duplicate,
             processingStatus: "stored",
             analysis: null,
+            category: input.category ?? null,
+            source: input.source ?? null,
           },
         };
       },
@@ -492,10 +569,36 @@ export function createAdapter(config: AdapterConfig) {
         if (config.backend) {
           return requestJson<Evidence>(`/evidence/${encodeURIComponent(id)}`);
         }
+        if (sessionRemovedIds.has(id)) {
+          return Promise.resolve(failure("NOT_FOUND"));
+        }
         const evidence = [...fixture.evidence, ...sessionEvidence].find(
           (item) => item.id === id,
         );
         return Promise.resolve(evidence ? success(evidence) : failure("NOT_FOUND"));
+      },
+      async remove(
+        id: string,
+      ): Promise<AdapterResult<{ id: string; removed: true }>> {
+        if (config.backend) {
+          return request<{ id: string; removed: true }>(
+            config.backend.baseUrl,
+            `/evidence/${encodeURIComponent(id)}`,
+            { method: "DELETE" },
+          );
+        }
+        if (sessionRemovedIds.has(id)) {
+          return failure("NOT_FOUND");
+        }
+        const inFixture = fixture.evidence.some((e) => e.id === id);
+        const inSession = sessionEvidence.some((e) => e.id === id);
+        if (!inFixture && !inSession) {
+          return failure("NOT_FOUND");
+        }
+        sessionRemovedIds.add(id);
+        const idx = sessionEvidence.findIndex((e) => e.id === id);
+        if (idx !== -1) sessionEvidence.splice(idx, 1);
+        return success({ id, removed: true as const });
       },
       originalUrl(id: string): string | null {
         return config.backend
@@ -526,8 +629,38 @@ export function createAdapter(config: AdapterConfig) {
           verification ? success(verification) : failure("NOT_FOUND"),
         );
       },
+
+      async consult(id: string): Promise<AdapterResult<{ id: string; consultation: string | null }>> {
+        if (config.backend) {
+          return requestJson<{ id: string; consultation: string | null }>(
+            `/evidence/${encodeURIComponent(id)}/consult`,
+            { method: "POST" },
+          );
+        }
+        return failure("FEATURE_UNAVAILABLE");
+      },
     },
     exports: {
+      async generate(caseId: string): Promise<AdapterResult<{ blob: Blob; filename: string }>> {
+        if (config.backend) {
+          try {
+            const res = await fetch(
+              `${config.backend.baseUrl}/cases/${encodeURIComponent(caseId)}/export`,
+              { method: "POST" },
+            );
+            if (!res.ok) return failure(`HTTP_${res.status}`);
+            const blob = await res.blob();
+            const disposition = res.headers.get("Content-Disposition") || "";
+            const match = disposition.match(/filename="([^"]+)"/);
+            const filename = match ? match[1] : `case_${caseId}_export.zip`;
+            return success({ blob, filename });
+          } catch {
+            return failure("BACKEND_UNREACHABLE");
+          }
+        }
+        return failure("FEATURE_UNAVAILABLE");
+      },
+
       preview(caseId: string, type: string) {
         if (config.backend) {
           return requestJson<ExportPreview>(

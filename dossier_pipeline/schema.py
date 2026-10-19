@@ -82,6 +82,9 @@ class Document(Base):
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     storage_key: Mapped[Optional[str]] = mapped_column(String(64), unique=True, nullable=True)
     media_type: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    category: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    source: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    consultation_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     byte_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
@@ -113,7 +116,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    case_id: Mapped[int] = mapped_column(ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, index=True)
+    case_id: Mapped[Optional[int]] = mapped_column(ForeignKey("cases.id", ondelete="CASCADE"), nullable=True, index=True)
     actor_username: Mapped[str] = mapped_column(String(128), nullable=False)
     action: Mapped[str] = mapped_column(String(128), nullable=False)
     details: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -173,6 +176,9 @@ def init_schema(engine) -> None:
             "analysis_rules_hash": "VARCHAR(64) NOT NULL DEFAULT ''",
             "analysis_config_hash": "VARCHAR(64) NOT NULL DEFAULT ''",
             "analysed_at": "DATETIME",
+            "category": "VARCHAR(64)",
+            "source": "VARCHAR(64)",
+            "consultation_json": "TEXT",
         }
         existing_documents = {
             column["name"] for column in inspect(engine).get_columns("documents")

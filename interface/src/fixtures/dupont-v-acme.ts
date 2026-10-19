@@ -21,6 +21,8 @@ export const fixture = {
       quarantinedReason: null,
       holdReason: null,
       duplicateCandidate: false,
+      category: "correspondence",
+      source: "employer",
     },
     {
       id: "E-1043",
@@ -30,6 +32,8 @@ export const fixture = {
       quarantinedReason: null,
       holdReason: null,
       duplicateCandidate: true,
+      category: "payroll",
+      source: "employer",
     },
     {
       id: "E-1044",
@@ -39,6 +43,8 @@ export const fixture = {
       quarantinedReason: "scan_unsupported_variant",
       holdReason: null,
       duplicateCandidate: false,
+      category: "medical",
+      source: "clinic",
     },
     {
       id: "E-1045",
@@ -48,6 +54,8 @@ export const fixture = {
       quarantinedReason: null,
       holdReason: null,
       duplicateCandidate: false,
+      category: null,
+      source: null,
     },
     {
       id: "E-1046",
@@ -57,6 +65,8 @@ export const fixture = {
       quarantinedReason: null,
       holdReason: null,
       duplicateCandidate: false,
+      category: "correspondence",
+      source: "court",
     },
     {
       id: "E-1047",
@@ -66,6 +76,8 @@ export const fixture = {
       quarantinedReason: null,
       holdReason: "hash_mismatch_at_readback",
       duplicateCandidate: false,
+      category: "payroll",
+      source: "employer",
     },
   ],
   custody: {

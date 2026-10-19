@@ -1,3 +1,31 @@
+.register{overflow-x:auto}
 .register table{width:100%;border-collapse:collapse}
-.register th,.register td{text-align:left;padding:var(--sp-2);border-bottom:1px solid var(--tp-line)}
+.register th,.register td{text-align:left;padding:var(--sp-2);border-bottom:1px solid var(--tp-line);vertical-align:top}
+.register th{white-space:nowrap}
+.register td:first-child,.register th:first-child{max-width:13rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.register td:first-child a{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
 .register label{display:block;margin-bottom:var(--sp-3);color:var(--tp-muted)}
+
+
+.register__filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  align-items: end;
+}
+
+.register__filters label {
+  display: grid;
+  gap: var(--sp-1);
+  font-size: 0.875rem;
+}
+
+.register__filters select,
+.register__filters input {
+  border: 1px solid var(--tp-line);
+  padding: var(--sp-1);
+  font: inherit;
+  color: var(--tp-fg);
+  background: var(--tp-bg);
+}

@@ -273,6 +273,7 @@ def test_c4_the_timeline_reports_the_documents_own_events(uploaded) -> None:
             "evidence_uploaded",
             "evidence_verified",
             "evidence_analysed",
+            "evidence_filed_with_date",
         }
         assert event["people"] == ["system"]
 

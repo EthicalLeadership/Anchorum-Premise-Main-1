@@ -160,3 +160,87 @@ describe("EvidenceIntake", () => {
     );
   });
 });
+describe("EvidenceIntake intake metadata", () => {
+  function uploadFile() {
+    const file = new File(["hello"], "a.pdf", { type: "application/pdf" });
+    Object.defineProperty(file, "arrayBuffer", {
+      value: async () => new TextEncoder().encode("hello").buffer,
+    });
+    fireEvent.change(screen.getByTestId("file-input"), { target: { files: [file] } });
+  }
+
+  function stubIngest(adapter: ReturnType<typeof createAdapter>) {
+    return vi.spyOn(adapter.evidence, "ingest").mockResolvedValue({
+      ok: true,
+      value: {
+        id: "E-META",
+        hash: "abc123",
+        sourceSha256: "abc123",
+        duplicate: false,
+        processingStatus: "extracted",
+      },
+    });
+  }
+
+  it("forwards the selected category and source to ingest", async () => {
+    const adapter = createAdapter({ backend: null });
+    const ingest = stubIngest(adapter);
+    render(<EvidenceIntake locale="en" adapter={adapter} caseId="CASE-2024-018" />);
+
+    fireEvent.change(screen.getByLabelText("Category"), {
+      target: { value: "medical" },
+    });
+    fireEvent.change(screen.getByLabelText("Source"), {
+      target: { value: "clinic" },
+    });
+    uploadFile();
+
+    expect(await screen.findByText(/E-META/)).toBeTruthy();
+    expect(ingest).toHaveBeenCalledWith(
+      "CASE-2024-018",
+      expect.objectContaining({ category: "medical", source: "clinic" }),
+    );
+  });
+
+  it("sends null for both when nothing was chosen", async () => {
+    const adapter = createAdapter({ backend: null });
+    const ingest = stubIngest(adapter);
+    render(<EvidenceIntake locale="en" adapter={adapter} caseId="CASE-2024-018" />);
+
+    uploadFile();
+
+    expect(await screen.findByText(/E-META/)).toBeTruthy();
+    // The route reads `Form(None)`; sending "" would be an unrecognised value.
+    expect(ingest).toHaveBeenCalledWith(
+      "CASE-2024-018",
+      expect.objectContaining({ category: null, source: null }),
+    );
+  });
+
+  it("offers only the vocabulary the API accepts", async () => {
+    const adapter = createAdapter({ backend: null });
+    stubIngest(adapter);
+    render(<EvidenceIntake locale="en" adapter={adapter} caseId="CASE-2024-018" />);
+
+    const category = screen.getByLabelText("Category") as HTMLSelectElement;
+    const source = screen.getByLabelText("Source") as HTMLSelectElement;
+
+    // The first option is the unset placeholder, so the rest are the allowlist.
+    expect(Array.from(category.options, (o) => o.value)).toEqual([
+      "",
+      "medical",
+      "payroll",
+      "correspondence",
+      "pleading",
+      "other",
+    ]);
+    expect(Array.from(source.options, (o) => o.value)).toEqual([
+      "",
+      "clinic",
+      "insurer",
+      "employer",
+      "court",
+      "other",
+    ]);
+  });
+});

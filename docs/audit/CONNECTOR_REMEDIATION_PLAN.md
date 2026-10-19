@@ -22,14 +22,14 @@ the risk register's coverage and is not affected by `W5`.
 Read the workstream sections as the specification they were written to be, and
 this table as what is on the tree.
 
-| workstream | finding | state | pin |
-|------------|---------|-------|-----|
-| `W1` | `C-5` | Implemented. The record carries `source_sha256`, `source_bytes`, `source_filename`, `source_media_type`, `transport` and `synthesised_fields`; the synthetic wrapper is a function of the artifact alone, so unchanged bytes are recognised as a resubmission. | `tests/test_control_record_integrity.py::ArtifactIdentityInCommittedRecordTests`, `::DocumentResubmissionIdentityTests` |
-| `W2` | `C-3` | Implemented. A non-email transport records `actor = unknown` with `classification_scope_warning` on the committed record, and a synthesised envelope field no longer counts towards provenance completeness. | `tests/test_control_record_integrity.py::ArtifactIdentityInCommittedRecordTests::test_record_does_not_invent_an_actor_for_a_document` |
-| `W3` | `C-4` | Implemented. `interface/analysis.py` reads, segments and projects a stored artifact; `GET /evidence/{id}/analysis` and `POST /evidence/{id}/analyse` serve it; the item's status advances and carries an analysis block; custody entries state whether a chain was checked. | `tests/test_analysis.py`, `tests/test_evidence_analysis_api.py` |
-| `W4` | `C-2` (a) | Implemented. Coverage is computed, and a majority-fallback or zero-match document carries an explicit warning instead of reading as "no legal concepts here". | `tests/test_analysis.py::test_uncovered_language_is_surfaced_as_a_warning` |
-| `W5` | `C-2` (b) | Implemented. `lexicons/legal-doctrine-v1.yaml` (12 concepts, 42 patterns) bound through a second engine; 9 of 12 concepts fire on the brief; `DOCTRINE_OFFER` is a near miss asserted in the suite. The risk register is unchanged and the C2 warning stays at 1 of 8 -- that is the risk register's coverage, not the doctrine lexicon's. | `tests/test_doctrine_lexicon.py`, `tests/test_acceptance_brief.py::test_a5_doctrine_projection`, `::test_a6_analysis_record_carries_doctrine_block`, `::test_a6_doctrine_block_does_not_overwrite_risk_projection`, `::test_c7_api_analysis_returns_doctrine_block` |
-| `W6` | `C-6` | Verify only; not re-checked in this pass. | |
+|workstream|finding|state|pin|
+|----------|---------|-------|-----|
+|`W1`|`C-5`|Implemented. The record carries `source_sha256`, `source_bytes`, `source_filename`, `source_media_type`, `transport` and `synthesised_fields`; the synthetic wrapper is a function of the artifact alone, so unchanged bytes are recognised as a resubmission.|`tests/test_control_record_integrity.py::ArtifactIdentityInCommittedRecordTests`, `::DocumentResubmissionIdentityTests`|
+|`W2`|`C-3`|Implemented. A non-email transport records `actor = unknown` with `classification_scope_warning` on the committed record, and a synthesised envelope field no longer counts towards provenance completeness.|`tests/test_control_record_integrity.py::ArtifactIdentityInCommittedRecordTests::test_record_does_not_invent_an_actor_for_a_document`|
+|`W3`|`C-4`|Implemented. `interface/analysis.py` reads, segments and projects a stored artifact; `GET /evidence/{id}/analysis` and `POST /evidence/{id}/analyse` serve it; the item's status advances and carries an analysis block; custody entries state whether a chain was checked.|`tests/test_analysis.py`, `tests/test_evidence_analysis_api.py`|
+|`W4`|`C-2` (a)|Implemented. Coverage is computed, and a majority-fallback or zero-match document carries an explicit warning instead of reading as "no legal concepts here".|`tests/test_analysis.py::test_uncovered_language_is_surfaced_as_a_warning`|
+|`W5`|`C-2` (b)|Implemented. `lexicons/legal-doctrine-v1.yaml` (12 concepts, 42 patterns) bound through a second engine; 9 of 12 concepts fire on the brief; `DOCTRINE_OFFER` is a near miss asserted in the suite. The risk register is unchanged and the C2 warning stays at 1 of 8 -- that is the risk register's coverage, not the doctrine lexicon's.|`tests/test_doctrine_lexicon.py`, `tests/test_acceptance_brief.py::test_a5_doctrine_projection`, `::test_a6_analysis_record_carries_doctrine_block`, `::test_a6_doctrine_block_does_not_overwrite_risk_projection`, `::test_c7_api_analysis_returns_doctrine_block`|
+|`W6`|`C-6`|Verify only; not re-checked in this pass.||
 
 Verification measured on this tree: the acceptance run in §3 is green, both as a
 standalone run (16 of 16 checks) and in the suite, where
@@ -44,15 +44,15 @@ this is where the planned names map to the pins that exist. The plan's own names
 are kept here rather than edited out of the sections: a reader who searches for
 one needs to land on the test, not on a gap.
 
-| planned test file | where the pin lives now |
+|planned test file|where the pin lives now|
 |-------------------|-------------------------|
-| `tests/test_document_custody_identity.py` | `tests/test_control_record_integrity.py::DocumentResubmissionIdentityTests` (determinism, resubmission, artifact binding) |
-| `tests/test_document_transport_provenance.py` | `tests/test_control_record_integrity.py::ArtifactIdentityInCommittedRecordTests` (transport, synthesised fields, actor, provenance, and the email-path regression guard) |
-| `tests/test_document_api_hash_agreement.py` | as named; the cross-track tie, plus the assertion that the wrapper is not the artifact |
-| `tests/test_analysis_scopes.py` | `tests/test_scopes.py` (segmentation, guarded by the real brief) |
-| `tests/test_analysis_coverage.py` | `tests/test_analysis.py` (coverage counts, the warning, thresholds, refusals) |
-| `tests/test_evidence_analysis_route.py` | `tests/test_evidence_analysis_api.py` (analysis route, re-analysis, item status, custody detail, search, timeline) |
-| `tests/test_legal_doctrine_lexicon.py` | `tests/test_doctrine_lexicon.py` (shipped under this name; the suite is green) |
+|`tests/test_document_custody_identity.py`|`tests/test_control_record_integrity.py::DocumentResubmissionIdentityTests` (determinism, resubmission, artifact binding)|
+|`tests/test_document_transport_provenance.py`|`tests/test_control_record_integrity.py::ArtifactIdentityInCommittedRecordTests` (transport, synthesised fields, actor, provenance, and the email-path regression guard)|
+|`tests/test_document_api_hash_agreement.py`|as named; the cross-track tie, plus the assertion that the wrapper is not the artifact|
+|`tests/test_analysis_scopes.py`|`tests/test_scopes.py` (segmentation, guarded by the real brief)|
+|`tests/test_analysis_coverage.py`|`tests/test_analysis.py` (coverage counts, the warning, thresholds, refusals)|
+|`tests/test_evidence_analysis_route.py`|`tests/test_evidence_analysis_api.py` (analysis route, re-analysis, item status, custody detail, search, timeline)|
+|`tests/test_legal_doctrine_lexicon.py`|`tests/test_doctrine_lexicon.py` (shipped under this name; the suite is green)|
 
 The frontend mapping in §7.4 has its own pin,
 `interface/src/screens/EvidenceIntake.test.tsx`, which asserts that a refused or
@@ -73,7 +73,7 @@ closes, the evidence for it, the decision it needs, the exact files to touch, th
 tests that must exist, and the condition that marks it done.
 
 | | |
-|---|---|
+| --- | --- |
 | **Workstream ids** | `W1`…`W6`. One workstream is one pull request, except `W5`, which is several. |
 | **Finding ids** | `C-1`…`C-6` from the connector audit. `W1` closes `C-5`, `W2` closes `C-3`, `W3` closes `C-4`, `W4` closes half of `C-2`, `W5` closes the other half, `W6` is documentation only. |
 | **Must do / may defer** | Each workstream has an explicit "Not in this workstream" list. Do not widen it without saying so on the plan. |
@@ -93,7 +93,7 @@ findings is the implementation-status table at the top of this document.
 From `docs/audit/CONNECTOR_AUDIT.md` §3 and §13:
 
 | id | severity | connector | state | closed by |
-|----|----------|-----------|-------|-----------|
+| ---- | ---------- | ----------- | ------- | ----------- |
 | C-1 | Critical | PDF / binary document ingestion | **Fixed** (`0e9c273`) | |
 | C-2 | High | Legal lexicon projection (the "scopes") | **Fixed** | `W4` + `W5` |
 | C-3 | High | Document classification in the dossier pipeline | Open | `W2` |
@@ -271,6 +271,7 @@ misclassification inside a signed record is not recoverable by the reader.
 paths under `/home/kark`, and §6 records that two defects in this repository's
 history were caused by operating on the wrong copy. Confirm the working copy
 before starting.
+
 ## 5. W1 C-5: custody must bind the submitted artifact
 
 **Finding.** Two runs of the same PDF through `interface/document.py::process`
@@ -608,6 +609,7 @@ provenance test fails.
   would touch every file in the pipeline at once.
 - Changing the classifier's confidence formula (`0.3 + 0.15 × hits`). It is
   referenced by the F-16 note in `policy.py`. Flagged as a decision in §13.
+
 ## 7. W3 C-4: wire analysis into the product API
 
 **Finding.** The API stores bytes faithfully 201, hash equal to the PDF's own
@@ -690,7 +692,7 @@ leaving a bare `not_checked` for a reader to interpret.
   `tests/test_interface_api.py::test_existing_sqlite_documents_get_local_storage_metadata_columns`.
   Add to both the `Document` model and `document_additions`:
 
-  ```
+  ```text
   extract_status        VARCHAR(32) NOT NULL DEFAULT 'stored'
   extract_error         TEXT NOT NULL DEFAULT ''
   extract_sha256        VARCHAR(64) NOT NULL DEFAULT ''
@@ -802,6 +804,7 @@ leaving a bare `not_checked` for a reader to interpret.
   entry is the local audit row and there is no control chain on this host; with it
   configured and a record committed, the entry can be `linked`. Never report
   `linked` for a row that was not checked.
+
 ### 7.5 The 501s replace exactly the ones that can now be true
 
 - [ ] **`GET /cases/{id}/search?q=`** → implement. Text now exists. A first cut is
@@ -932,6 +935,7 @@ test fails.
   correct for a single-process local slice; a queue is a different product.
 - Malware scanning. The README already says it is not provided, and a PDF text
   extractor is not a scanner. Say so again where analysis is described.
+
 ## 8. W4 C-2a: the zero-coverage outcome must be explicit
 
 **Finding.** Seven of eight scopes return `canonical_projection_fallback` with
@@ -951,6 +955,7 @@ independent of any lexicon work.** Ship it before `W5`.
   `interface/analysis.py`, over the per-scope projections:
 
   ```
+  ```text
   coverage = {
     "scopesTotal":        len(scopes),
     "scopesMatched":      count(concept_id is not None),
@@ -1003,6 +1008,7 @@ threshold to 0 → the short-document test fails.
 - The lexicon (`W5`).
 - A confidence score for coverage. `ratio` is a count, not a claim about
   correctness; do not dress it up as one.
+
 ## 9. W5 C-2b: give the engine a vocabulary for a case brief
 
 **Finding.** The brief is a contracts case brief offer, acceptance,
@@ -1064,6 +1070,7 @@ Either way: **a new versioned file, not an in-place edit.** `load_lexicon` in
 `ccsp/verify.py` hashes the whole concept-and-pattern payload into `rules.hash`,
 and that hash is carried into every projection's `rules_hash` and into the
 engine's `config_hash`, so the change is visible wherever a projection is read.
+
 ### 9.2 Scope of the concepts the owner's list, not the coder's
 
 Under Option A the doctrine lexicon needs concepts for at least: offer,
@@ -1083,6 +1090,7 @@ without *asserting* it, so a pattern that fires on "The Court considered whether
 the evidence supported the plaintiff's claim" is a false positive and that
 sentence is already a `benign_tests` entry in the risk register, which is the
 precedent to follow.
+
 ### 9.3 Steps
 
 - [ ] **5.1 the owner produces the concept list** (names, one-line definitions,
@@ -1108,6 +1116,7 @@ precedent to follow.
   `analysis_rules_hash` without touching the stored bytes or the custody chain.
   This is the reason `W3` adds that route, and it is what makes a lexicon change
   safe to ship.
+
 ### Tests
 
 - [ ] `tests/test_legal_doctrine_lexicon.py`: every concept has at least one
@@ -1142,6 +1151,7 @@ the doctrine engine at `legal-v3.1.yaml` → the concept assertions fail.
 - Any change to `ccsp/verify.py`.
 - Widening `runtime.matching`, `runtime.negation` or `runtime.precedence` to make
   the brief match. Rule 4.6.
+
 ## 10. W6 C-6: the signing requirement is documented, and stays accurate
 
 `interface/README.md` was updated in the C-1 pass to state that the document path
@@ -1164,7 +1174,7 @@ No code change in this workstream unless the README turns out to be wrong.
 ## 11. Sequencing, ownership and work-in-progress
 
 | order | workstream | closes | depends on | parallel-safe |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | 1 | `W1` | C-5 | | |
 | 2 | `W2` | C-3 | `W1` (it consumes `transport`/`synthesised_fields`) | `W3` |
 | 3 | `W3` | C-4 | `W1` (hash agreement) | `W2`, `W5` |
@@ -1208,6 +1218,7 @@ run the whole time without touching code until §9.1 is answered.
 tests. `W1` and `W2` both change the committed record's payload, so they change
 what `tests/test_control_record_integrity.py` sees; if they land together the
 pins are easier to read, but they must be separable.
+
 ## 12. Coordination hazards
 
 Six things will bite during this work. Each is a fact about the tree, not a
@@ -1259,13 +1270,14 @@ warning in general.
 
 Two more, lower severity but real:
 
-7. **The work must happen in the canonical working copy.** §4.7.
-8. **`interface/document.py` sets `ANCHORUM_ENV=local` at import.**
+1. **The work must happen in the canonical working copy.** §4.7.
+2. **`interface/document.py` sets `ANCHORUM_ENV=local` at import.**
    `_os.environ.setdefault("ANCHORUM_ENV", "local")` runs on import of that
    module, so any test or script that imports it inherits a local environment
    regardless of what the test intended. Nothing in this plan depends on it, but
    a test that wants to exercise a non-local environment path cannot do so
    through this module.
+
 ## 13. Decisions requiring an owner's call
 
 Each of these has more than one defensible answer, and picking one silently is
@@ -1273,7 +1285,7 @@ how the audit's own complaint a choice made without the evidence being visible
 gets repeated. Record the decision in the commit message or in this document.
 
 | # | Decision | Options | This plan recommends | Who |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | D-1 | `W5`: doctrine vocabulary | A: second lexicon + second engine. B: extend `legal-v3.1.yaml` | **A.** Keeps the risk register's semantics intact and does not move its pins | Vertical owner |
 | D-2 | `W5`: the concept list itself | coverage of the contracts curriculum | Owner-produced list with positive **and negative** examples per concept | Vertical owner |
 | D-3 | `W3`: the scope model | the eight IRAC scopes from the audit's probe, or something else | Confirm the eight before `scopes.py` becomes a pin | Product owner |
@@ -1321,7 +1333,7 @@ matters here: the working tree carries another actor's untracked
 travels with a clone.
 
 | gate | command | expected |
-|---|---|---|
+| --- | --- | --- |
 | Integrity self-test | `python3 scripts/check_integrity.py --selftest` | 6/6 |
 | Integrity, all source | `python3 scripts/check_integrity.py --all` | OK |
 | Secret scan | `gitleaks dir . --config .gitleaks.toml` | no findings |
@@ -1343,6 +1355,7 @@ never been seen to fail is not evidence, and this plan does not count it as such
 API and the pipeline path through `interface/document.py`, on the real brief,
 start to finish, with the output pasted into the closing report. That is what
 "the brief can be put in and analysed" means; nothing less closes `C-4`.
+
 ## Appendix A exact targets
 
 Every path is relative to the repository root. The symbol names are the functions
@@ -1351,7 +1364,7 @@ or fields the work touches.
 ### A.1 `interface/`
 
 | file | symbol | what changes |
-|---|---|---|
+| --- | --- | --- |
 | `document.py` | `_wrap_text_as_eml` | deterministic `Message-ID` and `Date`; takes the source artifact |
 | `document.py` | `_submit_text` | passes `source=` and `transport="document"` |
 | `document.py` | `process` | computes `source_sha256` on all three input paths |
@@ -1379,7 +1392,7 @@ or fields the work touches.
 ### A.2 `dossier_pipeline/`
 
 | file | symbol | what changes |
-|---|---|---|
+| --- | --- | --- |
 | `contracts.py` | `EmailEnvelope` | `source_sha256`, `source_bytes`, `source_filename`, `source_media_type`, `transport`, `synthesised_fields` |
 | `contracts.py` | `ClassificationResult` | `classification_scope_warning` |
 | `contracts.py` | `AdapterResult` | carry the six envelope fields + the scope warning |
@@ -1402,10 +1415,11 @@ or fields the work touches.
 | `governance/semantic_adapter.py` | `build_for_vertical` | the pattern for the second engine binding |
 | `evidence.py` | `EvidenceSignerUnbound`, `EvidenceStore.ingest` | unchanged; it is the fail-closed boundary `W3` stops crossing |
 | `barreau_gate.py` | `BarreauGate` | not wired in this pass (§7.5) |
+
 ### A.3 `ccsp/` and `lexicons/`
 
 | file | what changes |
-|---|---|
+| --- | --- |
 | `ccsp/verify.py` | **nothing.** `_FB`, `Engine.project`, `_canon`, `load_lexicon`, `_ph` are read, not modified |
 | `lexicons/legal-v3.1.yaml` | unchanged under Option A; extended under Option B (with pin updates) |
 | `lexicons/legal-doctrine-v1.yaml` | *(new under Option A)* the owner's concept list |
@@ -1413,7 +1427,7 @@ or fields the work touches.
 ### A.4 Tests
 
 | test | workstream | new / extended |
-|---|---|---|
+| --- | --- | --- |
 | `tests/test_document_custody_identity.py` | `W1` | new |
 | `tests/test_document_api_hash_agreement.py` | `W1` + `W3` | new |
 | `tests/test_control_record_integrity.py` | `W1` | extended |
@@ -1430,7 +1444,7 @@ or fields the work touches.
 `dossier_pipeline/trust_boundary.py::DEFAULT_CONTRACT`, verbatim field lists, so
 the additions in `W1` and `W2` are made against the real thing:
 
-```
+```python
 internal_only_fields = (
     "decision_reasoning", "decision_trace", "payload_hash",
     "previous_hash", "control_hash", "trace",
@@ -1460,6 +1474,7 @@ Note the shape of `validate_export_fields`: it returns the fields to *drop*, so
 `regulated_fields` is not consulted by that function at all it is descriptive
 metadata for other readers. Do not assume adding a name there removes it from an
 export.
+
 ## Appendix B reproduction commands
 
 These are the commands the audit used, plus the ones this plan adds. The probe

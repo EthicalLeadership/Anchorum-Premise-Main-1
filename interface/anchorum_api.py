@@ -2,17 +2,20 @@
 from __future__ import annotations
 
 import hashlib
+import io
+import hmac
 import json
 import os
 import re
 import tempfile
 import uuid
+import zipfile
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, cast
 
-from fastapi import Depends, FastAPI, File, HTTPException, Response, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,8 +27,9 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.engine import make_url
 
-from dossier_pipeline.schema import AuditLog, Case, Document, init_schema
+from dossier_pipeline.schema import AuditLog, Case, Document, User, init_schema
 from interface import analysis as analysis_service
+from interface import malware_scan
 
 ROOT = Path(__file__).resolve().parents[1]
 INTERFACE_ROOT = Path(__file__).resolve().parent
@@ -35,6 +39,26 @@ DIST_ROOT = INTERFACE_ROOT / "dist"
 #: storage key is a uuid4 hex digest; a name that does not match it never
 #: reaches the filesystem.
 STORAGE_KEY_PATTERN = re.compile(r"[0-9a-f]{32}")
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+MAX_FILENAME_LENGTH = 255
+ALLOWED_CATEGORIES = frozenset({"medical", "payroll", "correspondence", "pleading", "other"})
+ALLOWED_SOURCES = frozenset({"clinic", "insurer", "employer", "court", "other"})
+ALLOWED_MEDIA_TYPES = frozenset({
+    "application/pdf",
+    "text/plain",
+    "text/csv",
+    "image/jpeg",
+    "image/png",
+    "image/tiff",
+    "image/dicom",
+    "application/dicom",
+    "application/zip",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/octet-stream",
+})
 
 #: Search bounds. Hits are capped and each excerpt is a fixed window, so a
 #: query cannot pull a whole document back through the API.
@@ -71,10 +95,13 @@ ANALYSIS_STATUS = {
 #: The audit actions the timeline surfaces and the event name each becomes. An
 #: allowlist rather than a passthrough, so a new audit action does not show up
 #: in the timeline until someone decides what it means to a reader.
+EVENT_EVIDENCE_FILED_WITH_DATE = "evidence_filed_with_date"
+
 TIMELINE_EVENTS = {
     "evidence_verified": "evidence_verified",
     "evidence_analysed": "evidence_analysed",
     "evidence_reanalysed": "evidence_reanalysed",
+    EVENT_EVIDENCE_FILED_WITH_DATE: EVENT_EVIDENCE_FILED_WITH_DATE,
 }
 
 #: This API slice has no control plane, so no chain is ever walked here. The
@@ -236,6 +263,8 @@ def _analysis_summary(document: Document) -> dict | None:
         "scopesTotal": coverage.get("scopesTotal", 0),
         "scopesMatched": coverage.get("scopesMatched", 0),
         "warning": coverage.get("warning"),
+        "documentType": record.get("documentType", "unknown"),
+        "metadata": record.get("metadata", {}),
         "analysedAt": (
             _datetime_text(document.analysed_at) if document.analysed_at else None
         ),
@@ -260,7 +289,69 @@ def _evidence_item(db: Session, document: Document) -> dict:
         "quarantinedReason": None,
         "holdReason": None,
         "duplicateCandidate": int(duplicate_count or 0) > 1,
+        "category": document.category,
+        "source": document.source,
+        "consultation": document.consultation_json,
     }
+
+
+def _record_filed_date(db: Session, case_id: int, document: Document) -> None:
+    """Extract a document date and write an audit row for the timeline.
+
+    Expects `document.analysis_json` with a `metadata` object holding `date`.
+    Normalizes to ISO 8601 and deduplicates so reanalysis does not duplicate rows.
+    No row when there is no date — silence is honest.
+    """
+    record: dict = {}
+    if document.analysis_json:
+        try:
+            parsed = json.loads(document.analysis_json)
+            if isinstance(parsed, dict):
+                record = parsed
+        except (TypeError, ValueError):
+            record = {}
+    metadata = record.get("metadata") if isinstance(record, dict) else None
+    if not isinstance(metadata, dict):
+        metadata = {}
+
+    date_value = metadata.get("date") or record.get("date")
+    if not date_value or not str(date_value).strip():
+        return
+
+    date_str = str(date_value).strip()
+    try:
+        from datetime import datetime as _dt
+        date_str = _dt.strptime(date_str[:10], "%Y-%m-%d").date().isoformat()
+    except ValueError:
+        pass
+
+    existing = db.scalar(
+        select(AuditLog.id).where(
+            AuditLog.case_id == case_id,
+            AuditLog.action == EVENT_EVIDENCE_FILED_WITH_DATE,
+            AuditLog.details.like(f'%"evidenceId":"{document.document_key}"%'),
+        )
+    )
+    if existing:
+        return
+
+    db.add(
+        AuditLog(
+            case_id=case_id,
+            actor_username="system",
+            action=EVENT_EVIDENCE_FILED_WITH_DATE,
+            details=json.dumps(
+                {
+                    "evidenceId": document.document_key,
+                    "date": date_str,
+                    "documentType": record.get("documentType"),
+                    "author": metadata.get("author"),
+                    "issuer": metadata.get("issuer"),
+                },
+                separators=(",", ":"),
+            ),
+        )
+    )
 
 
 def _custody_log(
@@ -372,7 +463,7 @@ def create_app(
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(_, exc: RequestValidationError):
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content=jsonable_encoder(
                 {"error": "INVALID_REQUEST", "detail": exc.errors()}
             ),
@@ -694,6 +785,13 @@ def create_app(
             if event is None:
                 continue
             details = json.loads(log.details or "{}")
+            date_text = _datetime_text(log.created_at)
+            precision = "exact"
+            if event == EVENT_EVIDENCE_FILED_WITH_DATE:
+                extracted = details.get("date")
+                if extracted:
+                    date_text = extracted
+                    precision = "day"
             rows.append(
                 (
                     log.created_at,
@@ -701,8 +799,8 @@ def create_app(
                     {
                         "id": f"log-{log.id}",
                         "event": event,
-                        "date": _datetime_text(log.created_at),
-                        "precision": "exact",
+                        "date": date_text,
+                        "precision": precision,
                         "people": ["system"],
                         "evidenceId": details.get("evidenceId"),
                     },
@@ -716,15 +814,66 @@ def create_app(
     def get_case(case_id: str, db: Session = Depends(get_db)) -> dict:
         return _case_summary(find_case(db, case_id))
 
+    @app.patch("/cases/{case_id}", dependencies=[local_api])
+    def update_case(case_id: str, request: dict, db: Session = Depends(get_db)):
+        case = find_case(db, case_id)
+        new_status = request.get("status")
+        if new_status and new_status in ("open", "closed", "on_hold"):
+            case.status = new_status
+            db.add(AuditLog(
+                case_id=case.id,
+                actor_username="system",
+                action="case_status_changed",
+                details=json.dumps({"status": new_status}),
+            ))
+            db.commit()
+        return _case_summary(case)
+
     @app.get("/cases/{case_id}/evidence", dependencies=[local_api])
-    def list_evidence(case_id: str, db: Session = Depends(get_db)):
+    def list_evidence(
+        case_id: str,
+        status: str | None = None,
+        category: str | None = None,
+        source: str | None = None,
+        document_type: str | None = None,
+        author: str | None = None,
+        date: str | None = None,
+        db: Session = Depends(get_db),
+    ):
         case = find_case(db, case_id)
         documents = db.scalars(
             select(Document)
             .where(Document.case_id == case.id)
             .order_by(Document.created_at.desc(), Document.id.desc())
         )
-        return [_evidence_item(db, document) for document in documents]
+        items = [_evidence_item(db, document) for document in documents]
+
+        if status == "hold":
+            items = [i for i in items if i.get("status") == "integrity_hold"]
+        elif status:
+            items = [i for i in items if i.get("status") == status]
+        if category:
+            items = [i for i in items if i.get("category") == category]
+        if source:
+            items = [i for i in items if i.get("source") == source]
+        if document_type:
+            items = [
+                i for i in items
+                if (i.get("analysis") or {}).get("documentType") == document_type
+            ]
+        if author:
+            needle = author.lower()
+            items = [
+                i for i in items
+                if needle in ((((i.get("analysis") or {}).get("metadata") or {}).get("author")) or "").lower()
+            ]
+        if date:
+            items = [
+                i for i in items
+                if ((i.get("analysis") or {}).get("metadata") or {}).get("date") == date
+            ]
+
+        return items
 
     @app.post(
         "/cases/{case_id}/evidence",
@@ -734,24 +883,52 @@ def create_app(
     def upload_evidence(
         case_id: str,
         file: UploadFile = File(...),
+        category: str | None = Form(None),
+        source: str | None = Form(None),
         db: Session = Depends(get_db),
     ):
         case = find_case(db, case_id)
-        filename = (file.filename or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
-        if not filename or "\x00" in filename or len(filename) > 255:
+
+        def reject(status_code: int, error_code: str, message: str):
+            db.add(AuditLog(
+                case_id=case.id,
+                actor_username="system",
+                action="evidence_upload_rejected",
+                details=json.dumps({"reason": error_code}, separators=(",", ":")),
+            ))
+            db.commit()
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail={
-                    "error": "INVALID_FILENAME",
-                    "message": "Upload a file with a valid name of at most 255 characters.",
-                },
+                status_code=status_code,
+                detail={"error": error_code, "message": message},
             )
+        filename = (file.filename or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
+        if (
+            not filename
+            or filename in (".", "..")
+            or any(ord(c) < 0x20 or ord(c) == 0x7F for c in filename)
+            or len(filename) > MAX_FILENAME_LENGTH
+        ):
+            reject(status.HTTP_422_UNPROCESSABLE_CONTENT, "INVALID_FILENAME", "Upload a file with a valid name.")
+
+        media_type = (file.content_type or "application/octet-stream").split(";")[0].strip().lower()
+        if media_type not in ALLOWED_MEDIA_TYPES:
+            reject(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_MEDIA_TYPE", "The declared media type is not allowed.")
+
+        category = (category or "").strip() or None
+        if category is not None and category not in ALLOWED_CATEGORIES:
+            reject(status.HTTP_422_UNPROCESSABLE_CONTENT, "INVALID_CATEGORY", "The provided category is not allowed.")
+
+        source = (source or "").strip() or None
+        if source is not None and source not in ALLOWED_SOURCES:
+            reject(status.HTTP_422_UNPROCESSABLE_CONTENT, "INVALID_SOURCE", "The provided source is not allowed.")
 
         storage_key = uuid.uuid4().hex
         temporary_path: Path | None = None
         stored_file = storage_root / f"{storage_key}.bin"
         digest = hashlib.sha256()
         byte_size = 0
+        committed = False
+        scanner = malware_scan.EicarScanner()
         try:
             storage_root.mkdir(parents=True, exist_ok=True)
             with tempfile.NamedTemporaryFile(
@@ -762,11 +939,32 @@ def create_app(
             ) as destination:
                 temporary_path = Path(destination.name)
                 while chunk := file.file.read(1024 * 1024):
+                    if byte_size + len(chunk) > MAX_UPLOAD_BYTES:
+                        reject(status.HTTP_413_CONTENT_TOO_LARGE, "EVIDENCE_TOO_LARGE", f"Evidence exceeds the {MAX_UPLOAD_BYTES} byte limit.")
                     destination.write(chunk)
                     digest.update(chunk)
                     byte_size += len(chunk)
+                    scanner.feed(chunk)
+                if byte_size == 0:
+                    reject(status.HTTP_422_UNPROCESSABLE_CONTENT, "EMPTY_UPLOAD", "Upload an evidence file with at least one byte.")
                 destination.flush()
                 os.fsync(destination.fileno())
+            try:
+                scan_result = scanner.finish()
+            except Exception:
+                reject(status.HTTP_422_UNPROCESSABLE_CONTENT, "EVIDENCE_REJECTED_BY_SCAN", "The file was rejected by the malware scanner.")
+            
+            if scan_result.status != "clean":
+                reject(status.HTTP_422_UNPROCESSABLE_CONTENT, "EVIDENCE_REJECTED_BY_SCAN", "The file was rejected by the malware scanner.")
+
+            readback = hashlib.sha256()
+            with temporary_path.open("rb") as handle:
+                while chunk := handle.read(1024 * 1024):
+                    readback.update(chunk)
+            size_on_disk = temporary_path.stat().st_size
+            if not hmac.compare_digest(readback.hexdigest(), digest.hexdigest()) or size_on_disk != byte_size:
+                reject(status.HTTP_507_INSUFFICIENT_STORAGE, "EVIDENCE_READBACK_FAILED", "The stored file could not be read back correctly.")
+
             os.replace(temporary_path, stored_file)
             temporary_path = None
 
@@ -783,7 +981,9 @@ def create_app(
                 filename=filename,
                 content_hash=content_hash,
                 storage_key=storage_key,
-                media_type=file.content_type or "application/octet-stream",
+                media_type=media_type,
+                category=category,
+                source=source,
                 byte_size=byte_size,
             )
             db.add(document)
@@ -797,6 +997,7 @@ def create_app(
             # The bytes and their custody row are committed before analysis
             # runs, so an analysis failure can never lose an accepted upload.
             db.commit()
+            committed = True
 
             run_analysis(document)
             _custody_log(
@@ -805,6 +1006,7 @@ def create_app(
                 evidence_id=document.document_key,
                 action="evidence_analysed",
             )
+            _record_filed_date(db, case.id, document)
             db.commit()
             return {
                 "id": document.document_key,
@@ -818,6 +1020,8 @@ def create_app(
                 # the intake screen can say *why* an artifact was not read
                 # rather than only that it was not.
                 "analysis": _analysis_summary(document),
+                "category": category,
+                "source": source,
             }
         except OSError:
             db.rollback()
@@ -842,6 +1046,8 @@ def create_app(
         finally:
             if temporary_path is not None:
                 temporary_path.unlink(missing_ok=True)
+            if not committed:
+                stored_file.unlink(missing_ok=True)
 
     @app.get("/evidence/{evidence_id}", dependencies=[local_api])
     def get_evidence(evidence_id: str, db: Session = Depends(get_db)):
@@ -854,6 +1060,31 @@ def create_app(
                 detail={"error": "NOT_FOUND", "message": "Evidence item not found."},
             )
         return _evidence_item(db, document)
+
+    @app.delete("/evidence/{evidence_id}", dependencies=[local_api])
+    def delete_evidence(evidence_id: str, db: Session = Depends(get_db)) -> dict:
+        document = db.scalar(
+            select(Document).where(Document.document_key == evidence_id)
+        )
+        if document is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "NOT_FOUND", "message": "Evidence not found."},
+            )
+        case_id = document.case_id
+        for suffix in (".bin", ".txt"):
+            stored = stored_path(document, suffix)
+            if stored is not None:
+                stored.unlink(missing_ok=True)
+        _custody_log(
+            db,
+            case_id=case_id,
+            evidence_id=evidence_id,
+            action="evidence_removed",
+        )
+        db.delete(document)
+        db.commit()
+        return {"id": evidence_id, "removed": True}
 
     @app.get("/evidence/{evidence_id}/custody", dependencies=[local_api])
     def get_evidence_custody(evidence_id: str, db: Session = Depends(get_db)):
@@ -965,6 +1196,18 @@ def create_app(
             )
         return document
 
+    @app.post("/evidence/{evidence_id}/consult", dependencies=[local_api])
+    def consult_evidence(evidence_id: str, db: Session = Depends(get_db)):
+        document = db.scalar(
+            select(Document).where(Document.document_key == evidence_id)
+        )
+        if document is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "NOT_FOUND", "message": "Evidence not found."},
+            )
+        _not_implemented("consultation", "The Saul AI consultant is not configured.")
+
     @app.get("/evidence/{evidence_id}/analysis", dependencies=[local_api])
     def get_evidence_analysis(evidence_id: str, db: Session = Depends(get_db)):
         """What the analysis made of this item, scope by scope.
@@ -990,6 +1233,7 @@ def create_app(
             evidence_id=document.document_key,
             action="evidence_reanalysed",
         )
+        _record_filed_date(db, document.case_id, document)
         db.commit()
         return analysis_response(document)
 
@@ -1009,7 +1253,7 @@ def create_app(
         needle = q.strip()
         if not needle:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail={
                     "error": "INVALID_QUERY",
                     "message": "Provide a non-empty search query.",
@@ -1023,45 +1267,210 @@ def create_app(
         return search_documents(db, case, needle)
 
     @app.post("/cases/{case_id}/export", dependencies=[local_api])
-    def export_case(
-        case_id: str,
-        type: str,
-        db: Session = Depends(get_db),
-    ):
-        find_case(db, case_id)
-        _not_implemented(
-            "case_export",
-            "Case-scoped gated export generation is not implemented.",
+    def export_case(case_id: str, db: Session = Depends(get_db)):
+        case = find_case(db, case_id)
+        documents = db.scalars(select(Document).where(Document.case_id == case.id)).all()
+
+        # Build the manifest
+        manifest = {
+            "case": {
+                "id": case.id,
+                "key": case.case_key,
+                "title": case.title,
+                "status": case.status,
+                "exported_at": _datetime_text(datetime.now(timezone.utc)),
+            },
+            "documents": [
+                {
+                    "document_key": doc.document_key,
+                    "filename": doc.filename,
+                    "category": doc.category,
+                    "source": doc.source,
+                    "analysis": json.loads(doc.analysis_json) if doc.analysis_json else None,
+                }
+                for doc in documents
+            ],
+        }
+
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("manifest.json", json.dumps(manifest, indent=2))
+            
+            for doc in documents:
+                path = stored_evidence_path(doc)
+                if path and path.is_file():
+                    # Use the original filename inside the zip, prefixed with the document key to avoid collisions
+                    arcname = f"evidence/{doc.document_key}_{doc.filename}"
+                    zf.write(path, arcname)
+
+        buffer.seek(0)
+        
+        db.add(AuditLog(
+            case_id=case.id,
+            actor_username="system",
+            action="export_produced",
+            details=json.dumps({"format": "zip", "docCount": len(documents)}),
+        ))
+        db.commit()
+
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="case_{case.case_key}_export.zip"'
+            },
         )
 
     @app.post("/cases/{case_id}/exports/preview", dependencies=[local_api])
     def preview_case_export(
         case_id: str,
-        type: str,
+        type: str = "evidence_index",
         db: Session = Depends(get_db),
     ):
-        find_case(db, case_id)
-        _not_implemented(
-            "export_preview",
-            "The product export gates and Barreau validation are not implemented.",
-        )
+        case = find_case(db, case_id)
+        documents = db.scalars(
+            select(Document).where(Document.case_id == case.id)
+        ).all()
+
+        restriction_fail = None
+        for doc in documents:
+            if (doc.extract_status or "") == "failed":
+                restriction_fail = doc.document_key
+                break
+
+        barreau_fail = None if documents else "(no evidence)"
+
+        gates = [
+            {
+                "id": "restriction",
+                "result": "fail" if restriction_fail else "pass",
+                "failingItem": restriction_fail,
+            },
+            {
+                "id": "disclaimer",
+                "result": "pass",
+                "failingItem": None,
+            },
+            {
+                "id": "barreau",
+                "result": "fail" if barreau_fail else "pass",
+                "failingItem": barreau_fail,
+            },
+        ]
+        return {
+            "type": type,
+            "gates": gates,
+            "blocked": any(g["result"] == "fail" for g in gates),
+        }
 
     @app.get("/cases/{case_id}/audit", dependencies=[local_api])
     def get_case_audit(case_id: str, db: Session = Depends(get_db)):
-        find_case(db, case_id)
-        _not_implemented("case_audit", "Case-scoped audit projections are not implemented.")
+        case = find_case(db, case_id)
+        logs = db.scalars(
+            select(AuditLog)
+            .where(AuditLog.case_id == case.id)
+            .order_by(AuditLog.created_at.asc(), AuditLog.id.asc())
+        ).all()
+        rows = []
+        for log in logs:
+            try:
+                details = json.loads(log.details or "{}")
+            except (TypeError, ValueError):
+                details = {}
+            chain = "not_checked"
+            failing = None
+            if log.action == "evidence_verified":
+                failing = details.get("failingStep")
+                chain = "broken" if failing else "linked"
+            row = {
+                "id": f"log-{log.id}",
+                "event": log.action,
+                "at": _datetime_text(log.created_at),
+                "actor": log.actor_username,
+                "evidenceId": details.get("evidenceId"),
+                "chain": chain,
+            }
+            if failing:
+                row["failingStep"] = failing
+            if log.action == "member_role_changed":
+                row["memberId"] = details.get("memberId")
+                row["previousRole"] = details.get("previousRole")
+                row["role"] = details.get("role")
+                row["reason"] = details.get("reason")
+            rows.append(row)
+        return rows
 
     @app.get("/admin/members", dependencies=[local_api])
-    def list_members():
-        _not_implemented("member_administration", "Member management is not implemented.")
+    def list_members(db: Session = Depends(get_db)):
+        users = db.scalars(select(User)).all()
+        return [
+            {
+                "id": str(u.id),
+                "name": u.username.split("@")[0] if "@" in u.username else u.username,
+                "email": u.username,
+                "role": u.role,
+                "status": "active",
+                "caseIds": [],
+            }
+            for u in users
+        ]
 
     @app.post("/admin/members/invitations", dependencies=[local_api])
-    def invite_member():
-        _not_implemented("member_administration", "Member invitations are not implemented.")
+    def invite_member(request: dict, db: Session = Depends(get_db)):
+        email = request.get("email")
+        role = request.get("role", "reviewer")
+        if not email:
+            raise HTTPException(status_code=400, detail={"error": "INVALID_FORM", "message": "Email required."})
+        
+        existing = db.scalar(select(User).where(User.username == email))
+        if existing:
+            raise HTTPException(status_code=409, detail={"error": "MEMBER_ALREADY_EXISTS", "message": "Member already exists."})
+            
+        user = User(username=email, role=role, credential_fingerprint="pending")
+        db.add(user)
+        db.flush()
+        
+        db.add(AuditLog(
+            case_id=None,
+            actor_username="system",
+            action="member_invited",
+            details=json.dumps({"memberId": str(user.id), "email": email, "role": role}),
+        ))
+        db.commit()
+        return {
+            "id": str(user.id),
+            "name": user.username.split("@")[0],
+            "email": user.username,
+            "role": user.role,
+            "status": "invited",
+            "caseIds": [],
+        }
 
     @app.patch("/admin/members/{member_id}/role", dependencies=[local_api])
-    def change_member_role(member_id: str):
-        _not_implemented("member_administration", "Audited role changes are not implemented.")
+    def change_member_role(member_id: str, request: dict, db: Session = Depends(get_db)):
+        role = request.get("role")
+        reason = request.get("reason", "")
+        user = db.get(User, int(member_id))
+        if not user:
+            raise HTTPException(status_code=404, detail={"error": "NOT_FOUND", "message": "Member not found."})
+        
+        old_role = user.role
+        user.role = role
+        db.add(AuditLog(
+            case_id=None,
+            actor_username="system",
+            action="member_role_changed",
+            details=json.dumps({"memberId": str(user.id), "previousRole": old_role, "role": role, "reason": reason}),
+        ))
+        db.commit()
+        return {
+            "id": str(user.id),
+            "name": user.username.split("@")[0],
+            "email": user.username,
+            "role": user.role,
+            "status": "active",
+            "caseIds": [],
+        }
 
     return app
 

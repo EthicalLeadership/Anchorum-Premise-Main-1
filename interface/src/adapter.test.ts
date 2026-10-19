@@ -370,3 +370,47 @@ describe("members adapter", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Removal contract: `remove` hides the item from both `list` and `get`,
+// and does so per-adapter so a removal in one test cannot leak into another.
+// ---------------------------------------------------------------------------
+
+describe("evidence removal in fixture mode", () => {
+  let adapter: ReturnType<typeof createAdapter>;
+
+  beforeEach(() => {
+    adapter = createAdapter(fixtureConfig);
+  });
+
+  it("hides a removed item from list and get", async () => {
+    const before = await adapter.evidence.list(fixture.case.id);
+    expect(before.ok).toBe(true);
+    if (!before.ok) return;
+    expect(before.value.map((e) => e.id)).toContain("E-1042");
+
+    const removed = await adapter.evidence.remove("E-1042");
+    expect(removed.ok).toBe(true);
+    if (!removed.ok) return;
+    expect(removed.value).toEqual({ id: "E-1042", removed: true });
+
+    const after = await adapter.evidence.list(fixture.case.id);
+    expect(after.ok).toBe(true);
+    if (!after.ok) return;
+    const idsAfter = after.value.map((e) => e.id);
+    expect(idsAfter).not.toContain("E-1042");
+    expect(idsAfter).toContain("E-1047");
+
+    const got = await adapter.evidence.get("E-1042");
+    expect(got.ok).toBe(false);
+    if (got.ok) return;
+    expect(got.error).toBe("NOT_FOUND");
+  });
+
+  it("returns NOT_FOUND when the id was never present", async () => {
+    const missing = await adapter.evidence.remove("E-NOPE");
+    expect(missing.ok).toBe(false);
+    if (missing.ok) return;
+    expect(missing.error).toBe("NOT_FOUND");
+  });
+});

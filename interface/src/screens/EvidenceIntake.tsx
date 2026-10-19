@@ -38,6 +38,18 @@ const NOT_READ_KEY: Partial<Record<ExtractStatus, string>> = {
   failed: "evidence.intake.result.failed",
 };
 
+/**
+ * The category and source vocabularies the API accepts, mirroring
+ * `ALLOWED_CATEGORIES` / `ALLOWED_SOURCES` in interface/anchorum_api.py.
+ *
+ * Duplicated rather than fetched so the selects can render before any request
+ * is made. The server stays the authority: a value outside its allowlist is
+ * rejected with 422 INVALID_CATEGORY / INVALID_SOURCE, so the two lists drifting
+ * apart produces a refusal, not a silently stored unrecognised value.
+ */
+const CATEGORIES = ["medical", "payroll", "correspondence", "pleading", "other"] as const;
+const SOURCES = ["clinic", "insurer", "employer", "court", "other"] as const;
+
 function intakeStateFor(status: ExtractStatus | undefined): IntakeState {
   // No status at all means the bytes were accepted and nothing further was
   // reported, which is exactly what "stored" says.
@@ -70,6 +82,10 @@ let nextKey = 0;
 
 export function EvidenceIntake({ locale, adapter, caseId }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
+  // One selection per batch: a batch of files normally arrives from one source,
+  // and per-row selection would need the same two fields on `Row`.
+  const [category, setCategory] = useState("");
+  const [source, setSource] = useState("");
 
   const patch = (key: number, change: Partial<Row>) =>
     setRows((all) => all.map((r) => (r.key === key ? { ...r, ...change } : r)));
@@ -93,6 +109,8 @@ export function EvidenceIntake({ locale, adapter, caseId }: Props) {
             size: files[i].size,
             type: files[i].type,
             bytes: await files[i].arrayBuffer(),
+            category: category || null,
+            source: source || null,
           });
           if (result.ok) {
             const state = intakeStateFor(result.value.processingStatus);
@@ -139,6 +157,28 @@ export function EvidenceIntake({ locale, adapter, caseId }: Props) {
           policy: translate(locale, "evidence.intake.policy_default"),
         })}
       </p>
+      <label>
+        {translate(locale, "evidence.intake.category")}
+        <select value={category} onChange={(e) => setCategory(e.target.value)}>
+          <option value="">{translate(locale, "evidence.intake.unset")}</option>
+          {CATEGORIES.map((value) => (
+            <option key={value} value={value}>
+              {translate(locale, `evidence.category.${value}` as never)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        {translate(locale, "evidence.intake.source")}
+        <select value={source} onChange={(e) => setSource(e.target.value)}>
+          <option value="">{translate(locale, "evidence.intake.unset")}</option>
+          {SOURCES.map((value) => (
+            <option key={value} value={value}>
+              {translate(locale, `evidence.source.${value}` as never)}
+            </option>
+          ))}
+        </select>
+      </label>
       <FileDropZone locale={locale} onFiles={onFiles} />
       {rows.length > 0 ? (
         <table>

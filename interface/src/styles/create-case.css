@@ -23,3 +23,77 @@
   margin-bottom: var(--sp-4);
 }
 .create-case__actions { display: flex; gap: var(--sp-3); }
+
+
+.case-tree {
+  border: 1px solid var(--tp-line);
+  padding: var(--sp-4);
+  border-radius: 4px;
+}
+
+.case-tree__title {
+  margin: 0 0 var(--sp-3) 0;
+  font-size: 1.125rem;
+}
+
+.case-tree__filters {
+  display: flex;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.case-tree__filters label {
+  display: grid;
+  gap: var(--sp-1);
+  flex: 1;
+}
+
+.case-tree__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.case-tree__row {
+  border: 1px solid var(--tp-line);
+  padding: var(--sp-2) var(--sp-3);
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.case-tree__meta {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: baseline;
+}
+
+.case-tree__count {
+  margin-left: auto;
+  color: var(--tp-muted);
+  font-size: 0.875rem;
+}
+
+.case-tree__upload {
+  display: inline-flex;
+  gap: var(--sp-1);
+  align-items: center;
+  cursor: pointer;
+  color: var(--tp-acc);
+}
+
+.case-tree__upload input {
+  display: none;
+}
+
+.case-tree__uploading {
+  color: var(--tp-muted);
+  font-style: italic;
+}
+
+.case-tree__error {
+  color: var(--state-fail);
+  margin: 0;
+  font-size: 0.875rem;
+}
