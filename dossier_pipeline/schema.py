@@ -120,6 +120,8 @@ class AuditLog(Base):
     actor_username: Mapped[str] = mapped_column(String(128), nullable=False)
     action: Mapped[str] = mapped_column(String(128), nullable=False)
     details: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    previous_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    record_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     case: Mapped["Case"] = relationship("Case", back_populates="audit_logs")
@@ -179,6 +181,8 @@ def init_schema(engine) -> None:
             "category": "VARCHAR(64)",
             "source": "VARCHAR(64)",
             "consultation_json": "TEXT",
+            "previous_hash": "VARCHAR(64) NOT NULL DEFAULT ''",
+            "record_hash": "VARCHAR(64) NOT NULL DEFAULT ''",
         }
         existing_documents = {
             column["name"] for column in inspect(engine).get_columns("documents")

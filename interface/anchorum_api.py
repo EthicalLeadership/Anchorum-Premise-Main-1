@@ -335,23 +335,51 @@ def _record_filed_date(db: Session, case_id: int, document: Document) -> None:
     if existing:
         return
 
+    _append_audit(
+        db,
+        case_id=case_id,
+        action=EVENT_EVIDENCE_FILED_WITH_DATE,
+        details={
+            "evidenceId": document.document_key,
+            "date": date_str,
+            "documentType": record.get("documentType"),
+            "author": metadata.get("author"),
+            "issuer": metadata.get("issuer"),
+        },
+    )
+
+
+def _append_audit(
+    db: Session,
+    *,
+    case_id: int,
+    action: str,
+    details: dict,
+    actor: str = "system",
+) -> None:
+    """Append a chained audit row. All case-scoped logs go through here."""
+    details_str = json.dumps(details, separators=(",", ":"))
+    prev = db.scalar(
+        select(AuditLog)
+        .where(AuditLog.case_id == case_id)
+        .order_by(AuditLog.id.desc())
+        .limit(1)
+    )
+    previous_hash = prev.record_hash if prev else ""
+    record_hash = hashlib.sha256(
+        (previous_hash + "|" + action + "|" + details_str).encode("utf-8")
+    ).hexdigest()
     db.add(
         AuditLog(
             case_id=case_id,
-            actor_username="system",
-            action=EVENT_EVIDENCE_FILED_WITH_DATE,
-            details=json.dumps(
-                {
-                    "evidenceId": document.document_key,
-                    "date": date_str,
-                    "documentType": record.get("documentType"),
-                    "author": metadata.get("author"),
-                    "issuer": metadata.get("issuer"),
-                },
-                separators=(",", ":"),
-            ),
+            actor_username=actor,
+            action=action,
+            details=details_str,
+            previous_hash=previous_hash,
+            record_hash=record_hash,
         )
     )
+    db.flush()
 
 
 def _custody_log(
@@ -820,12 +848,12 @@ def create_app(
         new_status = request.get("status")
         if new_status and new_status in ("open", "closed", "on_hold"):
             case.status = new_status
-            db.add(AuditLog(
+            _append_audit(
+                db,
                 case_id=case.id,
-                actor_username="system",
                 action="case_status_changed",
-                details=json.dumps({"status": new_status}),
-            ))
+                details={"status": new_status},
+            )
             db.commit()
         return _case_summary(case)
 
@@ -890,12 +918,12 @@ def create_app(
         case = find_case(db, case_id)
 
         def reject(status_code: int, error_code: str, message: str):
-            db.add(AuditLog(
+            _append_audit(
+                db,
                 case_id=case.id,
-                actor_username="system",
                 action="evidence_upload_rejected",
-                details=json.dumps({"reason": error_code}, separators=(",", ":")),
-            ))
+                details={"reason": error_code},
+            )
             db.commit()
             raise HTTPException(
                 status_code=status_code,
@@ -1393,6 +1421,33 @@ def create_app(
             },
         }
 
+        # inv_007: verify the audit chain links from genesis to tip.
+        from interface import invariants_bridge as _ib
+        _logs = db.scalars(
+            select(AuditLog)
+            .where(AuditLog.case_id == case.id)
+            .order_by(AuditLog.id.asc())
+        ).all()
+        _prev = None
+        for _log in _logs:
+            _ok = _ib.run_one(
+                "inv_007",
+                {
+                    "prev_record": (
+                        {"record_hash": _prev.record_hash} if _prev else None
+                    ),
+                    "new_record": {"previous_hash": _log.previous_hash},
+                },
+            )
+            if _ok["status"] != "pass":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "error": "CUSTODY_CHAIN_BROKEN",
+                        "message": f"record {_log.id}: " + (_ok.get("reason") or "chain break"),
+                    },
+                )
+            _prev = _log
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("manifest.json", json.dumps(manifest, indent=2))
@@ -1529,12 +1584,13 @@ def create_app(
             approved_by=approved_by,
         )
         db.add(stamp)
-        db.add(AuditLog(
+        _append_audit(
+            db,
             case_id=case.id,
-            actor_username=approved_by,
             action="barreau_stamp_applied",
-            details=json.dumps({"stamp_version": "1.0.0"}),
-        ))
+            details={"stamp_version": "1.0.0"},
+            actor=approved_by,
+        )
         db.commit()
         return {
             "case_id": case.id,
