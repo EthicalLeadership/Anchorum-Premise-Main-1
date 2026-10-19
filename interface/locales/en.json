@@ -378,5 +378,12 @@
   "case.list.resume": "Resume",
   "case.list.needs_attention": "Needs attention",
   "case.list.hold_count": "items on hold",
-  "audit.event.barreau_stamp_applied": "barreau stamp applied"
+  "audit.event.barreau_stamp_applied": "barreau stamp applied",
+  "administration.invite.credential": "Barreau credential (optional)",
+  "administration.invite.credential_help": "Fingerprint of an official Barreau credential. Required only when ANCHORUM_BARREAU_REQUIRED=1.",
+  "administration.members.column.credential": "Barreau",
+  "administration.members.credential.pending": "pending",
+  "administration.members.credential.none": "—",
+  "error.barreau_credential_rejected": "This credential is not in the Barreau allowlist.",
+  "error.barreau_credential_required": "A Barreau credential is required on this install."
 }

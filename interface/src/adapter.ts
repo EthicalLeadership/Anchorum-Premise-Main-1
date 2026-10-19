@@ -228,12 +228,14 @@ export interface AdminMember {
   role: SessionUser["role"];
   status: "active" | "invited" | "suspended";
   caseIds: readonly string[];
+  credentialFingerprint?: string;
 }
 
 export interface InviteMemberInput {
   email: string;
   role: SessionUser["role"];
   caseIds: string[];
+  credential?: string;
 }
 
 export function createAdapter(config: AdapterConfig) {
@@ -308,6 +310,7 @@ export function createAdapter(config: AdapterConfig) {
           role: input.role,
           status: "invited",
           caseIds: [...input.caseIds],
+          credentialFingerprint: "pending",
         };
         sessionMembers.push(member);
         return success({ ...member, caseIds: [...member.caseIds] });

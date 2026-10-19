@@ -378,5 +378,12 @@
   "case.list.resume": "Reprendre",
   "case.list.needs_attention": "Attention requise",
   "case.list.hold_count": "éléments en suspens",
-  "audit.event.barreau_stamp_applied": "estampille du Barreau appliquée"
+  "audit.event.barreau_stamp_applied": "estampille du Barreau appliquée",
+  "administration.invite.credential": "Estampille du Barreau (optionnelle)",
+  "administration.invite.credential_help": "Empreinte d'une estampille officielle du Barreau. Requise seulement si ANCHORUM_BARREAU_REQUIRED=1.",
+  "administration.members.column.credential": "Barreau",
+  "administration.members.credential.pending": "en attente",
+  "administration.members.credential.none": "—",
+  "error.barreau_credential_rejected": "Cette estampille n'est pas dans la liste autorisée.",
+  "error.barreau_credential_required": "Une estampille du Barreau est requise sur cette installation."
 }

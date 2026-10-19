@@ -24,6 +24,7 @@ type Load =
 export function Administration({ locale, adapter }: Props) {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [email, setEmail] = useState("");
+  const [credential, setCredential] = useState("");
   const [role, setRole] = useState<SessionRole>("reviewer");
   const [caseIds, setCaseIds] = useState<string[]>([]);
   const [formError, setFormError] = useState("");
@@ -78,6 +79,7 @@ export function Administration({ locale, adapter }: Props) {
       email: email.trim(),
       role,
       caseIds,
+      credential: credential.trim() || undefined,
     };
     const result = await adapter.members.invite(input);
     setSubmitting(false);
@@ -87,6 +89,7 @@ export function Administration({ locale, adapter }: Props) {
     }
     setLoad({ ...load, members: [...load.members, result.value] });
     setEmail("");
+    setCredential("");
     setCaseIds([]);
     setSuccessMessage(t("administration.invite.success"));
   }
@@ -151,6 +154,16 @@ export function Administration({ locale, adapter }: Props) {
     },
     { id: "status", header: t("administration.members.column.status"), render: (member) => t(`member.status.${member.status}`) },
     {
+      id: "credential",
+      header: t("administration.members.column.credential"),
+      render: (member) => {
+        const fp = member.credentialFingerprint;
+        if (!fp) return t("administration.members.credential.none");
+        if (fp === "pending") return t("administration.members.credential.pending");
+        return fp.slice(0, 8) + "…";
+      },
+    },
+    {
       id: "cases",
       header: t("administration.members.column.cases"),
       render: (member) =>
@@ -195,6 +208,19 @@ export function Administration({ locale, adapter }: Props) {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
             />
+          </label>
+          <label className="form-field" htmlFor="member-credential">
+            {t("administration.invite.credential")}
+            <input
+              id="member-credential"
+              type="text"
+              value={credential}
+              onChange={(event) => setCredential(event.target.value)}
+              aria-describedby="member-credential-help"
+            />
+            <p id="member-credential-help" className="form-field__help">
+              {t("administration.invite.credential_help")}
+            </p>
           </label>
           <FormField
             id="member-role"
