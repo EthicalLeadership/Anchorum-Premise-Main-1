@@ -76,3 +76,21 @@ def run_all(context: dict[str, Any]) -> list[dict]:
             {"id": inv_id, "status": "pass" if ok else "fail", "reason": "" if ok else "returned False"}
         )
     return results
+
+
+def run_one(inv_id: str, context: dict) -> dict:
+    _load_once()
+    for rid, inv in _snapshot:
+        if rid != inv_id:
+            continue
+        try:
+            ok = inv.check(**context)
+        except TypeError as exc:
+            msg = str(exc)
+            if "unexpected keyword" in msg or "missing" in msg:
+                return {"id": inv_id, "status": "skip", "reason": msg}
+            return {"id": inv_id, "status": "fail", "reason": f"TypeError: {msg}"}
+        except Exception as exc:
+            return {"id": inv_id, "status": "fail", "reason": f"{type(exc).__name__}: {exc}"}
+        return {"id": inv_id, "status": "pass" if ok else "fail", "reason": "" if ok else "returned False"}
+    return {"id": inv_id, "status": "skip", "reason": "invariant not registered"}

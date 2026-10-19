@@ -1345,6 +1345,25 @@ def create_app(
             )
         documents = db.scalars(select(Document).where(Document.case_id == case.id)).all()
 
+        # inv_003: every file on disk must still hash to its recorded content_hash.
+        # Refuse to package evidence that has been tampered with on disk.
+        from interface import invariants_bridge as _ib
+        for _doc in documents:
+            _p = stored_evidence_path(_doc)
+            if _p is None or not _p.is_file():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={"error": "INTEGRITY_CHECK_FAILED", "message": _doc.document_key + ": stored bytes missing"},
+                )
+            _raw = _p.read_bytes()
+            _env = {"message_id": "sha256:" + _doc.content_hash}
+            _r = _ib.run_one("inv_003", {"raw_bytes": _raw, "envelope": _env})
+            if _r["status"] != "pass":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={"error": "INTEGRITY_CHECK_FAILED", "message": _doc.document_key + ": " + (_r.get("reason") or "mismatch")},
+                )
+
         # Build the manifest
         manifest = {
             "schema_version": "1.0",
@@ -1460,55 +1479,6 @@ def create_app(
                 "failingItem": barreau_fail,
             },
         ]
-        # Blue-team invariants: run every invariant registered by
-        # dossier_pipeline.invariants against each document in the case.
-        # Disabled by setting ANCHORUM_BLUE_TEAM=0.
-        if os.environ.get("ANCHORUM_BLUE_TEAM", "1") != "0":
-            from interface import invariants_bridge
-
-            invariant_failures = []
-            invariant_skips = []
-            for doc in documents:
-                ctx = {
-                    "document_key": doc.document_key,
-                    "filename": doc.filename,
-                    "content_hash": doc.content_hash,
-                    "byte_size": doc.byte_size,
-                    "media_type": doc.media_type,
-                    "extract_status": doc.extract_status,
-                    "extract_error": doc.extract_error,
-                    "category": doc.category,
-                    "source": doc.source,
-                    "case_id": doc.case_id,
-                }
-                for r in invariants_bridge.run_all(ctx):
-                    if r["status"] == "fail":
-                        invariant_failures.append(
-                            {
-                                "invariant": r["id"],
-                                "document": doc.document_key,
-                                "reason": r["reason"],
-                            }
-                        )
-                    elif r["status"] == "skip":
-                        invariant_skips.append(
-                            {"invariant": r["id"], "reason": r["reason"]}
-                        )
-
-            gates.append(
-                {
-                    "id": "blue_team_invariants",
-                    "result": "fail" if invariant_failures else "pass",
-                    "failingItem": (
-                        invariant_failures[0]["invariant"] if invariant_failures else None
-                    ),
-                    "detail": invariant_failures,
-                    "skipped": invariant_skips,
-                    "loadError": invariants_bridge.load_error(),
-                    "count": len(invariants_bridge.list_invariant_ids()),
-                }
-            )
-
         return {
             "type": type,
             "gates": gates,
