@@ -64,3 +64,24 @@ def test_llm_classify_parses_loose_model_output():
     ):
         result = llm_classifier.llm_classify("Dr. Smith.")
     assert result["documentType"] == "medical_note"
+
+
+def test_llm_summarize_returns_narrative():
+    with patch("urllib.request.urlopen", return_value=_mock_ollama("This is a summary. It has three sentences.")):
+        result = llm_classifier.llm_summarize("Full document text.")
+    assert result["narrative"].startswith("This is a summary")
+    assert result["error"] is None
+
+
+def test_llm_summarize_empty_short_circuits():
+    result = llm_classifier.llm_summarize("   ")
+    assert result["narrative"] == ""
+    assert result["error"] == "EMPTY_TEXT"
+
+
+def test_llm_summarize_fails_closed():
+    err = urllib.error.URLError("connection refused")
+    with patch("urllib.request.urlopen", side_effect=err):
+        result = llm_classifier.llm_summarize("Some text")
+    assert result["narrative"] == ""
+    assert result["error"].startswith("OLLAMA_UNREACHABLE")

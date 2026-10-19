@@ -1272,6 +1272,53 @@ def create_app(
         db.commit()
         return {"id": evidence_id, "consultation": result}
 
+    @app.post("/evidence/{evidence_id}/summarize", dependencies=[local_api])
+    def summarize_evidence(evidence_id: str, db: Session = Depends(get_db)):
+        from interface import llm_classifier
+
+        document = db.scalar(
+            select(Document).where(Document.document_key == evidence_id)
+        )
+        if document is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "NOT_FOUND", "message": "Evidence not found."},
+            )
+
+        if os.environ.get("ANCHORUM_LLM_ENABLED") != "1":
+            return {
+                "id": evidence_id,
+                "narrative": None,
+                "reason": "LLM_DISABLED",
+                "message": "Set ANCHORUM_LLM_ENABLED=1 to enable the AI summariser.",
+            }
+
+        text_path = stored_text_path(document)
+        if text_path is None or not text_path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "NO_EXTRACTED_TEXT",
+                    "message": "This evidence item has no extracted text to summarize.",
+                },
+            )
+
+        try:
+            text = text_path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    "error": "TEXT_READ_FAILED",
+                    "message": type(exc).__name__,
+                },
+            ) from None
+
+        result = llm_classifier.llm_summarize(text)
+        document.consultation_json = json.dumps(result)
+        db.commit()
+        return {"id": evidence_id, "narrative": result}
+
     @app.get("/evidence/{evidence_id}/analysis", dependencies=[local_api])
     def get_evidence_analysis(evidence_id: str, db: Session = Depends(get_db)):
         """What the analysis made of this item, scope by scope.

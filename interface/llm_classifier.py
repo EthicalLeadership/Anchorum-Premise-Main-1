@@ -119,3 +119,74 @@ def llm_classify(text: str) -> dict:
     except OSError:
         pass
     return result
+
+SUMMARIZE_PROMPT = (
+    "You are assisting a legal operator reading a document in a case file. "
+    "Produce a concise factual summary in 3 to 5 sentences. State only what "
+    "the document says. Do not offer legal advice. Do not speculate. If the "
+    "document is too short or garbled to summarise, say so plainly.\n\n"
+    "Document:\n"
+)
+
+
+def llm_summarize(text: str) -> dict:
+    """Return a summary of the given text.
+
+    Shape:
+        {
+          "narrative": str,
+          "backend": "ollama",
+          "model": str,
+          "cached": bool,
+          "error": None | "EMPTY_TEXT" | "OLLAMA_UNREACHABLE: ..."
+        }
+    """
+    if not text or not text.strip():
+        return {
+            "narrative": "",
+            "backend": "ollama",
+            "model": LLM_MODEL,
+            "cached": False,
+            "error": "EMPTY_TEXT",
+        }
+
+    key = hashlib.sha256((SUMMARIZE_PROMPT + "\x00" + text).encode("utf-8")).hexdigest()
+    cache = _load_cache()
+    cache_key = "summarize:" + key
+    if cache_key in cache and isinstance(cache[cache_key], dict):
+        cached = dict(cache[cache_key])
+        cached["cached"] = True
+        return cached
+
+    body = json.dumps(
+        {"model": LLM_MODEL, "prompt": SUMMARIZE_PROMPT + text, "stream": False}
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        OLLAMA_URL, data=body, headers={"Content-Type": "application/json"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=180) as r:
+            payload = json.loads(r.read())
+            raw = payload.get("response", "") if isinstance(payload, dict) else ""
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+        return {
+            "narrative": "",
+            "backend": "ollama",
+            "model": LLM_MODEL,
+            "cached": False,
+            "error": f"OLLAMA_UNREACHABLE: {type(exc).__name__}",
+        }
+
+    result = {
+        "narrative": raw.strip(),
+        "backend": "ollama",
+        "model": LLM_MODEL,
+        "cached": False,
+        "error": None,
+    }
+    cache[cache_key] = result
+    try:
+        _save_cache(cache)
+    except OSError:
+        pass
+    return result
