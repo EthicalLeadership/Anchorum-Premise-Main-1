@@ -1501,6 +1501,54 @@ def create_app(
             zf.writestr("manifest.json", json.dumps(manifest, indent=2))
 
             # Governance disclaimer — versioned and timestamped by the engine
+            # Human-readable summary. Goes through output_gates.sanitize_output
+            # so any internal term that slipped into prose is redacted before
+            # leaving the machine. The structured manifest is not passed through
+            # sanitize_output because it must retain content_hash for verification.
+            try:
+                from dossier_pipeline.output_gates import sanitize_output
+            except ImportError:
+                sanitize_output = None
+
+            summary_lines = [
+                f"# Case {case.case_key}",
+                "",
+                f"**Title**: {case.title}",
+                f"**Jurisdiction**: {case.jurisdiction}",
+                f"**Status**: {case.status}",
+                f"**Evidence files**: {len(documents)}",
+                "",
+                "## Barreau approval",
+                "",
+                f"- Approved by: {stamp.approved_by}",
+                f"- Stamp version: {stamp.stamp_version}",
+                "",
+                "## Evidence",
+                "",
+            ]
+            for _doc in documents:
+                _cur = _curated_analysis(_doc) or {}
+                _type = _cur.get("documentType", "unknown")
+                summary_lines.append(
+                    f"- `{_doc.document_key}` — {_doc.filename} "
+                    f"(type: {_type}, bytes: {_doc.byte_size})"
+                )
+
+            raw_summary = "\n".join(summary_lines) + "\n"
+
+            if sanitize_output is not None:
+                report = sanitize_output(raw_summary)
+                if report.leakage_found:
+                    raw_summary = (
+                        "> **Note**: some text was redacted before export "
+                        f"({len(report.redacted_terms)} term(s)).\n\n"
+                        + report.sanitized_text
+                    )
+                else:
+                    raw_summary = report.sanitized_text
+
+            zf.writestr("SUMMARY.md", raw_summary)
+
             try:
                 from dossier_pipeline.disclaimer import format_disclaimer_block
                 zf.writestr("DISCLAIMER.md", format_disclaimer_block())
