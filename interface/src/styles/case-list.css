@@ -33,3 +33,19 @@
   margin: 0;
   padding-left: var(--sp-4);
 }
+
+
+/* === LAYOUT FIX === */
+/* Force every main screen to fill the center grid column and centre itself
+   with a max-width, instead of hugging the left edge. */
+.shell__main > section {
+  width: 100%;
+  max-width: 90rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Make tables inside these sections fill their container. */
+.shell__main .data-table {
+  width: 100%;
+}

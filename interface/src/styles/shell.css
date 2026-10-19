@@ -38,7 +38,37 @@ button:disabled {
 .shell__body {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr) auto;
+  grid-template-areas: "rail main drawer";
   min-height: 0;
+}
+
+.rail {
+  grid-area: rail;
+}
+
+.shell__main {
+  grid-area: main;
+}
+
+.shell__drawer {
+  grid-area: drawer;
+}
+
+/* When there is no rail rendered — i.e. no case is selected, on the
+   workspace home, the case list, or admin — collapse .shell__body to a
+   single main column. Without this, the middle column always sits 220px
+   to the right of an empty rail slot, which looks "jammed" on screens
+   that have no rail at all. */
+.shell__body:not(:has(.rail)) {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "main";
+}
+
+@media (max-width: 720px) {
+  .shell__body:not(:has(.rail)) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "main";
+  }
 }
 
 .shell__main {
@@ -385,6 +415,10 @@ button:disabled {
 
   .shell__body {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "rail"
+      "main"
+      "drawer";
     align-content: start;
   }
 

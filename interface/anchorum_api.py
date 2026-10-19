@@ -1460,6 +1460,55 @@ def create_app(
                 "failingItem": barreau_fail,
             },
         ]
+        # Blue-team invariants: run every invariant registered by
+        # dossier_pipeline.invariants against each document in the case.
+        # Disabled by setting ANCHORUM_BLUE_TEAM=0.
+        if os.environ.get("ANCHORUM_BLUE_TEAM", "1") != "0":
+            from interface import invariants_bridge
+
+            invariant_failures = []
+            invariant_skips = []
+            for doc in documents:
+                ctx = {
+                    "document_key": doc.document_key,
+                    "filename": doc.filename,
+                    "content_hash": doc.content_hash,
+                    "byte_size": doc.byte_size,
+                    "media_type": doc.media_type,
+                    "extract_status": doc.extract_status,
+                    "extract_error": doc.extract_error,
+                    "category": doc.category,
+                    "source": doc.source,
+                    "case_id": doc.case_id,
+                }
+                for r in invariants_bridge.run_all(ctx):
+                    if r["status"] == "fail":
+                        invariant_failures.append(
+                            {
+                                "invariant": r["id"],
+                                "document": doc.document_key,
+                                "reason": r["reason"],
+                            }
+                        )
+                    elif r["status"] == "skip":
+                        invariant_skips.append(
+                            {"invariant": r["id"], "reason": r["reason"]}
+                        )
+
+            gates.append(
+                {
+                    "id": "blue_team_invariants",
+                    "result": "fail" if invariant_failures else "pass",
+                    "failingItem": (
+                        invariant_failures[0]["invariant"] if invariant_failures else None
+                    ),
+                    "detail": invariant_failures,
+                    "skipped": invariant_skips,
+                    "loadError": invariants_bridge.load_error(),
+                    "count": len(invariants_bridge.list_invariant_ids()),
+                }
+            )
+
         return {
             "type": type,
             "gates": gates,
