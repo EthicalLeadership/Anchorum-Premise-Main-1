@@ -85,6 +85,8 @@ def test_export_preview_passes_with_clean_evidence(tmp_path):
             "/cases/EX2/evidence",
             files={"file": ("clean.txt", b"hello", "text/plain")},
         )
+        # Barreau gate: a case must be stamped before export passes.
+        client.post("/cases/EX2/stamp", json={"approved_by": "Me. Tremblay"})
         r = client.post("/cases/EX2/exports/preview?type=evidence_index")
         assert r.status_code == 200
         body = r.json()

@@ -27,7 +27,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.engine import make_url
 
-from dossier_pipeline.schema import AuditLog, Case, Document, User, init_schema
+from dossier_pipeline.schema import AuditLog, Case, Document, JurisdictionStamp, User, init_schema
 from interface import analysis as analysis_service
 from interface import malware_scan
 
@@ -1198,6 +1198,8 @@ def create_app(
 
     @app.post("/evidence/{evidence_id}/consult", dependencies=[local_api])
     def consult_evidence(evidence_id: str, db: Session = Depends(get_db)):
+        from interface import llm_classifier
+
         document = db.scalar(
             select(Document).where(Document.document_key == evidence_id)
         )
@@ -1206,7 +1208,40 @@ def create_app(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"error": "NOT_FOUND", "message": "Evidence not found."},
             )
-        _not_implemented("consultation", "The Saul AI consultant is not configured.")
+
+        if os.environ.get("ANCHORUM_LLM_ENABLED") != "1":
+            return {
+                "id": evidence_id,
+                "consultation": None,
+                "reason": "LLM_DISABLED",
+                "message": "Set ANCHORUM_LLM_ENABLED=1 to enable the AI consultant.",
+            }
+
+        text_path = stored_text_path(document)
+        if text_path is None or not text_path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "NO_EXTRACTED_TEXT",
+                    "message": "This evidence item has no extracted text to classify.",
+                },
+            )
+
+        try:
+            text = text_path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    "error": "TEXT_READ_FAILED",
+                    "message": type(exc).__name__,
+                },
+            ) from None
+
+        result = llm_classifier.llm_classify(text)
+        document.consultation_json = json.dumps(result)
+        db.commit()
+        return {"id": evidence_id, "consultation": result}
 
     @app.get("/evidence/{evidence_id}/analysis", dependencies=[local_api])
     def get_evidence_analysis(evidence_id: str, db: Session = Depends(get_db)):
@@ -1266,13 +1301,53 @@ def create_app(
         response.headers["X-Anchorum-Search-Method"] = SEARCH_METHOD_SUBSTRING
         return search_documents(db, case, needle)
 
+
+
+    def _curated_analysis(document: Document) -> dict | None:
+        """The publicly safe subset of an analysis record.
+
+        Excludes analysis_rules_hash, analysis_config_hash, and the full
+        doctrine projection. Includes the deterministic documentType and the
+        extracted metadata (date/author/issuer) — the two things a recipient
+        of an exported case can defensibly see.
+        """
+        if not document.analysis_json:
+            return None
+        try:
+            record = json.loads(document.analysis_json)
+        except (TypeError, ValueError):
+            return None
+        if not isinstance(record, dict):
+            return None
+        out: dict = {}
+        if "documentType" in record:
+            out["documentType"] = record["documentType"]
+        metadata = record.get("metadata")
+        if isinstance(metadata, dict):
+            out["metadata"] = {
+                k: metadata[k] for k in ("date", "author", "issuer") if k in metadata
+            }
+        return out or None
+
     @app.post("/cases/{case_id}/export", dependencies=[local_api])
     def export_case(case_id: str, db: Session = Depends(get_db)):
         case = find_case(db, case_id)
+        stamp = db.scalar(
+            select(JurisdictionStamp).where(JurisdictionStamp.case_id == case.id)
+        )
+        if stamp is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": "EXPORT_BLOCKED_BARREAU",
+                    "message": "A Barreau stamp must be applied before export.",
+                },
+            )
         documents = db.scalars(select(Document).where(Document.case_id == case.id)).all()
 
         # Build the manifest
         manifest = {
+            "schema_version": "1.0",
             "case": {
                 "id": case.id,
                 "key": case.case_key,
@@ -1286,15 +1361,32 @@ def create_app(
                     "filename": doc.filename,
                     "category": doc.category,
                     "source": doc.source,
-                    "analysis": json.loads(doc.analysis_json) if doc.analysis_json else None,
+                    "content_hash": doc.content_hash,
+                    "byte_size": doc.byte_size,
+                    "analysis": _curated_analysis(doc),
                 }
                 for doc in documents
             ],
+            "barreau_stamp": {
+                "version": stamp.stamp_version,
+                "approved_by": stamp.approved_by,
+                "applied_at": _datetime_text(stamp.applied_at),
+            },
         }
 
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("manifest.json", json.dumps(manifest, indent=2))
+
+            # Governance disclaimer — versioned and timestamped by the engine
+            try:
+                from dossier_pipeline.disclaimer import format_disclaimer_block
+                zf.writestr("DISCLAIMER.md", format_disclaimer_block())
+            except ImportError:
+                zf.writestr(
+                    "DISCLAIMER.md",
+                    "Disclaimer module unavailable in this build.",
+                )
             
             for doc in documents:
                 path = stored_evidence_path(doc)
@@ -1338,7 +1430,18 @@ def create_app(
                 restriction_fail = doc.document_key
                 break
 
-        barreau_fail = None if documents else "(no evidence)"
+        # Barreau gate: a case must have evidence AND a JurisdictionStamp
+        # before it can be exported. The stamp is a row in the
+        # jurisdiction_stamps table, applied via POST /cases/{id}/stamp.
+        stamp = db.scalar(
+            select(JurisdictionStamp).where(JurisdictionStamp.case_id == case.id)
+        )
+        if not documents:
+            barreau_fail = "(no evidence)"
+        elif stamp is None:
+            barreau_fail = "(no barreau stamp)"
+        else:
+            barreau_fail = None
 
         gates = [
             {
@@ -1361,6 +1464,65 @@ def create_app(
             "type": type,
             "gates": gates,
             "blocked": any(g["result"] == "fail" for g in gates),
+        }
+
+
+    @app.get("/cases/{case_id}/stamp", dependencies=[local_api])
+    def get_stamp(case_id: str, db: Session = Depends(get_db)):
+        case = find_case(db, case_id)
+        stamp = db.scalar(
+            select(JurisdictionStamp).where(JurisdictionStamp.case_id == case.id)
+        )
+        if stamp is None:
+            return {"case_id": case.id, "stamped": False}
+        return {
+            "case_id": case.id,
+            "stamped": True,
+            "stamp_version": stamp.stamp_version,
+            "approved_by": stamp.approved_by,
+            "applied_at": _datetime_text(stamp.applied_at),
+        }
+
+    @app.post("/cases/{case_id}/stamp", dependencies=[local_api])
+    def create_stamp(case_id: str, request: dict, db: Session = Depends(get_db)):
+        case = find_case(db, case_id)
+        approved_by = (request.get("approved_by") or "").strip()
+        if not approved_by:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "INVALID_FORM", "message": "approved_by is required."},
+            )
+        existing = db.scalar(
+            select(JurisdictionStamp).where(JurisdictionStamp.case_id == case.id)
+        )
+        if existing is not None:
+            return {
+                "case_id": case.id,
+                "stamped": True,
+                "stamp_version": existing.stamp_version,
+                "approved_by": existing.approved_by,
+                "applied_at": _datetime_text(existing.applied_at),
+                "already_stamped": True,
+            }
+        stamp = JurisdictionStamp(
+            case_id=case.id,
+            stamp_version="1.0.0",
+            approved_by=approved_by,
+        )
+        db.add(stamp)
+        db.add(AuditLog(
+            case_id=case.id,
+            actor_username=approved_by,
+            action="barreau_stamp_applied",
+            details=json.dumps({"stamp_version": "1.0.0"}),
+        ))
+        db.commit()
+        return {
+            "case_id": case.id,
+            "stamped": True,
+            "stamp_version": stamp.stamp_version,
+            "approved_by": stamp.approved_by,
+            "applied_at": _datetime_text(stamp.applied_at),
         }
 
     @app.get("/cases/{case_id}/audit", dependencies=[local_api])

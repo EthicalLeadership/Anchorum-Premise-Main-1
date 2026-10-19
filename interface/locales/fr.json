@@ -377,5 +377,6 @@
   "case.list.continue": "Continuer",
   "case.list.resume": "Reprendre",
   "case.list.needs_attention": "Attention requise",
-  "case.list.hold_count": "éléments en suspens"
+  "case.list.hold_count": "éléments en suspens",
+  "audit.event.barreau_stamp_applied": "estampille du Barreau appliquée"
 }

@@ -377,5 +377,6 @@
   "case.list.continue": "Continue",
   "case.list.resume": "Resume",
   "case.list.needs_attention": "Needs attention",
-  "case.list.hold_count": "items on hold"
+  "case.list.hold_count": "items on hold",
+  "audit.event.barreau_stamp_applied": "barreau stamp applied"
 }

@@ -383,7 +383,9 @@ def test_api_requires_explicit_local_test_mode(tmp_path):
     assert response.json()["error"] == "LOCAL_API_MODE_DISABLED"
 
 
-def test_unimplemented_product_routes_fail_explicitly(tmp_path):
+def test_consult_route_defaults_to_disabled(tmp_path, monkeypatch):
+    """Saul is wired but off by default. No route in the app returns 501 anymore."""
+    monkeypatch.delenv("ANCHORUM_LLM_ENABLED", raising=False)
     app = app_for(tmp_path / "api.db")
     case = request(
         app,
@@ -400,16 +402,21 @@ def test_unimplemented_product_routes_fail_explicitly(tmp_path):
         },
     ).json()
     case_id = case["id"]
-    body, ct = multipart_file("a.txt", b"hello")
+    body, ct = multipart_file("a.txt", b"hello world")
     upload = request(
-        app, "POST", f"/cases/{case_id}/evidence", raw_body=body, content_type=ct,
+        app,
+        "POST",
+        f"/cases/{case_id}/evidence",
+        raw_body=body,
+        content_type=ct,
     ).json()
     evidence_id = upload["id"]
 
-    # The only intentional stub left is Saul: it should fail closed with 501.
     response = request(app, "POST", f"/evidence/{evidence_id}/consult")
-    assert response.status_code == 501
-    assert response.json()["error"] == "FEATURE_UNAVAILABLE"
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["reason"] == "LLM_DISABLED"
+    assert payload["consultation"] is None
 
 def test_upload_appends_to_existing_case(tmp_path):
     app = app_for(tmp_path / "api.db")
