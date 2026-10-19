@@ -385,5 +385,9 @@
   "administration.members.credential.pending": "pending",
   "administration.members.credential.none": "—",
   "error.barreau_credential_rejected": "This credential is not in the Barreau allowlist.",
-  "error.barreau_credential_required": "A Barreau credential is required on this install."
+  "error.barreau_credential_required": "A Barreau credential is required on this install.",
+  "evidence.viewer.ask_summarize": "Ask Saul to summarize",
+  "evidence.viewer.ask_summarize_loading": "Summarizing…",
+  "evidence.viewer.ask_summarize_unavailable": "The summarizer is not configured.",
+  "evidence.viewer.narrative_label": "AI summary (for review, not authoritative)"
 }

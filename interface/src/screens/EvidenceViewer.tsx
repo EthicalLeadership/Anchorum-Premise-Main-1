@@ -23,6 +23,8 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
   const [attempt, setAttempt] = useState(0);
   const [consulting, setConsulting] = useState(false);
   const [consultError, setConsultError] = useState<string | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
+  const [summarizeError, setSummarizeError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -62,6 +64,18 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
       return;
     }
     setAttempt((n) => n + 1); // Refetch evidence to pick up the new consultation.
+  }
+
+  async function onSummarize() {
+    setSummarizing(true);
+    setSummarizeError(null);
+    const r = await adapter.evidence.summarize(evidenceId);
+    setSummarizing(false);
+    if (!r.ok) {
+      setSummarizeError(t(r.error === "FEATURE_UNAVAILABLE" ? "evidence.viewer.ask_summarize_unavailable" : "error.generic"));
+      return;
+    }
+    setAttempt((n) => n + 1);
   }
 
   const back = (
@@ -147,7 +161,18 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
           {consultError ? <p role="alert" className="form-error">{consultError}</p> : null}
         </div>
       ) : null}
-            <h2>{t("evidence.viewer.verification")}</h2>
+      <div style={{ marginBottom: "1rem" }}>
+        <button
+          type="button"
+          className="btn"
+          onClick={onSummarize}
+          disabled={summarizing}
+        >
+          {summarizing ? t("evidence.viewer.ask_summarize_loading") : t("evidence.viewer.ask_summarize")}
+        </button>
+        {summarizeError ? <p role="alert" className="form-error">{summarizeError}</p> : null}
+      </div>
+      <h2>{t("evidence.viewer.verification")}</h2>
       {verification ? (
         <VerificationTile locale={locale} timeZone={timeZone} verification={verification} />
       ) : (

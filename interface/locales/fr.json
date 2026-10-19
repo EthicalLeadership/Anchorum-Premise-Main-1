@@ -385,5 +385,9 @@
   "administration.members.credential.pending": "en attente",
   "administration.members.credential.none": "—",
   "error.barreau_credential_rejected": "Cette estampille n'est pas dans la liste autorisée.",
-  "error.barreau_credential_required": "Une estampille du Barreau est requise sur cette installation."
+  "error.barreau_credential_required": "Une estampille du Barreau est requise sur cette installation.",
+  "evidence.viewer.ask_summarize": "Demander un résumé à Saul",
+  "evidence.viewer.ask_summarize_loading": "Résumé en cours…",
+  "evidence.viewer.ask_summarize_unavailable": "Le résumeur n'est pas configuré.",
+  "evidence.viewer.narrative_label": "Résumé IA (à vérifier, non officiel)"
 }

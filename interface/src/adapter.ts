@@ -633,6 +633,16 @@ export function createAdapter(config: AdapterConfig) {
         );
       },
 
+      async summarize(id: string): Promise<AdapterResult<{ id: string; narrative: string | null }>> {
+        if (config.backend) {
+          return requestJson<{ id: string; narrative: string | null }>(
+            `/evidence/${encodeURIComponent(id)}/summarize`,
+            { method: "POST" },
+          );
+        }
+        return failure("FEATURE_UNAVAILABLE");
+      },
+
       async consult(id: string): Promise<AdapterResult<{ id: string; consultation: string | null }>> {
         if (config.backend) {
           return requestJson<{ id: string; consultation: string | null }>(
