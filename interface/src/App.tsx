@@ -101,6 +101,16 @@ export function App() {
     };
   }, [adapter, activeCaseId]);
 
+  // Remember the last opened case so the workspace home screen can surface
+  // a Continue banner. Reads caseLoad (a state value) rather than the
+  // derived activeCase, because hooks must run before early returns.
+  useEffect(() => {
+    if (caseLoad?.kind === "ready" && caseLoad.value) {
+      localStorage.setItem("anchorum:lastCaseId", caseLoad.value.id);
+      localStorage.setItem("anchorum:lastCaseAt", new Date().toISOString());
+    }
+  }, [caseLoad]);
+
   if (sessionError) return <StateBlock locale={locale} kind="error" />;
   if (!session) return <StateBlock locale={locale} kind="loading" />;
   if (
@@ -126,6 +136,7 @@ export function App() {
     activeCaseId && caseLoad?.caseId === activeCaseId && caseLoad.kind === "ready"
       ? caseLoad.value
       : null;
+
 
   const activeSection = path.endsWith("/timeline")
     ? "timeline"
@@ -215,6 +226,8 @@ export function App() {
             message={translate(locale, "state.permission_limited")}
           />
         )
+      ) : path === "#/workspace" || path === "" || path === "#" ? (
+        <CaseList locale={locale} adapter={adapter} />
       ) : (
       <section className="empty-state" aria-labelledby="empty-state-title">
         <h1 id="empty-state-title">

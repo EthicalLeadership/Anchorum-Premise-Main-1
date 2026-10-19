@@ -5,3 +5,31 @@
 .data-table th, .data-table td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--tp-border); }
 .state-block { padding: 1.5rem; border: 1px dashed var(--tp-border); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+
+.case-list__continue {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--tp-line);
+  background: var(--tp-bg-subtle, transparent);
+  margin-bottom: var(--sp-3);
+}
+
+.case-list__needs-attention {
+  padding: var(--sp-3);
+  border-left: 3px solid var(--state-warn, orange);
+  margin-bottom: var(--sp-3);
+}
+
+.case-list__needs-attention h2 {
+  margin: 0 0 var(--sp-2);
+  font-size: 1rem;
+}
+
+.case-list__needs-attention ul {
+  margin: 0;
+  padding-left: var(--sp-4);
+}

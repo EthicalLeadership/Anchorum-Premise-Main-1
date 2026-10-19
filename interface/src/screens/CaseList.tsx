@@ -39,6 +39,15 @@ export function CaseList({ locale, adapter, permissionLimited = false }: CaseLis
   }, [adapter, attempt]);
 
   const rows = load.kind === "ready" ? load.rows : [];
+  
+  // Slice B: Continue last case
+  const lastCaseId = typeof window !== "undefined" ? localStorage.getItem("anchorum:lastCaseId") : null;
+  const lastCaseAt = typeof window !== "undefined" ? localStorage.getItem("anchorum:lastCaseAt") : null;
+  const lastCase = lastCaseId ? rows.find((r) => r.id === lastCaseId) : null;
+  
+  // Slice C: Needs attention
+  const holds = rows.filter((r) => r.holdCount > 0);
+
   const visible = useMemo(
     () =>
       rows.filter(
@@ -142,6 +151,34 @@ export function CaseList({ locale, adapter, permissionLimited = false }: CaseLis
         <h1 id="case-list-title">{translate(locale, "case.list.title")}</h1>
         {!permissionLimited && load.kind !== "loading" && rows.length > 0 ? createLink : null}
       </header>
+      
+      {load.kind === "ready" && lastCase ? (
+        <div className="case-list__continue">
+          <span>
+            {translate(locale, "case.list.continue")}: <strong>{lastCase.key}</strong> — {lastCase.title}
+            {lastCaseAt ? ` · ${formatDateTime(locale, lastCaseAt, lastCase.timezone)}` : ""}
+          </span>
+          <a href={`#/cases/${encodeURIComponent(lastCase.id)}`} className="btn">
+            {translate(locale, "case.list.resume")}
+          </a>
+        </div>
+      ) : null}
+      
+      {load.kind === "ready" && holds.length > 0 ? (
+        <div className="case-list__needs-attention">
+          <h2>{translate(locale, "case.list.needs_attention")} ({holds.length})</h2>
+          <ul>
+            {holds.map((h) => (
+              <li key={h.id}>
+                <a href={`#/cases/${encodeURIComponent(h.id)}/evidence?filter=hold`}>
+                  {h.key} — {h.title} · {h.holdCount} {translate(locale, "case.list.hold_count")}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {body}
     </section>
   );

@@ -36,7 +36,7 @@
   "case.header.status.closed": "Fermé",
   "case.header.status.on_hold": "En suspens",
   "case.list.title": "Dossiers",
-  "case.list.empty": "Aucun dossier pour l’instant. Créez le premier dossier pour commencer.",
+  "case.list.empty": "Aucun dossier pour l'instant. Un dossier contient les preuves, la chronologie et la piste d'audit d'une affaire. Créez le premier pour commencer.",
   "case.list.empty_action": "Créer un dossier",
   "case.list.no_matches": "Aucun dossier ne correspond à ces filtres.",
   "case.list.no_matches_action": "Effacer les filtres",
@@ -373,5 +373,9 @@
   "evidence.viewer.ask_saul": "Demander une suggestion à Saul IA",
   "evidence.viewer.ask_saul_loading": "Consultation en cours…",
   "evidence.viewer.ask_saul_unavailable": "Le consultant IA n'est pas configuré.",
-  "evidence.viewer.consultation_label": "Suggestion IA (à vérifier, non officielle)"
+  "evidence.viewer.consultation_label": "Suggestion IA (à vérifier, non officielle)",
+  "case.list.continue": "Continuer",
+  "case.list.resume": "Reprendre",
+  "case.list.needs_attention": "Attention requise",
+  "case.list.hold_count": "éléments en suspens"
 }

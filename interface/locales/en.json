@@ -36,7 +36,7 @@
   "case.header.status.closed": "Closed",
   "case.header.status.on_hold": "On hold",
   "case.list.title": "Cases",
-  "case.list.empty": "No cases yet. Create the first case to begin.",
+  "case.list.empty": "No cases yet. A case holds the evidence, timeline and audit trail for one matter. Create the first one to begin.",
   "case.list.empty_action": "Create case",
   "case.list.no_matches": "No cases match these filters.",
   "case.list.no_matches_action": "Clear filters",
@@ -373,5 +373,9 @@
   "evidence.viewer.ask_saul": "Ask Saul AI for a suggestion",
   "evidence.viewer.ask_saul_loading": "Consulting…",
   "evidence.viewer.ask_saul_unavailable": "The AI consultant is not configured.",
-  "evidence.viewer.consultation_label": "AI suggestion (for review, not authoritative)"
+  "evidence.viewer.consultation_label": "AI suggestion (for review, not authoritative)",
+  "case.list.continue": "Continue",
+  "case.list.resume": "Resume",
+  "case.list.needs_attention": "Needs attention",
+  "case.list.hold_count": "items on hold"
 }
