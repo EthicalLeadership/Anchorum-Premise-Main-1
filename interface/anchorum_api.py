@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.engine import make_url
 
 from dossier_pipeline.schema import AuditLog, Case, Document, JurisdictionStamp, User, init_schema
+from dossier_pipeline.barreau_gate import BarreauGate, BarreauGateError
 from interface import analysis as analysis_service
 from interface import malware_scan
 
@@ -1656,23 +1657,73 @@ def create_app(
     def invite_member(request: dict, db: Session = Depends(get_db)):
         email = request.get("email")
         role = request.get("role", "reviewer")
+        credential = (request.get("credential") or "").strip()
         if not email:
             raise HTTPException(status_code=400, detail={"error": "INVALID_FORM", "message": "Email required."})
-        
+
         existing = db.scalar(select(User).where(User.username == email))
         if existing:
             raise HTTPException(status_code=409, detail={"error": "MEMBER_ALREADY_EXISTS", "message": "Member already exists."})
-            
-        user = User(username=email, role=role, credential_fingerprint="pending")
+
+        allowlist_raw = os.environ.get("ANCHORUM_BARREAU_ALLOWLIST", "").strip()
+        allowlist = [f.strip() for f in allowlist_raw.split(",") if f.strip()]
+        required = os.environ.get("ANCHORUM_BARREAU_REQUIRED", "0") == "1"
+
+        if not credential:
+            if required:
+                _append_audit(
+                    db,
+                    case_id=None,
+                    action="barreau_credential_rejected",
+                    details={"email": email, "reason": "credential_missing"},
+                    actor="system",
+                )
+                db.commit()
+                raise HTTPException(status_code=400, detail={
+                    "error": "BARREAU_CREDENTIAL_REQUIRED",
+                    "message": "This install requires a Barreau credential to invite members.",
+                })
+            stored_fingerprint = "pending"
+        else:
+            gate = BarreauGate(allowlist)
+            try:
+                result = gate.validate(credential)
+            except BarreauGateError:
+                _append_audit(
+                    db,
+                    case_id=None,
+                    action="barreau_credential_rejected",
+                    details={"email": email, "reason": "not_in_allowlist"},
+                    actor="system",
+                )
+                db.commit()
+                raise HTTPException(status_code=403, detail={
+                    "error": "BARREAU_CREDENTIAL_REJECTED",
+                    "message": "This credential is not in the Barreau allowlist.",
+                })
+            stored_fingerprint = result.credential_fingerprint
+            _append_audit(
+                db,
+                case_id=None,
+                action="barreau_credential_verified",
+                details={
+                    "email": email,
+                    "fingerprint_prefix": stored_fingerprint[:8],
+                },
+                actor="system",
+            )
+
+        user = User(username=email, role=role, credential_fingerprint=stored_fingerprint)
         db.add(user)
         db.flush()
-        
-        db.add(AuditLog(
+
+        _append_audit(
+            db,
             case_id=None,
-            actor_username="system",
             action="member_invited",
-            details=json.dumps({"memberId": str(user.id), "email": email, "role": role}),
-        ))
+            details={"memberId": str(user.id), "email": email, "role": role},
+            actor="system",
+        )
         db.commit()
         return {
             "id": str(user.id),
@@ -1681,8 +1732,8 @@ def create_app(
             "role": user.role,
             "status": "invited",
             "caseIds": [],
+            "credentialFingerprint": stored_fingerprint,
         }
-
     @app.patch("/admin/members/{member_id}/role", dependencies=[local_api])
     def change_member_role(member_id: str, request: dict, db: Session = Depends(get_db)):
         role = request.get("role")
