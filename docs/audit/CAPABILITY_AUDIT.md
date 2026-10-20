@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** commit `01ca51ad41b6d075234ebee01beab53fed86f29e`, branch
+**Tree stamp:** commit `f0fe58f1b2333f18c90022a27b0aac62c2509fdf`, branch
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
@@ -635,7 +635,7 @@ the only write path. `EmailIntake` dedups via `EmailSeenSet`.
 
 ## 15. Honest inventory of gaps
 
-Findings reflect commit `01ca51a`. Items resolved after that stamp are not
+Findings reflect commit `f0fe58f`. Items resolved after that stamp are not
 represented.
 
 ### Critical (1)
