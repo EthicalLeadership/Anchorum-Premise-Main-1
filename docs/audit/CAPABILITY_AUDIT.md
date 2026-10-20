@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** commit `6af79f3172ef605405a5a0cef0c405c663c20c3d`, branch
+**Tree stamp:** commit `23909a5119bd870b45bacb194a439e3974811abd`, branch
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
@@ -635,7 +635,7 @@ the only write path. `EmailIntake` dedups via `EmailSeenSet`.
 
 ## 15. Honest inventory of gaps
 
-Findings reflect commit `6af79f3`. Items resolved after that stamp are not
+Findings reflect commit `23909a5`. Items resolved after that stamp are not
 represented.
 
 ### Critical (1)
@@ -654,12 +654,11 @@ represented.
 | Two CI systems | `integrity.yml` and `ci/run.py` share no state; no file names which is authoritative; no artefact records a comparison of their verdicts | §11 |
 | LLM surface | The LLM does more than a document-type second opinion: `llm_classify` feeds `/consult` (1270) and `llm_summarize` feeds `/summarize` (1317) | documented out of scope by its own docstring ("NON-DETERMINISTIC by nature") at `interface/llm_classifier.py:1-8`; `anchorum_api.py:1228,1275` |
 
-### Medium (9)
+### Medium (8)
 
 | Area | What is absent | Evidence |
 |---|---|---|
-| Frontend build gate | No CI runs `tsc --noEmit` or `npx vitest`; `4eb0e57` demonstrates that a TS2554 error can land in a commit that passes pytest, gitleaks and integrity. Vitest transpiles without type-checking, so even running Vitest in CI would not catch this class | `integrity.yml` job list; `4eb0e57` → `6af79f3` |
-| Integrity gate does not detect document drift | Nothing in `integrity.yml` or `ci/run.py` compares a document's tree stamp to `HEAD`, so any document asserting facts about the tree can drift undetected | `integrity.yml` job list |
+| Audit self-accuracy | This document, at `6af79f3`, asserted in its "Frontend build gate" row that no CI runs `tsc --noEmit` or `npx vitest`. Both are present in `integrity.yml`, `tests` job (`Interface type-check`, `Interface tests`). Medium because the audit's accuracy is load-bearing for every other finding it makes. | `integrity.yml`, `tests` job |
 | Product spec accuracy | `docs/product/README.md` asserts there is no web/API application | contradicted by 29 routes |
 | Barreau credential source | `BarreauGate` has no credential store or issuer | `dossier_pipeline/barreau_gate.py`, 40 lines, 3 classes, no I/O |
 | Admin role value | `PATCH /admin/members/{id}/role` writes any string to `User.role`. No authorization path reads it: `has_role` (`auth.py:91`, called `:98`) has no caller in `interface/` | `anchorum_api.py:1892` |
@@ -692,7 +691,7 @@ represented.
 | `interface/server.py` | Declares zero routes — the app factory only | grep for `@app.*`, `add_api_route`, `mount` returned nothing |
 | This audit is an instance of the drift pattern | At `6af79f3` this document is accurate; nothing will notice when it is not | distinct from the Medium integrity-gate row above |
 
-**Totals: 29 rows — 1 Critical, 5 High, 9 Medium, 10 Low, 4 Info.**
+**Totals: 28 rows — 1 Critical, 5 High, 8 Medium, 10 Low, 4 Info.**
 
 ## 16. Verdict
 
