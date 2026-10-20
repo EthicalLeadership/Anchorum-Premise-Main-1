@@ -61,6 +61,8 @@ jobs:
       - name: Interface tests
         working-directory: interface
         run: npx vitest run
+      - name: Audit freshness
+        run: python scripts/check_audit_freshness.py --strict
       - name: Interface production build
         working-directory: interface
         run: npm run build
