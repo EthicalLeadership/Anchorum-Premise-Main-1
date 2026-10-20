@@ -4,6 +4,13 @@
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
+**How to read the stamp.** Committing this document necessarily moved `HEAD`
+past the commit it describes, so the stamp is the last commit whose *code* tree
+the findings describe — not `HEAD`. The invariant that makes the stamp
+checkable is: `git diff --name-only <stamp>..HEAD -- ':!docs/audit/CAPABILITY_AUDIT.md'`
+is empty. Any future check must apply that exclusion, otherwise it reports drift
+the moment this file is committed and every subsequent revision.
+
 **Test state at stamp:** `565 passed, 0 failed` (pytest, `pytest.ini`);
 `104 passed / 104` (Vitest, 15 files); `tsc --noEmit` clean; `vite build`
 succeeds (1.62s).
