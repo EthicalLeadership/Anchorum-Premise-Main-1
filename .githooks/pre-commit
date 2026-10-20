@@ -1,30 +1,85 @@
 #!/usr/bin/env bash
-# Pre-commit gate. Two independent checks, both of which must pass.
-set -euo pipefail
-
-repo_root="$(git rev-parse --show-toplevel)"
-
-# 1. Source integrity: zero-byte files, syntax errors, duplicated declarations
-#    and content, and imports spliced into docstrings.
-"${PYTHON:-python3}" "$repo_root/scripts/check_integrity.py"
-
-# 2. Secret scanning on the staged changes.
+# Pre-commit gate. Fail-aggregated across five checks:
+#   1. Source integrity (scripts/check_integrity.py)
+#   2. Secret scan on staged changes (gitleaks; SKIPPED-warn if not installed)
+#   3. TypeScript typecheck (tsc --noEmit) — only if .ts/.tsx staged
+#   4. Frontend unit tests (vitest run) — only if .test.ts/.test.tsx staged
+#   5. Python tests (pytest -q -x) — only if .py staged
 #
-#    .gitleaks.toml used to be inert: nothing invoked it, and it could not even
-#    be parsed, so it provided no protection at all (audit finding F-12). This is
-#    the point where a secret would actually enter history, so this is where the
-#    scan belongs.
-#
-#    If gitleaks is not installed the hook says so and continues. A missing
-#    optional tool must not block commits, but it must not pass silently either:
-#    a check that quietly does nothing is worse than no check, because it reads
-#    as coverage.
-if ! command -v gitleaks >/dev/null 2>&1; then
-  echo "pre-commit: gitleaks not installed - secret scan SKIPPED"
-  echo "pre-commit: install gitleaks to enable it"
-  exit 0
+# Integrity and secret scan run for every commit. Language-specific checks
+# run only when the corresponding language is in the change set, so a
+# doc-only or shell-only commit does not pay the pytest runtime.
+
+set -uo pipefail
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
+
+if [ -d "$REPO_ROOT/.venv/bin" ]; then
+    export PATH="$REPO_ROOT/.venv/bin:$PATH"
 fi
 
-cd "$repo_root"
-# --redact keeps a detected secret out of terminal scrollback and CI logs.
-gitleaks git --staged --config .gitleaks.toml --no-banner --redact
+fail=0
+
+# 1. Source integrity: zero-byte files, syntax errors, duplicated
+#    declarations and content, and imports spliced into docstrings.
+if ! "${PYTHON:-python3}" scripts/check_integrity.py; then
+    echo "pre-commit: check_integrity.py failed" >&2
+    fail=1
+fi
+
+# 2. Secret scan on staged changes. If gitleaks is not installed, warn but
+#    do not fail — a missing optional tool must not block commits, but must
+#    not pass silently either.
+if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "pre-commit: gitleaks not installed - secret scan SKIPPED"
+    echo "pre-commit: install gitleaks to enable it"
+else
+    # --redact keeps a detected secret out of terminal scrollback and CI logs.
+    if ! gitleaks git --staged --config .gitleaks.toml --no-banner --redact; then
+        echo "pre-commit: gitleaks failed" >&2
+        fail=1
+    fi
+fi
+
+# 3-5. Language-specific checks, only if the relevant files are staged.
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+has_ts=0
+has_test_ts=0
+has_py=0
+
+while IFS= read -r f; do
+    case "$f" in
+        *.test.ts|*.test.tsx)  has_ts=1; has_test_ts=1 ;;
+        *.ts|*.tsx)            has_ts=1 ;;
+        *.py)                  has_py=1 ;;
+    esac
+done <<EOF
+$staged
+EOF
+
+if [ "$has_ts" -eq 1 ]; then
+    echo "pre-commit: npx tsc --noEmit"
+    if ! ( cd "$REPO_ROOT/interface" && npx tsc --noEmit ); then
+        echo "pre-commit: tsc failed" >&2
+        fail=1
+    fi
+fi
+
+if [ "$has_test_ts" -eq 1 ]; then
+    echo "pre-commit: vitest run"
+    if ! ( cd "$REPO_ROOT/interface" && ./node_modules/.bin/vitest run ); then
+        echo "pre-commit: vitest failed" >&2
+        fail=1
+    fi
+fi
+
+if [ "$has_py" -eq 1 ]; then
+    echo "pre-commit: pytest -q -x"
+    if ! ( cd "$REPO_ROOT" && pytest -q -x ); then
+        echo "pre-commit: pytest failed" >&2
+        fail=1
+    fi
+fi
+
+exit $fail
