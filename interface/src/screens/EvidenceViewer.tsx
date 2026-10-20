@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { createAdapter, Evidence, CustodyEntry } from "../adapter";
 import { StateBlock } from "../components/StateBlock";
 import { DataTable, type Column } from "../components/DataTable";
+import { ChainTimeline } from "../components/ChainTimeline";
 import { VerificationTile, type VerificationView } from "../components/VerificationTile";
 import { formatDateTime, translate } from "../i18n";
 import type { Locale } from "../types";
@@ -157,7 +158,10 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
       {custody.length === 0 ? (
         <StateBlock locale={locale} kind="empty" message={t("evidence.viewer.custody.empty")} />
       ) : (
-        <DataTable caption={t("evidence.viewer.custody")} columns={columns} rows={custody} rowKey={(r) => r.id} />
+        <>
+          <ChainTimeline locale={locale} entries={custody} timeZone={timeZone} />
+          <DataTable caption={t("evidence.viewer.custody")} columns={columns} rows={custody} rowKey={(r) => r.id} />
+        </>
       )}
       {evidence.analysis?.documentType === "unknown" ? (
         <div className="ask-saul">

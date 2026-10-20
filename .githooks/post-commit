@@ -1,0 +1,24 @@
+#!/bin/sh
+# Post-commit: print the audit freshness reminder when the invariant is broken.
+# Never blocks; a stamp-bump commit shows silence here.
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+if [ -d "$REPO_ROOT/.venv/bin" ]; then
+    export PATH="$REPO_ROOT/.venv/bin:$PATH"
+fi
+
+[ -f "$REPO_ROOT/scripts/check_audit_freshness.py" ] || exit 0
+[ -d "$REPO_ROOT/docs/audit" ] || exit 0
+
+cd "$REPO_ROOT" || exit 0
+
+if ! python scripts/check_audit_freshness.py --strict >/dev/null 2>&1; then
+    echo
+    echo "----- audit freshness reminder -----"
+    python scripts/check_audit_freshness.py --strict || true
+    echo "------------------------------------"
+    echo "If this commit was a code change, the next commit should bump the"
+    echo "stamp in docs/audit/CAPABILITY_AUDIT.md to this commit's SHA."
+    echo "If this commit was a stamp bump, the reminder is expected to"
+    echo "disappear on the next post-commit run."
+fi

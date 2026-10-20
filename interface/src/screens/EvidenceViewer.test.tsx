@@ -6,6 +6,18 @@ import { EvidenceViewer } from "./EvidenceViewer";
 import { translate } from "../i18n";
 
 afterEach(cleanup);
+
+it("renders a custody chain timeline alongside the custody table", async () => {
+  view("E-1047");
+  await screen.findByRole("heading", { level: 1 });
+  const table = document.querySelector(".evidence-viewer table");
+  if (!table) return; // fixture has no custody entries for this id
+  const timeline = screen.getByTestId("chain-timeline");
+  expect(timeline).toBeTruthy();
+  const tableRows = table.querySelectorAll("tbody tr").length;
+  const timelineSteps = timeline.querySelectorAll(".chain-timeline__step").length;
+  expect(timelineSteps).toBe(tableRows);
+});
 const view = (id: string) =>
   render(<EvidenceViewer locale="en" adapter={createAdapter({ backend: null })} caseId="CASE-2024-018" evidenceId={id} />);
 

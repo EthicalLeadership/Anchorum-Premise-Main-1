@@ -395,5 +395,6 @@
   "evidence.viewer.doctrine_match": "Doctrine projection matches",
   "evidence.viewer.doctrine_mismatch": "Doctrine projection changed: {reason}",
   "chain.summary.verified": "Chain verified",
-  "chain.summary.broken_at": "Chain broken at ID {id}"
+  "chain.summary.broken_at": "Chain broken at ID {id}",
+  "chain.timeline.title": "Custody chain"
 }

@@ -395,5 +395,6 @@
   "evidence.viewer.doctrine_match": "La projection de doctrine correspond",
   "evidence.viewer.doctrine_mismatch": "La projection de doctrine a changé : {reason}",
   "chain.summary.verified": "Chaîne vérifiée",
-  "chain.summary.broken_at": "Chaîne rompue à l'ID {id}"
+  "chain.summary.broken_at": "Chaîne rompue à l'ID {id}",
+  "chain.timeline.title": "Chaîne de garde"
 }
