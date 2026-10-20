@@ -1,14 +1,21 @@
 #!/usr/bin/env bash
-# Pre-commit gate. Fail-aggregated across five checks:
+# Pre-commit gate. Fail-aggregated across six checks:
 #   1. Source integrity (scripts/check_integrity.py)
 #   2. Secret scan on staged changes (gitleaks; SKIPPED-warn if not installed)
-#   3. TypeScript typecheck (tsc --noEmit) — only if .ts/.tsx staged
-#   4. Frontend unit tests (vitest run) — only if .test.ts/.test.tsx staged
-#   5. Python tests (pytest -q -x) — only if .py staged
+#   3. Audit freshness (scripts/check_audit_freshness.py) — warn-only here
+#   4. TypeScript typecheck (tsc --noEmit) — only if .ts/.tsx staged
+#   5. Frontend unit tests (vitest run) — only if .test.ts/.test.tsx staged
+#   6. Python tests (pytest -q -x) — only if .py staged
 #
-# Integrity and secret scan run for every commit. Language-specific checks
-# run only when the corresponding language is in the change set, so a
-# doc-only or shell-only commit does not pay the pytest runtime.
+# Integrity, secret scan and audit freshness run for every commit.
+# Language-specific checks run only when the corresponding language is in
+# the change set, so a doc-only or shell-only commit does not pay the pytest
+# runtime.
+#
+# Audit freshness is deliberately non-blocking here and blocking in CI
+# (.github/workflows/integrity.yml runs it with --strict). Locally the goal is
+# to make drift visible at the moment it is created; the merge gate is what
+# makes it stop.
 
 set -uo pipefail
 
@@ -42,7 +49,19 @@ else
     fi
 fi
 
-# 3-5. Language-specific checks, only if the relevant files are staged.
+# 3. Audit freshness. Warn-only: a stale stamp prints what changed and how to
+#    resolve it, but does not block the commit. --strict is the CI behaviour.
+#
+#    --staged is required here. At pre-commit time the commit does not exist, so
+#    HEAD still points at the previous commit and a stamp..HEAD comparison would
+#    report an empty diff for the very change being committed. The index is what
+#    this check has to ask about.
+if ! "${PYTHON:-python3}" scripts/check_audit_freshness.py --staged; then
+    echo "pre-commit: check_audit_freshness.py failed" >&2
+    fail=1
+fi
+
+# 4-6. Language-specific checks, only if the relevant files are staged.
 staged=$(git diff --cached --name-only --diff-filter=ACMR)
 has_ts=0
 has_test_ts=0

@@ -40,10 +40,24 @@ def find_audits() -> list[tuple[Path, str]]:
     return out
 
 
-def changed_paths(stamp: str, exclude: Path) -> list[str]:
+def changed_paths(stamp: str, exclude: Path, *, staged: bool = False) -> list[str]:
+    """Paths that differ from the stamp, excluding the audit itself.
+
+    `staged` compares the index against the stamp rather than HEAD against the
+    stamp. That distinction is not cosmetic: at pre-commit time the commit does
+    not exist yet, so `HEAD` still points at the previous commit and a
+    `stamp..HEAD` comparison reports an empty diff for every change the hook is
+    about to accept. The hook must therefore ask about the index, not about
+    HEAD. CI runs after the commit and uses the HEAD comparison.
+    """
     rel = exclude.as_posix()
+    rev = stamp if staged else f"{stamp}..HEAD"
+    args = ["diff", "--name-only"]
+    if staged:
+        args.append("--cached")
+    args += [rev, "--", f":(exclude){rel}"]
     try:
-        out = git("diff", "--name-only", f"{stamp}..HEAD", "--", f":(exclude){rel}")
+        out = git(*args)
     except subprocess.CalledProcessError:
         return ["<stamp not in history>"]
     return [p for p in out.splitlines() if p]
@@ -53,6 +67,10 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--strict", action="store_true",
                     help="exit 1 on stale (default: warn only, exit 0)")
+    ap.add_argument("--staged", action="store_true",
+                    help="compare the index against the stamp instead of HEAD "
+                         "(for use in the pre-commit hook, where the commit "
+                         "does not exist yet)")
     args = ap.parse_args()
 
     audits = find_audits()
@@ -62,7 +80,7 @@ def main() -> int:
 
     stale = False
     for doc, stamp in audits:
-        paths = changed_paths(stamp, doc)
+        paths = changed_paths(stamp, doc, staged=args.staged)
         if not paths:
             print(f"OK    {doc.as_posix()}  stamp={stamp}")
             continue
