@@ -667,7 +667,7 @@ represented.
 | Untested components | 9 of 11 components have no test file (13 `.tsx` files, 2 of which are tests) | `interface/src/components/` |
 | Fuzz testing | No fuzz harness anywhere | no filename contains `fuzz` |
 
-### Low (13)
+### Low (12)
 
 | Area | What is absent | Evidence |
 |---|---|---|
@@ -682,7 +682,6 @@ represented.
 | Wrapper scripts | Four `apply_*.sh` rewrite files in place, appear in no CI job, are not `.gitignore`d | root listing |
 | `observability.py` | `StructuredLogger` has no test module naming it | `tests/` listing |
 
-| Wire 1 timeline graphic | The plan's Wire 1 asks for a "Custody Chain timeline graphic with green links" in EvidenceViewer. Delivered work (4eb0e57 + 68d24cf) provides a chain.summary banner above the table and CSS-colored audit-chain--linked/--broken cells, but no timeline structure exists: a grep for timeline returns nothing in EvidenceViewer.tsx, and no HTML list or SVG element appears in the file. Banner plus colored cells is not the plan's "timeline graphic" | interface/src/screens/EvidenceViewer.tsx; 4eb0e57 message says "chain-summary banner" |
 | Wire 4 HMAC on AuditLog | Plan asks for an hmac column on AuditLog, signing in _append_audit, and verification in /export. None exists. AuditLog (dossier_pipeline/schema.py:115-128) has id/case_id/actor/action/details/previous_hash/record_hash/created_at — no hmac. _append_audit (interface/anchorum_api.py:353-383) computes SHA-256 chain hashes but no HMAC. /export performs no HMAC verification. The HMAC code that does exist lives in dossier_pipeline/registry/audit.py (AuditSigner, file-based JSON registry), a distinct subsystem from the HTTP audit chain. Two AuditLog classes exist (dossier_pipeline/schema.py, mail_intake_pipeline_dossier/schema.py); neither has an hmac field | dossier_pipeline/schema.py:115-128; interface/anchorum_api.py:353-383; grep hmac finds hits only in dossier_pipeline/registry/audit.py |
 | Wire 9 gates in /export | Plan asks for ControlPlane.validate() and ProvenanceCurator.validate() in /export. Grep of the handler finds only invariants_bridge (from 4eb0e57). The two named classes are not imported and not called. Plan-spec gate count is 1 of 3 | interface/anchorum_api.py /export handler |
 
@@ -695,7 +694,7 @@ represented.
 | `interface/server.py` | Declares zero routes — the app factory only | grep for `@app.*`, `add_api_route`, `mount` returned nothing |
 | This audit is an instance of the drift pattern | At `6af79f3` this document is accurate; nothing will notice when it is not | distinct from the Medium integrity-gate row above |
 
-**Totals: 31 rows — 1 Critical, 5 High, 8 Medium, 13 Low, 4 Info.**
+**Totals: 30 rows — 1 Critical, 5 High, 8 Medium, 12 Low, 4 Info.**
 
 ## 16. Verdict
 
