@@ -183,6 +183,28 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
   return (
     <section className="audit-exports" aria-labelledby="audit-title">
       <h1 id="audit-title">{t("audit.title")}</h1>
+      {(() => {
+        const broken = audit.rows.find((row) => row.chain === "broken");
+        const anyChecked = audit.rows.some((row) => row.chain !== "not_checked");
+        if (!anyChecked) return null;
+        return broken ? (
+          <p
+            role="status"
+            data-testid="chain-summary"
+            className="audit-chain-summary audit-chain-summary--broken"
+          >
+            {t("chain.summary.broken_at", { id: broken.id })}
+          </p>
+        ) : (
+          <p
+            role="status"
+            data-testid="chain-summary"
+            className="audit-chain-summary audit-chain-summary--verified"
+          >
+            {t("chain.summary.verified")}
+          </p>
+        );
+      })()}
       {audit.rows.length === 0 ? (
         <StateBlock locale={locale} kind="empty" />
       ) : (

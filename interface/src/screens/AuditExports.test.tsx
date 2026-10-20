@@ -28,6 +28,19 @@ describe("AuditExports", () => {
     expect(screen.getByRole("button", { name: "Export" })).toBeDisabled();
   });
 
+  it("shows a broken-chain badge naming the first broken row", async () => {
+    render(
+      <AuditExports
+        locale="en"
+        adapter={createAdapter({ backend: null })}
+        caseId="CASE-2024-018"
+      />,
+    );
+    const badge = await screen.findByTestId("chain-summary");
+    expect(badge).toHaveTextContent(/Chain broken at ID log-/i);
+    expect(badge.className).toContain("audit-chain-summary--broken");
+  });
+
   it("shows not found for an unknown case", async () => {
     render(
       <AuditExports

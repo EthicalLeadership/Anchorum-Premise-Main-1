@@ -11,7 +11,7 @@ AUDIT = Path("docs/audit/CAPABILITY_AUDIT.md")
 
 
 def stamp_line_in(text: str) -> str:
-    """Return the exact `Findings reflect commit \`<sha>\`` line in text."""
+    r"""Return the exact `Findings reflect commit \`<sha>\`` line in text."""
     m = re.search(r"Findings reflect commit `[0-9a-f]{7,40}`", text)
     assert m, "fixture: no stamp line in audit doc"
     return m.group(0)

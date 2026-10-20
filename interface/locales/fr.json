@@ -393,5 +393,7 @@
   "evidence.viewer.verify_doctrine": "Vérifier la projection de doctrine",
   "evidence.viewer.verify_doctrine_loading": "Vérification en cours…",
   "evidence.viewer.doctrine_match": "La projection de doctrine correspond",
-  "evidence.viewer.doctrine_mismatch": "La projection de doctrine a changé : {reason}"
+  "evidence.viewer.doctrine_mismatch": "La projection de doctrine a changé : {reason}",
+  "chain.summary.verified": "Chaîne vérifiée",
+  "chain.summary.broken_at": "Chaîne rompue à l'ID {id}"
 }
