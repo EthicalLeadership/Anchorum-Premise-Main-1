@@ -667,7 +667,7 @@ represented.
 | Untested components | 9 of 11 components have no test file (13 `.tsx` files, 2 of which are tests) | `interface/src/components/` |
 | Fuzz testing | No fuzz harness anywhere | no filename contains `fuzz` |
 
-### Low (12)
+### Low (13)
 
 | Area | What is absent | Evidence |
 |---|---|---|
@@ -681,11 +681,12 @@ represented.
 | `_DATE_NUM` branch | The "YYYY-MM-DD" sub-branch cannot be taken; the first group is `\d{1,2}` | `interface/classifier.py`, §14 |
 | Wrapper scripts | Four `apply_*.sh` rewrite files in place, appear in no CI job, are not `.gitignore`d | root listing |
 | `observability.py` | `StructuredLogger` has no test module naming it | `tests/` listing |
+| No regression guard for tracked fixes | The F-12 fix (gitleaks invoked by the pre-commit hook) was silently removed by 283db50 and restored only by 035411b after manual review caught it. No check notices when a tracked fix is removed: check_integrity.py, gitleaks, tsc, vitest, pytest, and audit-freshness all verify current tree state, not that previous fixes remain in place. A hook can be deleted, a guard can be replaced with a narrower one, and the tree still looks healthy | git log 283db50 → 035411b |
 
 | Wire 4 HMAC on AuditLog | Plan asks for an hmac column on AuditLog, signing in _append_audit, and verification in /export. None exists. AuditLog (dossier_pipeline/schema.py:115-128) has id/case_id/actor/action/details/previous_hash/record_hash/created_at — no hmac. _append_audit (interface/anchorum_api.py:353-383) computes SHA-256 chain hashes but no HMAC. /export performs no HMAC verification. The HMAC code that does exist lives in dossier_pipeline/registry/audit.py (AuditSigner, file-based JSON registry), a distinct subsystem from the HTTP audit chain. Two AuditLog classes exist (dossier_pipeline/schema.py, mail_intake_pipeline_dossier/schema.py); neither has an hmac field | dossier_pipeline/schema.py:115-128; interface/anchorum_api.py:353-383; grep hmac finds hits only in dossier_pipeline/registry/audit.py |
 | Wire 9 gates in /export | Plan asks for ControlPlane.validate() and ProvenanceCurator.validate() in /export. Grep of the handler finds only invariants_bridge (from 4eb0e57). The two named classes are not imported and not called. Plan-spec gate count is 1 of 3 | interface/anchorum_api.py /export handler |
 
-### Info (4)
+### Info (5)
 
 | Area | What is absent | Evidence |
 |---|---|---|
@@ -693,8 +694,9 @@ represented.
 | Duplicate domain package | `mail_intake_pipeline_dossier/` is a divergent fork of `dossier_pipeline/`, differing in 4 files | `diff -rq` |
 | `interface/server.py` | Declares zero routes — the app factory only | grep for `@app.*`, `add_api_route`, `mount` returned nothing |
 | This audit is an instance of the drift pattern | At `6af79f3` this document is accurate; nothing will notice when it is not | distinct from the Medium integrity-gate row above |
+| Commit-message vs diff accuracy | Every automated check in the repo (check_integrity.py, gitleaks, tsc, vitest, pytest, audit-freshness) verifies tree state. None verifies that the diff contains what the message claims. This session produced at least six commits whose message was accurate about intent and silent about effect: 4eb0e57 claimed chain.summary keys that do not exist; 68d24cf landed with a tsc error; 713e6e4 claimed Wire 1B with one shell file; 283db50 claimed restoration of a fix it removed; 8734c11 claimed a CI step that was already present. §16 names the pattern; nothing catches it | git log; §16 |
 
-**Totals: 30 rows — 1 Critical, 5 High, 8 Medium, 12 Low, 4 Info.**
+**Totals: 32 rows — 1 Critical, 5 High, 8 Medium, 13 Low, 5 Info.**
 
 ## 16. Verdict
 
