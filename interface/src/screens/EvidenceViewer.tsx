@@ -55,7 +55,11 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
     };
   }, [adapter, caseId, evidenceId, attempt]);
 
-  const t = (k: string) => translate(locale, k as never);
+  // `translate` takes an optional parameter map and throws when a message
+  // declares a placeholder it was not given. Forwarding that third argument is
+  // what lets call sites supply `{reason}` rather than failing at render.
+  const t = (k: string, parameters?: Record<string, string | number>) =>
+    translate(locale, k as never, parameters);
   async function onConsult() {
     setConsulting(true);
     setConsultError(null);
