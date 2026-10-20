@@ -183,10 +183,8 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
   return (
     <section className="audit-exports" aria-labelledby="audit-title">
       <h1 id="audit-title">{t("audit.title")}</h1>
-      {(() => {
+      {audit.rows.length === 0 ? null : (() => {
         const broken = audit.rows.find((row) => row.chain === "broken");
-        const anyChecked = audit.rows.some((row) => row.chain !== "not_checked");
-        if (!anyChecked) return null;
         return broken ? (
           <p
             role="status"

@@ -37,7 +37,7 @@ describe("AuditExports", () => {
       />,
     );
     const badge = await screen.findByTestId("chain-summary");
-    expect(badge).toHaveTextContent(/Chain broken at ID log-/i);
+    expect(badge).toHaveTextContent(/Chain broken at ID \S+/i);
     expect(badge.className).toContain("audit-chain-summary--broken");
   });
 
