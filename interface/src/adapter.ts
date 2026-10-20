@@ -619,6 +619,16 @@ export function createAdapter(config: AdapterConfig) {
         const exists = [...fixture.evidence, ...sessionEvidence].some((e) => e.id === id);
         return Promise.resolve(exists ? success([]) : failure("NOT_FOUND"));
       },
+      async verifyDoctrine(id: string): Promise<AdapterResult<{ match: boolean; reason: string | null }>> {
+        if (config.backend) {
+          return requestJson<{ match: boolean; reason: string | null }>(
+            `/evidence/${encodeURIComponent(id)}/verify-doctrine`,
+            { method: "POST" },
+          );
+        }
+        return failure("FEATURE_UNAVAILABLE");
+      },
+
       verify(id: string) {
         if (config.backend) {
           return requestJson<Verification>(

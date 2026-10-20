@@ -389,5 +389,9 @@
   "evidence.viewer.ask_summarize": "Ask Saul to summarize",
   "evidence.viewer.ask_summarize_loading": "Summarizing…",
   "evidence.viewer.ask_summarize_unavailable": "The summarizer is not configured.",
-  "evidence.viewer.narrative_label": "AI summary (for review, not authoritative)"
+  "evidence.viewer.narrative_label": "AI summary (for review, not authoritative)",
+  "evidence.viewer.verify_doctrine": "Verify doctrine projection",
+  "evidence.viewer.verify_doctrine_loading": "Verifying…",
+  "evidence.viewer.doctrine_match": "Doctrine projection matches",
+  "evidence.viewer.doctrine_mismatch": "Doctrine projection changed: {reason}"
 }

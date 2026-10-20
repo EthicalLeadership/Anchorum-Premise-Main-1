@@ -389,5 +389,9 @@
   "evidence.viewer.ask_summarize": "Demander un résumé à Saul",
   "evidence.viewer.ask_summarize_loading": "Résumé en cours…",
   "evidence.viewer.ask_summarize_unavailable": "Le résumeur n'est pas configuré.",
-  "evidence.viewer.narrative_label": "Résumé IA (à vérifier, non officiel)"
+  "evidence.viewer.narrative_label": "Résumé IA (à vérifier, non officiel)",
+  "evidence.viewer.verify_doctrine": "Vérifier la projection de doctrine",
+  "evidence.viewer.verify_doctrine_loading": "Vérification en cours…",
+  "evidence.viewer.doctrine_match": "La projection de doctrine correspond",
+  "evidence.viewer.doctrine_mismatch": "La projection de doctrine a changé : {reason}"
 }

@@ -25,6 +25,8 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
   const [consultError, setConsultError] = useState<string | null>(null);
   const [summarizing, setSummarizing] = useState(false);
   const [summarizeError, setSummarizeError] = useState<string | null>(null);
+  const [verifyingDoctrine, setVerifyingDoctrine] = useState(false);
+  const [doctrineResult, setDoctrineResult] = useState<{ match: boolean; reason: string | null } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -64,6 +66,18 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
       return;
     }
     setAttempt((n) => n + 1); // Refetch evidence to pick up the new consultation.
+  }
+
+  async function onVerifyDoctrine() {
+    setVerifyingDoctrine(true);
+    setDoctrineResult(null);
+    const r = await adapter.evidence.verifyDoctrine(evidenceId);
+    setVerifyingDoctrine(false);
+    if (!r.ok) {
+      setDoctrineResult({ match: false, reason: r.error });
+      return;
+    }
+    setDoctrineResult({ match: r.value.match, reason: r.value.reason });
   }
 
   async function onSummarize() {
@@ -161,6 +175,21 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
           {consultError ? <p role="alert" className="form-error">{consultError}</p> : null}
         </div>
       ) : null}
+      <div style={{ marginBottom: "1rem" }}>
+        <button
+          type="button"
+          className="btn"
+          onClick={onVerifyDoctrine}
+          disabled={verifyingDoctrine}
+        >
+          {verifyingDoctrine ? t("evidence.viewer.verify_doctrine_loading") : t("evidence.viewer.verify_doctrine")}
+        </button>
+        {doctrineResult ? (
+          doctrineResult.match
+            ? <p role="status">{t("evidence.viewer.doctrine_match")}</p>
+            : <p role="alert" className="form-error">{t("evidence.viewer.doctrine_mismatch", { reason: doctrineResult.reason ?? "unknown" })}</p>
+        ) : null}
+      </div>
       <div style={{ marginBottom: "1rem" }}>
         <button
           type="button"

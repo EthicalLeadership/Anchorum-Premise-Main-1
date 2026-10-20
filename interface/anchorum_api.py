@@ -1319,6 +1319,66 @@ def create_app(
         db.commit()
         return {"id": evidence_id, "narrative": result}
 
+    @app.post("/evidence/{evidence_id}/verify-doctrine", dependencies=[local_api])
+    def verify_doctrine(evidence_id: str, db: Session = Depends(get_db)):
+        from interface import analysis as analysis_service
+
+        document = db.scalar(
+            select(Document).where(Document.document_key == evidence_id)
+        )
+        if document is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "NOT_FOUND", "message": "Evidence not found."},
+            )
+
+        if not document.analysis_json:
+            return {"match": False, "reason": "not_analysed", "stored": None, "recomputed": None}
+
+        try:
+            stored_record = json.loads(document.analysis_json)
+        except (TypeError, ValueError):
+            return {"match": False, "reason": "corrupt_stored_json", "stored": None, "recomputed": None}
+
+        stored_doctrine = stored_record.get("doctrine") or {}
+
+        bin_path = stored_evidence_path(document)
+        if bin_path is None or not bin_path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "NO_STORED_BYTES", "message": "Stored bytes are missing."},
+            )
+
+        try:
+            data = bin_path.read_bytes()
+            recomputed_record = analysis_service.analyse(
+                data, document.filename, document.media_type or ""
+            )
+            recomputed_doctrine = recomputed_record.get("doctrine") or {}
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": "ANALYSIS_FAILED", "message": type(exc).__name__},
+            ) from None
+
+        # 1. Lexicon hash — if the lexicon changed, the projection is not comparable
+        if stored_doctrine.get("lexiconHash") != recomputed_doctrine.get("lexiconHash"):
+            return {"match": False, "reason": "lexicon_changed", "stored": stored_doctrine, "recomputed": recomputed_doctrine}
+
+        # 2. Config hash — engine settings changed
+        if stored_doctrine.get("configHash") != recomputed_doctrine.get("configHash"):
+            return {"match": False, "reason": "config_changed", "stored": stored_doctrine, "recomputed": recomputed_doctrine}
+
+        # 3. Top-level classification
+        if stored_doctrine.get("classification") != recomputed_doctrine.get("classification"):
+            return {"match": False, "reason": "classification_changed", "stored": stored_doctrine, "recomputed": recomputed_doctrine}
+
+        # 4. Distribution of matched concepts
+        if stored_doctrine.get("conceptDistribution") != recomputed_doctrine.get("conceptDistribution"):
+            return {"match": False, "reason": "concepts_changed", "stored": stored_doctrine, "recomputed": recomputed_doctrine}
+
+        return {"match": True, "reason": None, "stored": stored_doctrine, "recomputed": recomputed_doctrine}
+
     @app.get("/evidence/{evidence_id}/analysis", dependencies=[local_api])
     def get_evidence_analysis(evidence_id: str, db: Session = Depends(get_db)):
         """What the analysis made of this item, scope by scope.
