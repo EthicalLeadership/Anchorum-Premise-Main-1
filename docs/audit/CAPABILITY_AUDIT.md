@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** commit `035411b9869ca39adb13cc86eed6577324eed032`, branch
+**Tree stamp:** commit `e92a201f4d16e92d826c4718c767321a619da7d9`, branch
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
@@ -11,9 +11,8 @@ checkable is: `git diff --name-only <stamp>..HEAD -- ':!docs/audit/CAPABILITY_AU
 is empty. Any future check must apply that exclusion, otherwise it reports drift
 the moment this file is committed and every subsequent revision.
 
-**Test state at stamp:** `565 passed, 0 failed` (pytest, `pytest.ini`);
-`104 passed / 104` (Vitest, 15 files); `tsc --noEmit` clean; `vite build`
-succeeds (1.62s).
+**Test state at stamp:** `571 passed, 0 failed` (pytest, `pytest.ini`);
+`109 passed / 109` (Vitest, 16 files); `tsc --noEmit` clean.
 
 **History note:** `4eb0e57` was committed with a TS2554 error that
 `tsc --noEmit` catches; it is fixed in `6af79f3`. Vitest transpiles without
@@ -40,9 +39,9 @@ Anchorum-Prem is a proprietary legal and audit toolkit for Quebec/Canada labour
 matters, spanning an evidence-management web application, a dossier-processing
 pipeline with governance and enforcement layers, cryptographic anchoring, and a
 performance/adversarial harness (`ARCHITECTURE_SUMMARY.md`;
-`docs/product/README.md`). The tree holds **258 Python files** (excluding
-`interface/node_modules/`, `.venv/`, `.git/`), **49 Python test modules** (48 in
-`tests/` plus `tests/invariants/test_state_machine_invariants.py`), and **15
+`docs/product/README.md`). The tree holds **268 Python files** (excluding
+`interface/node_modules/`, `.venv/`, `.git/`), **56 Python test modules** (55 in
+`tests/` plus `tests/invariants/test_state_machine_invariants.py`), and **16
 Vitest files** in `interface/src/`. At the stamp, `interface/anchorum_api.py`
 declares **29 routes**, the Python suite is green, and the frontend type-checks
 and builds. The system mixes genuinely implemented capability (29 live routes,
@@ -635,7 +634,7 @@ the only write path. `EmailIntake` dedups via `EmailSeenSet`.
 
 ## 15. Honest inventory of gaps
 
-Findings reflect commit `035411b`. Items resolved after that stamp are not
+Findings reflect commit `e92a201`. Items resolved after that stamp are not
 represented.
 
 ### Critical (1)
