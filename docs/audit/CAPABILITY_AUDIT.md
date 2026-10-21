@@ -653,7 +653,9 @@ represented.
 | Two CI systems | `integrity.yml` and `ci/run.py` share no state; no file names which is authoritative; no artefact records a comparison of their verdicts | §11 |
 | LLM surface | The LLM does more than a document-type second opinion: `llm_classify` feeds `/consult` (1270) and `llm_summarize` feeds `/summarize` (1317) | documented out of scope by its own docstring ("NON-DETERMINISTIC by nature") at `interface/llm_classifier.py:1-8`; `anchorum_api.py:1228,1275` |
 
-### Medium (9)
+| Phase 1 wire plan does not match the tree | Four confirmed plan-vs-code mismatches: Wire 9 names `ControlPlane.validate()` — class absent (grep returns pydantic hits in .venv only); Wire 9 names `dossier_enforcement.py` — the class is at `dossier_enforcement/gates.py`, named `TransactionGate`; Wire 9 names `ProvenanceCurator.validate()` — method is `.curate()`, takes email-specific arguments; Wire 10 names `ccsp.verify.verify()` — module has no `verify()` function and is a doctrine/lexicon verifier, not a cryptographic proof verifier; the cryptographic scripts in `scripts/verify_*.py` are CLI-shaped with only one reusable function (`check()` in `verify_graft.py`). Of 10 wires, 2 match reality exactly (1, 7); 2 are wired end-to-end (2, 3 partially); 4 require re-scoping before implementation (4, 9, 10, and 5 if the /anchor route is genuinely absent). The plan and the tree disagreed at the start of the session, and this session's work has been verifying wire-by-wire rather than implementing. The plan is an artifact that claims facts about the tree and nothing notices when those claims stop being true — same failure mode as this audit before wire B. Recommendation: rewrite Phase 1 against the actual tree, then track the rewritten plan with the same freshness discipline | git log for this session; ccsp/verify.py:1-466; dossier_enforcement/gates.py:79; dossier_pipeline/provenance.py:25; scripts/verify_*.py |
+
+### Medium (10)
 
 | Area | What is absent | Evidence |
 |---|---|---|
@@ -698,7 +700,7 @@ represented.
 | Commit-message vs diff accuracy | Every automated check in the repo (check_integrity.py, gitleaks, tsc, vitest, pytest, audit-freshness) verifies tree state. None verifies that the diff contains what the message claims. This session produced at least six commits whose message was accurate about intent and silent about effect: 4eb0e57 claimed chain.summary keys that do not exist; 68d24cf landed with a tsc error; 713e6e4 claimed Wire 1B with one shell file; 283db50 claimed restoration of a fix it removed; 8734c11 claimed a CI step that was already present. §16 names the pattern; nothing catches it | git log; §16 |
 | `--no-verify` bypasses the pre-commit hook | Commit 6df0d7f landed with `git commit --no-verify` because the pre-commit hook's `pytest -x` would stop at the FileResponse failure that this session later fixed by pinning starlette. The commit message documents the bypass honestly and records the manual checks that were run (tsc clean, vitest 114/114, pytest --deselect <the failing test> -> 570 passed, gitleaks clean). The bypass was legitimate given the reason, but nothing in the tree distinguishes it from a future --no-verify with a bad reason; the commit message is the only record | git log 6df0d7f |
 
-**Totals: 34 rows — 1 Critical, 5 High, 9 Medium, 13 Low, 6 Info.**
+**Totals: 35 rows — 1 Critical, 5 High, 10 Medium, 13 Low, 6 Info.**
 
 ## 16. Verdict
 
