@@ -54,7 +54,7 @@ python-multipart==0.0.32
 PyYAML==6.0.3
 six==1.17.0
 SQLAlchemy==2.1.4
-starlette==1.7.0
+starlette==0.52.1
 typeguard==4.6.0
 typing-extensions==4.16.0
 typing-inspection==0.4.4
