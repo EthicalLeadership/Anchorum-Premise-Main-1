@@ -60,10 +60,41 @@ def _call_ollama(prompt: str, text: str) -> tuple[list[dict], str | None]:
         logger.warning("tools: non-JSON from ollama: %r", raw[:200])
         return [], "non_json"
 
+    # The LLM may return the claims in one of several shapes:
+    #   [{...}, {...}]                  — bare array (expected)
+    #   {"claims": [...]}               — wrapped with "claims" key
+    #   {"results": [...]}              — wrapped with some other key
+    #   {"claim_1": {...}, ...}         — keyed by index
+    #   {"analysis": "..."}             — plain object, no list
+    # Extract the first list of dicts found. If none, log what we got
+    # so future debugging doesn't require guessing.
     if isinstance(parsed, dict) and "claims" in parsed:
         parsed = parsed["claims"]
+    elif isinstance(parsed, dict):
+        # Find the first list value that looks like claim objects
+        for key, val in parsed.items():
+            if isinstance(val, list) and val and isinstance(val[0], dict):
+                logger.info("tools: LLM returned claims under key %r", key)
+                parsed = val
+                break
+        else:
+            # Could not find a list. If every value is a dict, treat the
+            # dict as keyed claims (e.g. {"claim_1": {...}, "claim_2": {...}}).
+            if parsed and all(isinstance(v, dict) for v in parsed.values()):
+                logger.info(
+                    "tools: LLM returned keyed claims: keys=%s",
+                    list(parsed.keys())[:5],
+                )
+                parsed = list(parsed.values())
+            else:
+                logger.warning(
+                    "tools: unexpected dict shape; keys=%s",
+                    list(parsed.keys())[:10],
+                )
+                return [], f"unexpected_shape:dict(keys={list(parsed.keys())[:5]})"
+
     if not isinstance(parsed, list):
-        logger.warning("tools: unexpected shape: %s", type(parsed).__name__)
+        logger.warning("tools: unexpected top-level type: %s", type(parsed).__name__)
         return [], f"unexpected_shape:{type(parsed).__name__}"
 
     return [c for c in parsed if isinstance(c, dict)], None
