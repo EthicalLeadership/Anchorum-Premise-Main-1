@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** commit `7ae701c09912c9a0bb3850bf855f660119f1c9d6`, branch
+**Tree stamp:** commit `a31cec82788fbda6b14282618123d1a753aa4df8`, branch
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
