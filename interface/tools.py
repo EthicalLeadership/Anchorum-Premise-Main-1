@@ -78,14 +78,24 @@ def _call_ollama(prompt: str, text: str) -> tuple[list[dict], str | None]:
                 parsed = val
                 break
         else:
-            # Could not find a list. If every value is a dict, treat the
-            # dict as keyed claims (e.g. {"claim_1": {...}, "claim_2": {...}}).
-            if parsed and all(isinstance(v, dict) for v in parsed.values()):
+            # Could not find a list. Try these fallbacks in order:
+            CLAIM_FIELDS = {"text", "quote", "basis"}
+
+            # (a) Single claim object: {"text": ..., "quote": ..., "basis": ...}
+            # The LLM returned one claim instead of an array (common with
+            # format=json — the model forgets the surrounding [...]).
+            if parsed and set(parsed.keys()) & CLAIM_FIELDS:
+                logger.info("tools: LLM returned a single claim object")
+                parsed = [parsed]
+
+            # (b) Keyed claims: {"claim_1": {...}, "claim_2": {...}}
+            elif parsed and all(isinstance(v, dict) for v in parsed.values()):
                 logger.info(
                     "tools: LLM returned keyed claims: keys=%s",
                     list(parsed.keys())[:5],
                 )
                 parsed = list(parsed.values())
+
             else:
                 logger.warning(
                     "tools: unexpected dict shape; keys=%s",
