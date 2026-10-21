@@ -404,5 +404,6 @@
   "pdf.next": "Page suivante",
   "pdf.zoom_in": "Agrandir",
   "pdf.zoom_out": "Réduire",
-  "pdf.error": "Ce document n'a pas pu être affiché. Le fichier original reste téléchargeable."
+  "pdf.error": "Ce document n'a pas pu être affiché. Le fichier original reste téléchargeable.",
+  "evidence.viewer.original": "Document original"
 }

@@ -6,6 +6,7 @@ import { ChainTimeline } from "../components/ChainTimeline";
 import { VerificationTile, type VerificationView } from "../components/VerificationTile";
 import { formatDateTime, translate } from "../i18n";
 import type { Locale } from "../types";
+import { PdfViewer } from "../components/PdfViewer";
 
 type Props = { locale: Locale; adapter: ReturnType<typeof createAdapter>; caseId: string; evidenceId: string };
 type Load =
@@ -154,6 +155,12 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
         {evidence.badges.length > 0 ? ` · ${evidence.badges.map((b) => t(`badge.${b}`)).join(", ")}` : ""}
       </p>
       <p className="read-only">{t("evidence.viewer.read_only")}</p>
+      {originalUrl && (
+        <section className="evidence-viewer-pdf">
+          <h2>{t("evidence.viewer.original")}</h2>
+          <PdfViewer locale={locale} fileUrl={originalUrl} />
+        </section>
+      )}
       <h2>{t("evidence.viewer.custody")}</h2>
       {custody.length === 0 ? (
         <StateBlock locale={locale} kind="empty" message={t("evidence.viewer.custody.empty")} />

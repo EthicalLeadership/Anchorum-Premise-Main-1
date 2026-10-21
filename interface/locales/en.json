@@ -404,5 +404,6 @@
   "pdf.next": "Next page",
   "pdf.zoom_in": "Zoom in",
   "pdf.zoom_out": "Zoom out",
-  "pdf.error": "This document could not be rendered. The original file is still available for download."
+  "pdf.error": "This document could not be rendered. The original file is still available for download.",
+  "evidence.viewer.original": "Original document"
 }
