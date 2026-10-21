@@ -31,6 +31,10 @@ from dossier_pipeline.schema import AuditLog, Case, Document, JurisdictionStamp,
 from dossier_pipeline.barreau_gate import BarreauGate, BarreauGateError
 from interface import analysis as analysis_service
 from interface import malware_scan
+from interface.analysis import analyse
+from interface.pdf_text import extract_text, PdfTextError, looks_like_pdf
+import logging
+logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[1]
 INTERFACE_ROOT = Path(__file__).resolve().parent
@@ -1062,16 +1066,20 @@ def create_app(
                     "message": "The local evidence file could not be stored.",
                 },
             ) from None
-        except SQLAlchemyError:
+        except SQLAlchemyError as _exc:
             db.rollback()
             stored_file.unlink(missing_ok=True)
+            import logging as _logging
+            _logging.getLogger("interface.anchorum_api").exception(
+                "evidence metadata save failed: %s", _exc
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail={
                     "error": "EVIDENCE_METADATA_FAILED",
                     "message": "The local evidence metadata could not be saved.",
                 },
-            ) from None
+            ) from _exc
         finally:
             if temporary_path is not None:
                 temporary_path.unlink(missing_ok=True)
@@ -1169,10 +1177,16 @@ def create_app(
                     "message": "The locally stored original file is missing.",
                 },
             )
+        # Inline, not attachment: the viewer fetches this URL and renders the
+        # PDF in place. Starlette defaults `filename=` to attachment, which
+        # would still feed PDF.js (it ignores the header and reads the bytes)
+        # but would make the plain <a href> fallback download rather than open.
+        # "Download" stays an explicit, separate action in the toolbar.
         return FileResponse(
             stored_path,
             media_type=document.media_type or "application/octet-stream",
             filename=document.filename,
+            content_disposition_type="inline",
         )
 
     @app.post("/evidence/{evidence_id}/verify", dependencies=[local_api])
@@ -1696,6 +1710,85 @@ def create_app(
             "blocked": any(g["result"] == "fail" for g in gates),
         }
 
+
+
+
+    @app.post("/tools/analyse", dependencies=[local_api])
+    async def tools_analyse(
+        file: UploadFile = File(...),
+        mode: str = Form("inbound-analysis"),
+        contractType: str = Form(""),
+    ):
+        """Non-case, on-demand analysis with citation validation.
+
+        The route uses module-level extract_text / looks_like_pdf / analyse
+        (imported at top of this file) so tests can monkeypatch them.
+        """
+        from interface import tools
+
+        if mode not in ("contract-review", "inbound-analysis"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"error": "INVALID_MODE",
+                        "message": "mode must be contract-review or inbound-analysis"},
+            )
+
+        data = await file.read()
+        if not data:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"error": "EMPTY_FILE", "message": "No bytes received."},
+            )
+        if len(data) > 20 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail={"error": "FILE_TOO_LARGE",
+                        "message": "Document exceeds 20 MB."},
+            )
+
+        text = ""
+        try:
+            if looks_like_pdf(data):
+                text = extract_text(data)
+            else:
+                text = data.decode("utf-8", errors="replace")
+        except PdfTextError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"error": "EXTRACTION_FAILED", "message": str(exc)},
+            ) from exc
+        except Exception as exc:
+            logger.warning("tools_analyse: extraction failed: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"error": "EXTRACTION_FAILED", "message": type(exc).__name__},
+            ) from exc
+
+        analysis: dict = {}
+        analysis_ok = False
+        try:
+            analysis = analyse(data, file.filename or "", file.content_type or "")
+            analysis_ok = True
+        except Exception as exc:
+            logger.warning("tools_analyse: analysis failed: %s", exc)
+
+        raw_claims, extraction_meta = tools.extract_claims(text, mode, contractType)
+        claims, validation = tools.validate_claims(raw_claims, text)
+
+        return {
+            "document": {
+                "filename": file.filename or "",
+                "chars": len(text),
+                "docType": (analysis.get("documentType") or "unknown"),
+                "metadata": (analysis.get("metadata") or {}),
+            },
+            "extraction": {
+                **extraction_meta,
+                "analysis_ok": analysis_ok,
+            },
+            "claims": claims,
+            "validation": validation,
+        }
 
     @app.get("/cases/{case_id}/stamp", dependencies=[local_api])
     def get_stamp(case_id: str, db: Session = Depends(get_db)):

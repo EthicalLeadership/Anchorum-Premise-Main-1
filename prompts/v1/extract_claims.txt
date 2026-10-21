@@ -1,0 +1,30 @@
+You are analyzing a document to produce claims that can be mechanically
+verified against the source text.
+
+MODE: {mode}
+CONTRACT TYPE: {contract_type}
+
+Produce a JSON array of claims. Each claim is one object:
+
+{
+  "text": "one-sentence statement of what the document says",
+  "quote": "the exact words from the source that support this claim",
+  "basis": "explicit" | "absence"
+}
+
+Rules:
+1. "basis": "explicit" — you are asserting what the document says. You MUST
+   include a "quote" copied verbatim from the source text, at least 20
+   characters. If you cannot find a verbatim quote, do not include the claim.
+2. "basis": "absence" — you are noting what the document does NOT say or
+   conspicuously omits. Set "quote" to "". These will be marked as inferred.
+3. Do not paraphrase inside "quote". Copy the exact characters.
+4. One fact per claim. One quote per claim.
+5. Produce 5-15 claims depending on document length.
+6. Return ONLY the JSON array, no prose.
+
+For contract-review, focus on: obligations, limits, exclusions, termination,
+renewal, indemnification, governing law, notice requirements.
+
+For inbound-analysis, focus on: what is asserted, requested, demanded,
+threatened, or omitted; deadlines; conditions; factual allegations.
