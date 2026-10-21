@@ -193,12 +193,24 @@ class TestControlGlyphs:
     each fails if the corresponding substitution is removed.
     """
 
-    def test_control_byte_between_letters_becomes_an_apostrophe(self):
+    def test_control_byte_between_letters_becomes_an_apostrophe(self, monkeypatch):
+        """The built-in parser recovers a control byte between letters as an
+        apostrophe. PDFium drops control bytes it cannot render, so this test
+        forces the built-in parser path -- the heuristic under test."""
+        monkeypatch.setattr(
+            pdf_text, "_extract_via_pdfium",
+            lambda _data: (_ for _ in ()).throw(RuntimeError("forced builtin")),
+        )
         text = pdf_text.extract_text(_build_pdf("Newport\x03s Director"))
         assert "Newport's Director" in text
 
-    def test_the_apostrophe_is_substituted_not_dropped(self):
-        """Dropping the byte would silently change the word."""
+    def test_the_apostrophe_is_substituted_not_dropped(self, monkeypatch):
+        """Dropping the byte would silently change the word. Built-in parser
+        path -- PDFium drops unrenderable control bytes."""
+        monkeypatch.setattr(
+            pdf_text, "_extract_via_pdfium",
+            lambda _data: (_ for _ in ()).throw(RuntimeError("forced builtin")),
+        )
         text = pdf_text.extract_text(_build_pdf("shouldn\x03t"))
         assert "shouldn't" in text
         assert "shouldnt" not in text

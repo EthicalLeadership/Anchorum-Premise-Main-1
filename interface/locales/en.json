@@ -396,5 +396,13 @@
   "evidence.viewer.doctrine_mismatch": "Doctrine projection changed: {reason}",
   "chain.summary.verified": "Chain verified",
   "chain.summary.broken_at": "Chain broken at ID {id}",
-  "chain.timeline.title": "Custody chain"
+  "chain.timeline.title": "Custody chain",
+  "pdf.title": "Document preview",
+  "pdf.page_of": "Page {page} of {pages}",
+  "pdf.loading": "Loading document…",
+  "pdf.prev": "Previous page",
+  "pdf.next": "Next page",
+  "pdf.zoom_in": "Zoom in",
+  "pdf.zoom_out": "Zoom out",
+  "pdf.error": "This document could not be rendered. The original file is still available for download."
 }

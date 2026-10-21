@@ -30,9 +30,12 @@ use it see ``extract_text`` for the preferred-order contract.
 """
 from __future__ import annotations
 
+import logging
 import re
 import zlib
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 PDF_MAGIC = b"%PDF-"
 MAGIC_SCAN_BYTES = 1024
@@ -292,32 +295,161 @@ def _decode_stream(chunk: bytes) -> bytes | None:
         return None
 
 
+_COMMON_WORDS = frozenset({
+    "le","la","les","de","des","du","et","un","une","en","pour","par",
+    "que","qui","dans","sur","est","au","aux","ce","cette","ces","son",
+    "sa","ses","ne","pas","se","il","elle","nous","vous","ils",
+    "the","and","of","to","for","in","is","that","this","a","an","on",
+    "at","by","with","be","or","as",
+})
+
+
+def _looks_like_garbage(text: str) -> bool:
+    """Detect font-glyph soup and mojibake that look like text but are not.
+
+    Font-glyph soup carries control chars or PUA codepoints. Mojibake
+    (e.g. \xc3\xa9 for \xe9) is all alphabetic but contains no common
+    function words. Short legitimate text is NOT garbage.
+    """
+    if not text or not any(c.isalpha() for c in text):
+        return True
+    if any(ord(c) < 32 and c not in "\n\r\t" for c in text):
+        return True
+    if sum(1 for c in text if 0xE000 <= ord(c) <= 0xF8FF) > max(1, len(text) * 0.01):
+        return True
+    words = re.findall(r"\b[a-z\xe0-\xff]{2,}\b", text.lower())
+    if len(words) >= 50 and not any(w in _COMMON_WORDS for w in words):
+        return True
+    return False
+
+
+def _normalise_typography(text: str) -> str:
+    """Convert PDFium's typographic punctuation to the ASCII forms the rest
+    of the pipeline expects, and treat U+FFFD (PDFium's replacement
+    character for unrenderable glyphs) the way the control-byte normalizer
+    treats a control byte: apostrophe between letters, space otherwise.
+
+    The custom content-stream parser produced ASCII apostrophes directly
+    (via its CP1252 decoding); PDFium preserves Unicode typography
+    (U+02BC MODIFIER LETTER APOSTROPHE, U+2019 RIGHT SINGLE QUOTATION
+    MARK). Downstream consumers -- search, scopes, the acceptance-brief
+    tests -- are written against the ASCII form, so the pipeline normalizes
+    at the extraction boundary. En dashes (U+2013) are preserved: the tests
+    assert them and they are the correct punctuation for ranges.
+    """
+    text = text.replace("\u02bc", "'")   # MODIFIER LETTER APOSTROPHE
+    text = text.replace("\u2019", "'")   # RIGHT SINGLE QUOTATION MARK
+    text = text.replace("\u2018", "'")   # LEFT SINGLE QUOTATION MARK
+    text = text.replace("\u201c", '"')   # LEFT DOUBLE QUOTATION MARK
+    text = text.replace("\u201d", '"')   # RIGHT DOUBLE QUOTATION MARK
+    text = text.replace("\u00a0", " ")   # NO-BREAK SPACE
+    text = text.replace("\u202f", " ")   # NARROW NO-BREAK SPACE
+    fffd = chr(0xFFFD)
+    # U+FFFD between two letters -> apostrophe (mirrors control-byte rule).
+    text = re.sub(rf"(?<=[A-Za-z]){fffd}(?=[A-Za-z])", "'", text)
+    # Remaining U+FFFD -> space (normalise_control_glyphs collapses runs).
+    text = text.replace(fffd, " ")
+    # PDFium inserts \n at block boundaries. Strip *any* horizontal
+    # whitespace (ASCII space, tab, U+00A0 already converted above, but
+    # U+2009 etc. may remain) against those newlines so downstream
+    # consumers (scope splitting, exact-match assertions) see the same
+    # text the built-in parser produced.
+    text = re.sub(r"[^\S\n]+\n", "\n", text)
+    text = re.sub(r"\n[^\S\n]+", "\n", text)
+    return text
+
+
+def _extract_via_pdfium(data: bytes) -> str:
+    """PDFium (Apache-2.0, Chrome's PDF engine) via pypdfium2."""
+    import pypdfium2 as pdfium
+    pdf = pdfium.PdfDocument(data)
+    try:
+        parts: list[str] = []
+        for page in pdf:
+            tp = page.get_textpage()
+            parts.append(tp.get_text_range())
+        text = "".join(parts).replace("\r\n", "\n").replace("\r", "\n")
+        return _normalise_typography(text)
+    finally:
+        pdf.close()
+
+
+def _extract_via_ocr(data: bytes) -> str:
+    """Render pages and OCR via tesseract (needs tesseract-ocr-fra)."""
+    import pypdfium2 as pdfium
+    import pytesseract
+    pdf = pdfium.PdfDocument(data)
+    try:
+        parts: list[str] = []
+        for page in pdf:
+            bitmap = page.render(scale=2.0)
+            pil = bitmap.to_pil()
+            parts.append(pytesseract.image_to_string(pil, lang="fra+eng"))
+        return "\n".join(parts)
+    finally:
+        pdf.close()
+
+
 def extract_text(data: bytes) -> str:
     """Return the text layer of a PDF, or raise.
 
+    Tries PDFium (pypdfium2, Apache-2.0) first — it resolves font
+    encodings the built-in content-stream parser cannot. Falls back to
+    the built-in parser, then OCR. Every stage's failure is logged; the
+    caller sees only success or a NoTextFound summarising all stages.
+
     Raises:
         NotAPdf: the payload has no PDF header.
-        NoTextFound: the PDF has no recoverable text layer. Callers must treat
-            this as a failure, not as an empty document.
+        NoTextFound: no stage produced usable text.
     """
     if not looks_like_pdf(data):
         raise NotAPdf("payload does not begin with a PDF header")
 
-    runs: list[str] = []
-    for match in _STREAM_RE.finditer(data):
-        decoded = _decode_stream(match.group(1))
-        if decoded is not None:
-            runs.extend(_stream_text(decoded))
+    failures: list[tuple[str, str]] = []
 
-    text = " ".join(run.strip() for run in runs if run.strip())
-    text = re.sub(r"[ \t]+", " ", text).strip()
-    text = normalise_control_glyphs(text)
-    if len(text) < MIN_USEFUL_CHARS:
-        raise NoTextFound(
-            "no text layer recovered; the document may be a scan or use an "
-            "unsupported font encoding. Install 'pypdf' for broader coverage."
-        )
-    return text
+    try:
+        text = _extract_via_pdfium(data)
+        if text.strip() and not _looks_like_garbage(text):
+            logger.info("pdf_text: pdfium extracted %d chars", len(text))
+            return normalise_control_glyphs(text)
+        failures.append(("pdfium", f"empty or garbage ({len(text)} chars)"))
+    except Exception as exc:
+        failures.append(("pdfium", f"{type(exc).__name__}: {exc}"))
+
+    try:
+        runs: list[str] = []
+        for match in _STREAM_RE.finditer(data):
+            decoded = _decode_stream(match.group(1))
+            if decoded is not None:
+                runs.extend(_stream_text(decoded))
+        text = " ".join(run.strip() for run in runs if run.strip())
+        text = re.sub(r"[ \t]+", " ", text).strip()
+        # Normalize control bytes before the garbage check: the built-in
+        # parser's recovery heuristic converts in-word control bytes to
+        # apostrophes, but _looks_like_garbage rejects any text that still
+        # carries a control byte. Normalizing first lets a successful
+        # built-in extraction pass the check.
+        text = normalise_control_glyphs(text)
+        if text.strip() and not _looks_like_garbage(text):
+            logger.info("pdf_text: built-in extracted %d chars", len(text))
+            return text
+        failures.append(("builtin", f"empty or garbage ({len(text)} chars)"))
+    except Exception as exc:
+        failures.append(("builtin", f"{type(exc).__name__}: {exc}"))
+
+    try:
+        text = _extract_via_ocr(data)
+        if text.strip():
+            logger.info("pdf_text: OCR extracted %d chars", len(text))
+            return normalise_control_glyphs(text)
+        failures.append(("ocr", "empty result"))
+    except Exception as exc:
+        failures.append(("ocr", f"{type(exc).__name__}: {exc}"))
+
+    logger.warning("pdf_text: all extraction stages failed; %r", failures)
+    raise NoTextFound(
+        f"no text layer recovered after pdfium, built-in, and OCR; {failures}"
+    )
 
 
 def extract_text_from_file(path: str | Path) -> str:

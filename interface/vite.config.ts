@@ -3,6 +3,14 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  // pdfjs-dist ships its own worker bundle and is loaded through a `?url`
+  // import. Letting Vite pre-bundle it produces a second copy of the worker
+  // under a hashed name, and the PDF then fails to render with a
+  // "setting up fake worker failed" error. Excluding it keeps the `?url`
+  // import pointing at the real asset in dev and in the build.
+  optimizeDeps: {
+    exclude: ["pdfjs-dist"],
+  },
   test: {
     environment: "jsdom",
     setupFiles: ["./src/setupTests.ts"],

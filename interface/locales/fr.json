@@ -396,5 +396,13 @@
   "evidence.viewer.doctrine_mismatch": "La projection de doctrine a changé : {reason}",
   "chain.summary.verified": "Chaîne vérifiée",
   "chain.summary.broken_at": "Chaîne rompue à l'ID {id}",
-  "chain.timeline.title": "Chaîne de garde"
+  "chain.timeline.title": "Chaîne de garde",
+  "pdf.title": "Aperçu du document",
+  "pdf.page_of": "Page {page} sur {pages}",
+  "pdf.loading": "Chargement du document…",
+  "pdf.prev": "Page précédente",
+  "pdf.next": "Page suivante",
+  "pdf.zoom_in": "Agrandir",
+  "pdf.zoom_out": "Réduire",
+  "pdf.error": "Ce document n'a pas pu être affiché. Le fichier original reste téléchargeable."
 }

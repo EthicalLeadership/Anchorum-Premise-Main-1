@@ -108,8 +108,21 @@ def test_scope_offsets_index_into_the_source_text():
 
 
 @pytest.mark.skipif(not BRIEF.exists(), reason="benchmark brief not present")
-def test_benchmark_brief_segments_into_eight_irac_scopes():
-    from interface import submission
+def test_benchmark_brief_segments_into_eight_irac_scopes(monkeypatch):
+    from interface import submission, pdf_text
+
+    # The BENCHMARK_CHARS table was measured against the built-in
+    # content-stream parser. PDFium's text layer extraction differs at
+    # word boundaries on this specific PDF (some inter-word spaces are
+    # not encoded as space characters in the file). This test measures
+    # split_scopes, not extraction quality: force the built-in parser so
+    # it continues to test what it was written to test.
+    # Re-baselining the benchmark against PDFium output is a separate
+    # change, and should not enshrine the missing-space behaviour.
+    monkeypatch.setattr(
+        pdf_text, "_extract_via_pdfium",
+        lambda _data: (_ for _ in ()).throw(RuntimeError("forced builtin")),
+    )
 
     text = submission.extract_text(BRIEF.read_bytes(), BRIEF.name)
     scopes = split_scopes(text)

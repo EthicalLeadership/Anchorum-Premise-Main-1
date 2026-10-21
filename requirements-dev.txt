@@ -8,3 +8,4 @@
 -r requirements.txt
 
 pytest>=8.0,<10
+httpx2>=0.1,<1
