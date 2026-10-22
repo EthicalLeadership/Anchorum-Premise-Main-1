@@ -394,13 +394,12 @@ def _custody_log(
     evidence_id: str,
     action: str,
 ) -> None:
-    db.add(
-        AuditLog(
-            case_id=case_id,
-            actor_username="system",
-            action=action,
-            details=json.dumps({"evidenceId": evidence_id}, separators=(",", ":")),
-        )
+    _append_audit(
+        db,
+        case_id=case_id,
+        action=action,
+        details={"evidenceId": evidence_id},
+        actor="system",
     )
 
 
@@ -1329,9 +1328,30 @@ def create_app(
             ) from None
 
         result = llm_classifier.llm_summarize(text)
-        document.consultation_json = json.dumps(result)
+
+        # Validate the source, not the narrative. Same citation contract as
+        # /tools/analyse: every explicit claim's quote must be verbatim in
+        # the extracted text, or it's rejected with attempted_quote. The
+        # narrative is a readable guide; the claims below are what a reader
+        # can actually trust. Without this, 'Ask Saul to summarize' returns
+        # an unverified narrative — the same Critical gap /tools/analyse
+        # closed for the analysis path.
+        from interface import tools as _tools
+        _raw_claims, _meta = _tools.extract_claims(text, "inbound-analysis", "")
+        _claims, _validation = _tools.validate_claims(_raw_claims, text)
+
+        document.consultation_json = json.dumps({
+            "narrative": result,
+            "claims": _claims,
+            "validation": _validation,
+        })
         db.commit()
-        return {"id": evidence_id, "narrative": result}
+        return {
+            "id": evidence_id,
+            "narrative": result,
+            "claims": _claims,
+            "validation": _validation,
+        }
 
     @app.post("/evidence/{evidence_id}/verify-doctrine", dependencies=[local_api])
     def verify_doctrine(evidence_id: str, db: Session = Depends(get_db)):
@@ -1552,6 +1572,19 @@ def create_app(
         ).all()
         _prev = None
         for _log in _logs:
+            # inv_007 checks only prev.record_hash == new.previous_hash; it
+            # does not receive new.record_hash. A row with empty record_hash
+            # can pass the invariant when the prior row's hash was also empty
+            # (or for the first row). Reject empty hash explicitly so a
+            # half-chained DB cannot export.
+            if not _log.record_hash:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "error": "CUSTODY_CHAIN_BROKEN",
+                        "message": f"record {_log.id}: empty record_hash",
+                    },
+                )
             _ok = _ib.run_one(
                 "inv_007",
                 {
@@ -1641,12 +1674,13 @@ def create_app(
 
         buffer.seek(0)
         
-        db.add(AuditLog(
+        _append_audit(
+            db,
             case_id=case.id,
-            actor_username="system",
             action="export_produced",
-            details=json.dumps({"format": "zip", "docCount": len(documents)}),
-        ))
+            details={"format": "zip", "docCount": len(documents)},
+            actor="system",
+        )
         db.commit()
 
         return Response(
@@ -1858,16 +1892,31 @@ def create_app(
             .order_by(AuditLog.created_at.asc(), AuditLog.id.asc())
         ).all()
         rows = []
+        prev_log = None
         for log in logs:
             try:
                 details = json.loads(log.details or "{}")
             except (TypeError, ValueError):
                 details = {}
+            # `chain` = evidence-verification outcome for evidence_verified rows,
+            # not_checked otherwise. Unchanged from the pre-2026 behaviour.
             chain = "not_checked"
             failing = None
             if log.action == "evidence_verified":
                 failing = details.get("failingStep")
                 chain = "broken" if failing else "linked"
+
+            # `chainIntegrity` = audit-chain state, orthogonal to evidence
+            # verification. A row is "linked" only if its own record_hash is
+            # non-empty AND its previous_hash matches the prior row's
+            # record_hash (or, for the first row, previous_hash is empty).
+            prev_hash_matches = (
+                (prev_log is None and not log.previous_hash)
+                or (prev_log is not None and log.previous_hash == prev_log.record_hash)
+            )
+            has_hash = bool(log.record_hash)
+            chain_integrity = "linked" if (prev_hash_matches and has_hash) else "broken"
+
             row = {
                 "id": f"log-{log.id}",
                 "event": log.action,
@@ -1875,6 +1924,9 @@ def create_app(
                 "actor": log.actor_username,
                 "evidenceId": details.get("evidenceId"),
                 "chain": chain,
+                "chainIntegrity": chain_integrity,
+                "recordHash": log.record_hash,
+                "previousHash": log.previous_hash,
             }
             if failing:
                 row["failingStep"] = failing
@@ -1884,6 +1936,7 @@ def create_app(
                 row["role"] = details.get("role")
                 row["reason"] = details.get("reason")
             rows.append(row)
+            prev_log = log
         return rows
 
     @app.get("/admin/members", dependencies=[local_api])
@@ -1992,12 +2045,13 @@ def create_app(
         
         old_role = user.role
         user.role = role
-        db.add(AuditLog(
+        _append_audit(
+            db,
             case_id=None,
-            actor_username="system",
             action="member_role_changed",
-            details=json.dumps({"memberId": str(user.id), "previousRole": old_role, "role": role, "reason": reason}),
-        ))
+            details={"memberId": str(user.id), "previousRole": old_role, "role": role, "reason": reason},
+            actor="system",
+        )
         db.commit()
         return {
             "id": str(user.id),
