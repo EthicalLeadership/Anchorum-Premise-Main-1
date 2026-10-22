@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** `4cf865aa8b95b7144f8f002384fd758517fd7bfa`, branch
+**Tree stamp:** `497c7cbc8572b2e202abe5236a686b4efdc37e89`, branch
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
@@ -11,8 +11,8 @@ checkable is: `git diff --name-only <stamp>..HEAD -- ':!docs/audit/CAPABILITY_AU
 is empty. Any future check must apply that exclusion, otherwise it reports drift
 the moment this file is committed and every subsequent revision.
 
-**Test state at stamp:** `571 passed, 0 failed` (pytest, `pytest.ini`);
-`109 passed / 109` (Vitest, 16 files); `tsc --noEmit` clean.
+**Test state at stamp:** `583 passed, 0 failed` (pytest, `pytest.ini`);
+`114 passed / 114` (Vitest, 17 files); `tsc --noEmit` clean.
 
 **History note:** `4eb0e57` was committed with a TS2554 error that
 `tsc --noEmit` catches; it is fixed in `6af79f3`. Vitest transpiles without
@@ -39,9 +39,9 @@ Anchorum-Prem is a proprietary legal and audit toolkit for Quebec/Canada labour
 matters, spanning an evidence-management web application, a dossier-processing
 pipeline with governance and enforcement layers, cryptographic anchoring, and a
 performance/adversarial harness (`ARCHITECTURE_SUMMARY.md`;
-`docs/product/README.md`). The tree holds **268 Python files** (excluding
-`interface/node_modules/`, `.venv/`, `.git/`), **56 Python test modules** (55 in
-`tests/` plus `tests/invariants/test_state_machine_invariants.py`), and **16
+`docs/product/README.md`). The tree holds **271 Python files** (excluding
+`interface/node_modules/`, `.venv/`, `.git/`), **58 Python test modules** (57 in
+`tests/` plus `tests/invariants/test_state_machine_invariants.py`), and **17
 Vitest files** in `interface/src/`. At the stamp, `interface/anchorum_api.py`
 declares **29 routes**, the Python suite is green, and the frontend type-checks
 and builds. The system mixes genuinely implemented capability (29 live routes,
@@ -189,11 +189,11 @@ Screens — 10 `.tsx` with matching `.test.tsx`: `Administration`, `AuditExports
 `CaseList`, `CreateCase`, `EvidenceIntake`, `EvidenceViewer`, `Overview`,
 `Register`, `Search`, `Timeline`.
 
-Components — `interface/src/components/` holds 13 `.tsx` files, 2 of which are
-tests (`AppShell.test.tsx`, `CaseTreePanel.test.tsx`), leaving **11 components,
-2 tested, 9 untested**: `ConfirmWithReasonDialog`, `DataTable`, `FileDropZone`,
-`FilterBar`, `FormField`, `ProgressStrip`, `StateBlock`, `TimelineItem`,
-`VerificationTile`.
+Components — `interface/src/components/` holds 17 `.tsx` files, 4 of which are
+tests (`AppShell.test.tsx`, `CaseTreePanel.test.tsx`, `ChainTimeline.test.tsx`,
+`PdfViewer.test.tsx`), leaving **13 components, 4 tested, 9 untested**:
+`ConfirmWithReasonDialog`, `DataTable`, `FileDropZone`, `FilterBar`,
+`FormField`, `ProgressStrip`, `StateBlock`, `TimelineItem`, `VerificationTile`.
 
 Locales — `en.json`/`fr.json` at 397 lines each, parity enforced by
 `interface/src/i18n.test.ts`. `translate()` echoes an unknown key rather than
