@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createAdapter } from "../adapter";
 import { EvidenceViewer } from "./EvidenceViewer";
 import { translate } from "../i18n";
@@ -36,5 +36,21 @@ describe("EvidenceViewer", () => {
   it("alerts on an unknown id", async () => {
     view("E-9999");
     expect(await screen.findByRole("alert")).toBeTruthy();
+  });
+
+  it("switches to the extracted text panel and reports a failed fetch", async () => {
+    view("E-1047");
+    await screen.findByRole("heading", { level: 1 });
+    fireEvent.click(
+      screen.getByRole("tab", {
+        name: translate("en", "evidence.viewer.tab.extracted"),
+      }),
+    );
+    // The fixture adapter has no backend, so `evidence.text` answers
+    // FEATURE_UNAVAILABLE. The panel must say the fetch failed rather than
+    // rendering an empty document, which would read as "no text in the file".
+    expect(
+      await screen.findByText(translate("en", "evidence.text.error")),
+    ).toBeTruthy();
   });
 });

@@ -73,6 +73,13 @@ SEARCH_CONTEXT_CHARS = 80
 #: in a response header because it is not the same as token matching.
 SEARCH_METHOD_SUBSTRING = "substring"
 
+#: Ceiling on how much extracted text one response carries. A 25 MB scanned
+#: exhibit can extract to millions of characters; returning all of it in JSON
+#: would stall the browser and help nobody. The truncation is reported in the
+#: payload rather than silent, because a reader who is shown part of a document
+#: must know it is part of a document.
+EXTRACTED_TEXT_LIMIT = 200_000
+
 #: `documents.extract_status` (what analysis did) mapped to the evidence status
 #: the interface shows. `stored` is the pre-analysis state and keeps the
 #: existing `received` label, so nothing that reads the old value breaks.
@@ -1187,6 +1194,65 @@ def create_app(
             filename=document.filename,
             content_disposition_type="inline",
         )
+
+    @app.get("/evidence/{evidence_id}/text", dependencies=[local_api])
+    def get_evidence_text(evidence_id: str, db: Session = Depends(get_db)) -> dict:
+        """The text analysis extracted from this artifact.
+
+        Every item reports its real extraction status, because the difference
+        between "we read it and found nothing" and "we never read it" is the
+        difference between a document with no text and a document nobody
+        opened. Collapsing those into one empty result would tell a reader
+        their exhibit is blank when the connector simply cannot read .docx.
+
+        The text lives in a sidecar beside the stored bytes, never in the
+        database, so the record that travels carries no case content.
+        """
+        document = db.scalar(
+            select(Document).where(Document.document_key == evidence_id)
+        )
+        if document is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "NOT_FOUND", "message": "Evidence item not found."},
+            )
+
+        extract_status = document.extract_status or "stored"
+        payload = {
+            "id": document.document_key,
+            "status": extract_status,
+            "chars": document.extract_chars or 0,
+            "sha256": document.extract_sha256 or "",
+            "reason": document.extract_error or "",
+            "text": None,
+            "truncated": False,
+        }
+        if extract_status != "extracted":
+            return payload
+
+        text_path = stored_text_path(document)
+        if text_path is None or not text_path.is_file():
+            # The row says the text was extracted but the sidecar is gone. That
+            # is a storage fault, not an empty document, so it is reported as
+            # one rather than as a successful empty read.
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail={
+                    "error": "EXTRACTED_TEXT_MISSING",
+                    "message": (
+                        "The extracted text for this item is recorded but the "
+                        "stored copy is missing."
+                    ),
+                },
+            )
+
+        text = text_path.read_text(encoding="utf-8", errors="replace")
+        if len(text) > EXTRACTED_TEXT_LIMIT:
+            payload["text"] = text[:EXTRACTED_TEXT_LIMIT]
+            payload["truncated"] = True
+        else:
+            payload["text"] = text
+        return payload
 
     @app.post("/evidence/{evidence_id}/verify", dependencies=[local_api])
     def verify_evidence(evidence_id: str, db: Session = Depends(get_db)):

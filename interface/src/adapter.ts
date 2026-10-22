@@ -55,6 +55,23 @@ export type EvidenceStatus =
   | ExtractStatus
   | "processed";
 
+/**
+ * What analysis extracted from an artifact.
+ *
+ * `status` travels with the text because "we read it and found nothing" and
+ * "we never read it" both produce a null `text`, and a reader shown a blank
+ * pane cannot tell which happened. An unsupported file is not an empty one.
+ */
+export type EvidenceText = {
+  id: string;
+  status: ExtractStatus;
+  chars: number;
+  sha256: string;
+  reason: string;
+  text: string | null;
+  truncated: boolean;
+};
+
 /** The analysis-status vocabulary the analysis route reports. */
 export type AnalysisStatus =
   | "pending"
@@ -607,6 +624,14 @@ export function createAdapter(config: AdapterConfig) {
         return config.backend
           ? `${config.backend.baseUrl.replace(/\/$/, "")}/evidence/${encodeURIComponent(id)}/download`
           : null;
+      },
+      text(id: string) {
+        if (config.backend) {
+          return requestJson<EvidenceText>(
+            `/evidence/${encodeURIComponent(id)}/text`,
+          );
+        }
+        return Promise.resolve(failure("FEATURE_UNAVAILABLE"));
       },
       custody(id: string) {
         if (config.backend) {

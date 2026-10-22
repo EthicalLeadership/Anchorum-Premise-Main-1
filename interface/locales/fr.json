@@ -405,5 +405,11 @@
   "pdf.zoom_in": "Agrandir",
   "pdf.zoom_out": "Réduire",
   "pdf.error": "Ce document n'a pas pu être affiché. Le fichier original reste téléchargeable.",
-  "evidence.viewer.original": "Document original"
+  "evidence.viewer.original": "Document original",
+  "evidence.text.chars": "{count} caractères extraits",
+  "evidence.text.truncated": "affichage des 200 000 premiers caractères seulement",
+  "evidence.text.not_analysed": "L'extraction de texte n'a pas encore été exécutée sur cet élément.",
+  "evidence.text.loading": "Chargement du texte extrait…",
+  "evidence.text.error": "Le texte extrait n'a pas pu être chargé.",
+  "evidence.viewer.tab_unavailable": "Aucun contenu enregistré pour cet élément."
 }

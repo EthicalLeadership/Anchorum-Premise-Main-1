@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import type { createAdapter, Evidence, CustodyEntry } from "../adapter";
+import type { createAdapter, Evidence, CustodyEntry, EvidenceText } from "../adapter";
 import { StateBlock } from "../components/StateBlock";
 import { DataTable, type Column } from "../components/DataTable";
 import { ChainTimeline } from "../components/ChainTimeline";
 import { VerificationTile, type VerificationView } from "../components/VerificationTile";
 import { PdfViewer } from "../components/PdfViewer";
+import { ExtractedText } from "../components/ExtractedText";
 import { formatDateTime, translate } from "../i18n";
 import type { Locale } from "../types";
 
@@ -14,6 +15,11 @@ function isPdf(name: string): boolean {
 }
 
 type Props = { locale: Locale; adapter: ReturnType<typeof createAdapter>; caseId: string; evidenceId: string };
+type TextLoad =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "error"; key: string }
+  | { kind: "ready"; value: EvidenceText };
 type Load =
   | { kind: "loading" }
   | { kind: "error"; key: string }
@@ -34,6 +40,11 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
   const [summarizeError, setSummarizeError] = useState<string | null>(null);
   const [verifyingDoctrine, setVerifyingDoctrine] = useState(false);
   const [doctrineResult, setDoctrineResult] = useState<{ match: boolean; reason: string | null } | null>(null);
+  const [tab, setTab] = useState<"original" | "extracted">("original");
+  const [textLoad, setTextLoad] = useState<TextLoad>({ kind: "idle" });
+  // Which panel the reader is on, and what the extracted-text fetch returned.
+  // Kept beside the main load rather than inside it: the text is a second,
+  // optional read, and failing to fetch it must not blank the original.
 
   useEffect(() => {
     let active = true;
@@ -61,6 +72,33 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
       active = false;
     };
   }, [adapter, caseId, evidenceId, attempt]);
+
+  // The extracted text is a second, optional read: fetched only when the reader
+  // opens that panel, because most visits are to look at the original and the
+  // sidecar can run to hundreds of thousands of characters.
+  // Dependencies deliberately exclude `textLoad.kind`. Including it made the
+  // effect re-run when it set "loading", and that re-run's cleanup flipped
+  // `active` to false, so the resolved promise was discarded and the panel sat
+  // on "Loading…" forever - a deadlock that only appears at runtime.
+  useEffect(() => {
+    if (tab !== "extracted") return;
+    let active = true;
+    setTextLoad((current) =>
+      current.kind === "idle" ? { kind: "loading" } : current,
+    );
+    (async () => {
+      const result = await adapter.evidence.text(evidenceId);
+      if (!active) return;
+      if (!result.ok) {
+        setTextLoad({ kind: "error", key: "evidence.text.error" });
+        return;
+      }
+      setTextLoad({ kind: "ready", value: result.value });
+    })();
+    return () => {
+      active = false;
+    };
+  }, [adapter, evidenceId, tab]);
 
   // `translate` takes an optional parameter map and throws when a message
   // declares a placeholder it was not given. Forwarding that third argument is
@@ -150,15 +188,57 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
       {back}
       <h1>{t("evidence.viewer.title")}: {evidence.id}</h1>
       <p>{evidence.name}</p>
-      {originalUrl ? (
-        isPdf(evidence.name) ? (
-          <PdfViewer locale={locale} fileUrl={originalUrl} />
-        ) : (
-          <p>
-            <a href={originalUrl}>{t("evidence.viewer.download_original")}</a>
-          </p>
-        )
-      ) : null}
+      <div className="evidence-tabs" role="tablist" aria-label={t("evidence.viewer.title")}>
+        <button
+          type="button"
+          role="tab"
+          id="tab-original"
+          aria-selected={tab === "original"}
+          aria-controls="panel-original"
+          className="evidence-tabs__tab"
+          onClick={() => setTab("original")}
+        >
+          {t("evidence.viewer.tab.original")}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="tab-extracted"
+          aria-selected={tab === "extracted"}
+          aria-controls="panel-extracted"
+          className="evidence-tabs__tab"
+          onClick={() => setTab("extracted")}
+        >
+          {t("evidence.viewer.tab.extracted")}
+        </button>
+      </div>
+      {tab === "original" ? (
+        <div role="tabpanel" id="panel-original" aria-labelledby="tab-original">
+          {originalUrl ? (
+            isPdf(evidence.name) ? (
+              <PdfViewer locale={locale} fileUrl={originalUrl} />
+            ) : (
+              <p>
+                <a href={originalUrl}>{t("evidence.viewer.download_original")}</a>
+              </p>
+            )
+          ) : (
+            <p role="status">{t("evidence.viewer.tab_unavailable")}</p>
+          )}
+        </div>
+      ) : textLoad.kind === "ready" ? (
+        <div role="tabpanel" id="panel-extracted" aria-labelledby="tab-extracted">
+          <ExtractedText locale={locale} text={textLoad.value} />
+        </div>
+      ) : textLoad.kind === "error" ? (
+        <div role="tabpanel" id="panel-extracted" aria-labelledby="tab-extracted">
+          <p role="alert" className="form-error">{t(textLoad.key)}</p>
+        </div>
+      ) : (
+        <div role="tabpanel" id="panel-extracted" aria-labelledby="tab-extracted">
+          <p role="status">{t("evidence.text.loading")}</p>
+        </div>
+      )}
       <p>
         {t(`evidence.status.${evidence.status}`)}
         {evidence.badges.length > 0 ? ` · ${evidence.badges.map((b) => t(`badge.${b}`)).join(", ")}` : ""}
