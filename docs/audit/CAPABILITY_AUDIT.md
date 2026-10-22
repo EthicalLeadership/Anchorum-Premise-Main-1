@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** `22dc62c928abcf6ad4c076c92794de099e8fbd86`, branch
+**Tree stamp:** `e5c4f44d780062f2eb51d705bb2461b7ba8b95de`, branch
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
@@ -11,8 +11,8 @@ checkable is: `git diff --name-only <stamp>..HEAD -- ':!docs/audit/CAPABILITY_AU
 is empty. Any future check must apply that exclusion, otherwise it reports drift
 the moment this file is committed and every subsequent revision.
 
-**Test state at stamp:** `583 passed, 0 failed` (pytest, `pytest.ini`);
-`114 passed / 114` (Vitest, 17 files); `tsc --noEmit` clean.
+**Test state at stamp:** `596 passed, 1 skipped` (pytest, `pytest.ini`);
+`120 passed / 120` (Vitest, 18 files); `tsc --noEmit` clean.
 
 **History note:** `4eb0e57` was committed with a TS2554 error that
 `tsc --noEmit` catches; it is fixed in `6af79f3`. Vitest transpiles without
@@ -634,8 +634,10 @@ the only write path. `EmailIntake` dedups via `EmailSeenSet`.
 
 ## 15. Honest inventory of gaps
 
-Findings reflect commit `22dc62c928abcf6ad4c076c92794de099e8fbd86`. Items resolved after that stamp are not
+Findings reflect commit `e5c4f44d780062f2eb51d705bb2461b7ba8b95de`. Items resolved after that stamp are not
 represented.
+
+Δ 22dc62c → e5c4f44: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
 
 ### Critical (1)
 
