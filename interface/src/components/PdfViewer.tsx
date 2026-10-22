@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+// The text layer is positioned with absolute coordinates that only make sense
+// with these rules. Without them react-pdf logs "TextLayer styles not found"
+// and the selectable text sits unstyled on top of the canvas.
+import "react-pdf/dist/esm/Page/TextLayer.css";
 import { translate } from "../i18n";
 import type { Locale } from "../types";
 

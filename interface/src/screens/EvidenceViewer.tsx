@@ -4,9 +4,14 @@ import { StateBlock } from "../components/StateBlock";
 import { DataTable, type Column } from "../components/DataTable";
 import { ChainTimeline } from "../components/ChainTimeline";
 import { VerificationTile, type VerificationView } from "../components/VerificationTile";
+import { PdfViewer } from "../components/PdfViewer";
 import { formatDateTime, translate } from "../i18n";
 import type { Locale } from "../types";
-import { PdfViewer } from "../components/PdfViewer";
+
+/** Only PDFs go through react-pdf; anything else keeps the plain link. */
+function isPdf(name: string): boolean {
+  return /\.pdf$/i.test(name);
+}
 
 type Props = { locale: Locale; adapter: ReturnType<typeof createAdapter>; caseId: string; evidenceId: string };
 type Load =
@@ -146,21 +151,19 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
       <h1>{t("evidence.viewer.title")}: {evidence.id}</h1>
       <p>{evidence.name}</p>
       {originalUrl ? (
-        <p>
-          <a href={originalUrl}>{t("evidence.viewer.download_original")}</a>
-        </p>
+        isPdf(evidence.name) ? (
+          <PdfViewer locale={locale} fileUrl={originalUrl} />
+        ) : (
+          <p>
+            <a href={originalUrl}>{t("evidence.viewer.download_original")}</a>
+          </p>
+        )
       ) : null}
       <p>
         {t(`evidence.status.${evidence.status}`)}
         {evidence.badges.length > 0 ? ` · ${evidence.badges.map((b) => t(`badge.${b}`)).join(", ")}` : ""}
       </p>
       <p className="read-only">{t("evidence.viewer.read_only")}</p>
-      {originalUrl && (
-        <section className="evidence-viewer-pdf">
-          <h2>{t("evidence.viewer.original")}</h2>
-          <PdfViewer locale={locale} fileUrl={originalUrl} />
-        </section>
-      )}
       <h2>{t("evidence.viewer.custody")}</h2>
       {custody.length === 0 ? (
         <StateBlock locale={locale} kind="empty" message={t("evidence.viewer.custody.empty")} />

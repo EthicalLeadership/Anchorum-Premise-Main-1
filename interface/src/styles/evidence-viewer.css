@@ -3,3 +3,58 @@
 .evidence-viewer .read-only{color:var(--tp-muted)}
 .evidence-viewer [data-chain="broken"]{color:var(--state-fail);background:var(--state-fail-bg)}
 .evidence-viewer [data-chain="linked"]{color:var(--state-ok)}
+/* PDF preview ------------------------------------------------------------- */
+
+.pdf-viewer {
+  border: 1px solid var(--tp-line);
+  border-radius: 6px;
+  background: var(--tp-bg);
+  margin: 0 0 var(--sp-4);
+  overflow: hidden;
+}
+
+.pdf-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--tp-line);
+}
+
+.pdf-toolbar .btn {
+  min-width: 2rem;
+  padding: 0.15rem 0.5rem;
+  line-height: 1.4;
+}
+
+.pdf-counter {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  color: var(--tp-muted);
+  min-width: 4.5rem;
+  text-align: center;
+}
+
+.pdf-download {
+  margin-left: auto;
+  font-size: 0.875rem;
+}
+
+.pdf-canvas {
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-3);
+  max-height: 75vh;
+  overflow: auto;
+}
+
+.pdf-canvas canvas {
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+}
+
+.pdf-loading {
+  font-size: 0.875rem;
+  color: var(--tp-muted);
+}

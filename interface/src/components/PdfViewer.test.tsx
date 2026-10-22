@@ -77,7 +77,7 @@ describe("PdfViewer", () => {
 
   it("offers the original file as a separate explicit download", () => {
     renderViewer();
-    expect(screen.getByText(/Download original/)).toHaveAttribute(
+    expect(screen.getByText("Download original file")).toHaveAttribute(
       "href",
       FILE_URL,
     );
