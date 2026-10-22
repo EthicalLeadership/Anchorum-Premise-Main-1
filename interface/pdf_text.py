@@ -368,7 +368,12 @@ def _extract_via_pdfium(data: bytes) -> str:
         for page in pdf:
             tp = page.get_textpage()
             parts.append(tp.get_text_range())
-        text = "".join(parts).replace("\r\n", "\n").replace("\r", "\n")
+        # Pages are separated by a newline, never concatenated directly. An
+        # empty join welded the last word of one page to the first of the next
+        # ("Signed: Dr. M. Belanger, MDInsurer Response"), which corrupts the
+        # text a reader is shown and makes any phrase spanning a page break
+        # unfindable by search.
+        text = "\n".join(parts).replace("\r\n", "\n").replace("\r", "\n")
         return _normalise_typography(text)
     finally:
         pdf.close()

@@ -310,3 +310,38 @@ class TestRealBrief:
     def test_real_brief_en_dashes_are_recovered(self):
         text = submission.extract_text(self.BRIEF.read_bytes(), self.BRIEF.name)
         assert "Angel v. Murray \u2013 (IRAC)" in text
+
+
+def test_pages_are_separated_so_words_do_not_weld_across_a_break():
+    """A three-page letter must not read "...MDInsurer Response".
+
+    PDFium returns each page as an independent string. Joining them with an
+    empty string welds the last word of one page to the first word of the next,
+    which corrupts the text a reader is shown and makes any phrase spanning a
+    page break impossible to find by search.
+    """
+    pytest.importorskip("fpdf")
+    import tempfile
+    from pathlib import Path
+
+    from fpdf import FPDF
+
+    from interface import pdf_text
+
+    doc = FPDF()
+    for heading in ("Medical Note", "Insurer Response", "Employer Notice"):
+        doc.add_page()
+        doc.set_font("Helvetica", size=12)
+        doc.cell(0, 10, heading, new_x="LMARGIN", new_y="NEXT")
+        doc.cell(0, 10, "Body text for this page.", new_x="LMARGIN", new_y="NEXT")
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "letter.pdf"
+        doc.output(str(path))
+        text = pdf_text.extract_text(path.read_bytes())
+
+    assert "Medical Note" in text
+    assert "Insurer Response" in text
+    # The failure this guards against, stated as the string it produced.
+    assert "NoteInsurer" not in text
+    assert "ResponseEmployer" not in text
