@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** `ae13487e6066177324804b3315bac7304d5daff7`, branch
+**Tree stamp:** `b6081b7a8e2b1a2f6467c3d77d44ccb13fca7fee`, branch
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
@@ -654,10 +654,10 @@ the only write path. `EmailIntake` dedups via `EmailSeenSet`.
 
 ## 15. Honest inventory of gaps
 
-Findings reflect commit `ae13487e6066177324804b3315bac7304d5daff7`. Items resolved after that stamp are not
+Findings reflect commit `b6081b7a8e2b1a2f6467c3d77d44ccb13fca7fee`. Items resolved after that stamp are not
 represented.
 
-Δ 22dc62c → ae13487: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
+Δ 22dc62c → b6081b7: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
 
 ### Critical (1)
 
