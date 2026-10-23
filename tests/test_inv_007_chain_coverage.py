@@ -96,14 +96,16 @@ def test_export_produces_chained_audit_row(client_and_db):
         files={"file": ("note.txt", b"hello", "text/plain")},
     )
 
-    # export will likely fail on gates (barreau / disclaimer); audit row
-    # for export_produced is written only on success. Skip if export is gated.
+    # Export requires a Barreau stamp before it reaches the chain check
+    # (403 EXPORT_BLOCKED_BARREAU otherwise). Same fixture as
+    # test_export_refuses_empty_record_hash in this file.
+    stamp = client.post(f"/cases/{case_id}/stamp", json={
+        "stamp_version": "1.0", "approved_by": "test",
+    })
+    assert stamp.status_code in (200, 201), stamp.text
+
     r = client.post(f"/cases/{case_id}/export")
-    if r.status_code != 200:
-        pytest.skip(
-            f"export gated (status {r.status_code}); cannot verify "
-            "export_produced chaining without a successful export"
-        )
+    assert r.status_code == 200, r.text
 
     conn = sqlite3.connect(db_path)
     rows = conn.execute(
