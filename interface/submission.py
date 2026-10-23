@@ -134,3 +134,39 @@ def extract_text_from_file(path: str | Path) -> str:
     """Read ``path`` and return its readable text. See ``extract_text``."""
     file_path = Path(path)
     return extract_text(file_path.read_bytes(), file_path.name)
+
+
+def extract_text_with_pages(
+    data: bytes, filename: str = ""
+) -> tuple[str, list[tuple[int, int, int]] | None]:
+    """Return text plus per-page spans, or ``(text, None)`` for non-PDF types.
+
+    Mirrors ``extract_text``'s dispatch exactly; the two functions must
+    agree on what text is extracted and how refusals are raised. They
+    are kept as separate functions rather than ``extract_text`` being
+    reimplemented in terms of this one, because the pdfium path in
+    ``pdf_text.extract_text_with_pages`` normalizes per page rather than
+    across the join — usually byte-identical to ``extract_text`` output,
+    not guaranteed. Refactoring ``extract_text`` to call through this
+    wrapper would quietly move every existing caller onto that slightly
+    different text, and the consumers (scope splitting, doctrine
+    matching) are written against the current form.
+
+    Non-PDF artifacts (text, eml, and the suffix-decode fallbacks) have
+    no page concept: the second element is ``None``. A caller that uses
+    this function uniformly does not have to special-case its input
+    types, only check whether spans came back.
+
+    Raises:
+        UnsupportedSubmission: same conditions as ``extract_text`` — the
+            refusal happens inside ``extract_text``, which is called for
+            every non-PDF input, so the error surface is identical.
+        pdf_text.NotAPdf / pdf_text.NoTextFound: same as ``extract_text``
+            for a PDF that turns out to be unreadable or empty.
+    """
+    suffix = _suffix(filename)
+
+    if pdf_text.looks_like_pdf(data) or suffix == ".pdf":
+        return pdf_text.extract_text_with_pages(data)
+
+    return extract_text(data, filename), None
