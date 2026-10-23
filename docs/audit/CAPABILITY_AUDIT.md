@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** `7b92f2d9d8fd7ea444aaf169ddd1200ecddaa4a5`, branch
+**Tree stamp:** `6a0b509197b9615ce140bacdceb0d757572e16bf`, branch
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
@@ -11,7 +11,7 @@ checkable is: `git diff --name-only <stamp>..HEAD -- ':!docs/audit/CAPABILITY_AU
 is empty. Any future check must apply that exclusion, otherwise it reports drift
 the moment this file is committed and every subsequent revision.
 
-**Test state at stamp:** `596 passed, 1 skipped` (pytest, `pytest.ini`);
+**Test state at stamp:** `597 passed, 1 skipped` (pytest, `pytest.ini`);
 `120 passed / 120` (Vitest, 18 files); `tsc --noEmit` clean.
 
 **History note:** `4eb0e57` was committed with a TS2554 error that
@@ -40,8 +40,8 @@ matters, spanning an evidence-management web application, a dossier-processing
 pipeline with governance and enforcement layers, cryptographic anchoring, and a
 performance/adversarial harness (`ARCHITECTURE_SUMMARY.md`;
 `docs/product/README.md`). The tree holds **271 Python files** (excluding
-`interface/node_modules/`, `.venv/`, `.git/`), **58 Python test modules** (57 in
-`tests/` plus `tests/invariants/test_state_machine_invariants.py`), and **17
+`interface/node_modules/`, `.venv/`, `.git/`), **63 Python test modules** (62 in
+`tests/` plus `tests/invariants/test_state_machine_invariants.py`), and **18
 Vitest files** in `interface/src/`. At the stamp, `interface/anchorum_api.py`
 declares **29 routes**, the Python suite is green, and the frontend type-checks
 and builds. The system mixes genuinely implemented capability (29 live routes,
@@ -189,11 +189,12 @@ Screens — 10 `.tsx` with matching `.test.tsx`: `Administration`, `AuditExports
 `CaseList`, `CreateCase`, `EvidenceIntake`, `EvidenceViewer`, `Overview`,
 `Register`, `Search`, `Timeline`.
 
-Components — `interface/src/components/` holds 17 `.tsx` files, 4 of which are
+Components — `interface/src/components/` holds 19 `.tsx` files, 5 of which are
 tests (`AppShell.test.tsx`, `CaseTreePanel.test.tsx`, `ChainTimeline.test.tsx`,
-`PdfViewer.test.tsx`), leaving **13 components, 4 tested, 9 untested**:
-`ConfirmWithReasonDialog`, `DataTable`, `FileDropZone`, `FilterBar`,
-`FormField`, `ProgressStrip`, `StateBlock`, `TimelineItem`, `VerificationTile`.
+`PdfViewer.test.tsx`, `ExtractedText.test.tsx`), leaving **14 components,
+5 tested, 9 untested**: `ConfirmWithReasonDialog`, `DataTable`, `FileDropZone`,
+`FilterBar`, `FormField`, `ProgressStrip`, `StateBlock`, `TimelineItem`,
+`VerificationTile`.
 
 Locales — `en.json`/`fr.json` at 397 lines each, parity enforced by
 `interface/src/i18n.test.ts`. `translate()` echoes an unknown key rather than
@@ -637,7 +638,7 @@ the only write path. `EmailIntake` dedups via `EmailSeenSet`.
 Findings reflect commit `e5c4f44d780062f2eb51d705bb2461b7ba8b95de`. Items resolved after that stamp are not
 represented.
 
-Δ 22dc62c → 7b92f2d: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
+Δ 22dc62c → 6a0b509: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
 
 ### Critical (1)
 
