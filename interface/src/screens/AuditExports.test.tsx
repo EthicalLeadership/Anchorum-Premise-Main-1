@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { createAdapter } from "../adapter";
 import { AuditExports } from "./AuditExports";
@@ -51,5 +51,20 @@ describe("AuditExports", () => {
     );
 
     expect(await screen.findByText("Not found")).toBeTruthy();
+  });
+
+  it("treats chainIntegrity=broken as broken even when chain is not broken", async () => {
+    const adapter = createAdapter({ backend: null });
+    vi.spyOn(adapter.audit, "list").mockResolvedValue({
+      ok: true,
+      value: [
+        { id: "A-1", event: "evidence_uploaded", evidenceId: "E-1047", chain: "linked" },
+        { id: "A-9", event: "chain_break", evidenceId: "E-1047", chain: "linked", chainIntegrity: "broken" },
+      ],
+    } as never);
+    render(<AuditExports locale="en" adapter={adapter} caseId="CASE-2024-018" />);
+    const badge = await screen.findByTestId("chain-summary");
+    expect(badge).toHaveTextContent(/Chain broken at ID A-9/i);
+    expect(badge.className).toContain("audit-chain-summary--broken");
   });
 });
