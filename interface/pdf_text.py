@@ -460,3 +460,81 @@ def extract_text(data: bytes) -> str:
 def extract_text_from_file(path: str | Path) -> str:
     """Read ``path`` and return its text layer. See ``extract_text``."""
     return extract_text(Path(path).read_bytes())
+
+
+def extract_text_with_pages(
+    data: bytes,
+) -> tuple[str, list[tuple[int, int, int]] | None]:
+    """Extract text with per-page character spans, or ``(text, None)``.
+
+    Spans are ``(page_num, start, end)`` (1-based page) where
+    ``text[start:end]`` is that page's contribution to the returned text.
+    They are stable against normalization because normalization runs per
+    page before joining: a length-changing substitution inside one page
+    cannot shift any other page's offsets.
+
+    Returns ``(text, None)`` when the extraction path has no page concept.
+    The pdfium path is the only one that knows where pages begin; the
+    built-in content-stream parser and the OCR fallback both return
+    whole-document strings, so their spans are ``None`` and a caller must
+    fall back to line numbers or character offsets.
+
+    Note for callers who compare against ``extract_text``: the returned
+    text is *usually* but not always byte-identical to what
+    ``extract_text(data)`` produces. Normalization runs per page rather
+    than across the join, so a run of trailing whitespace on one page
+    that would collapse against a page-break newline in the whole-text
+    path stays put here. Do not assume equality; do assume that the
+    returned text is what should be stored — it is the text the spans
+    describe, and a stored text that disagrees with its spans would send
+    a search hit to the wrong page.
+
+    Raises:
+        NotAPdf: the payload has no PDF header.
+        NoTextFound: no stage produced usable text.
+    """
+    if not looks_like_pdf(data):
+        raise NotAPdf("payload does not begin with a PDF header")
+
+    try:
+        import pypdfium2 as pdfium
+
+        pdf = pdfium.PdfDocument(data)
+        try:
+            per_page: list[str] = []
+            for page in pdf:
+                tp = page.get_textpage()
+                raw = tp.get_text_range()
+                raw = raw.replace("\r\n", "\n").replace("\r", "\n")
+                # Per-page normalization, same order as the whole-text path:
+                # typography first (converts Unicode punctuation, collapses
+                # whitespace against newlines), then control glyphs (recovers
+                # CP1252 bytes, collapses runs of spaces). Running both here
+                # rather than on the joined text is what makes the spans
+                # stable — a collapse inside page 3 cannot shift page 4.
+                normalized = normalise_control_glyphs(_normalise_typography(raw))
+                per_page.append(normalized)
+        finally:
+            pdf.close()
+
+        joined = "\n".join(per_page)
+        if joined.strip() and not _looks_like_garbage(joined):
+            spans: list[tuple[int, int, int]] = []
+            offset = 0
+            for i, page_text in enumerate(per_page, start=1):
+                if i > 1:
+                    offset += 1  # the joining "\n"
+                spans.append((i, offset, offset + len(page_text)))
+                offset += len(page_text)
+            logger.info(
+                "pdf_text: pdfium extracted %d chars across %d page(s)",
+                len(joined),
+                len(per_page),
+            )
+            return joined, spans
+    except Exception as exc:
+        # Any pdfium failure falls through to extract_text, which records
+        # the failure and tries the built-in parser and OCR.
+        logger.debug("pdf_text: pdfium per-page failed: %s", exc)
+
+    return extract_text(data), None
