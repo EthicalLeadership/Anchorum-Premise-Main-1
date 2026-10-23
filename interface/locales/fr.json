@@ -211,6 +211,7 @@
   "search.unavailable": "La recherche est indisponible.",
   "search.result.open_exact": "Ouvrir la version exacte",
   "search.result.offset": "décalage {offset}",
+  "search.result.line": "ligne {line}",
   "search.result.location": "{evidenceId} · {pageOrOffset}",
   "timeline.title": "Chronologie",
   "timeline.filter.date": "Date",

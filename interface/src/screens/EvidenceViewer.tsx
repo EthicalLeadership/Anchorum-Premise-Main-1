@@ -45,7 +45,21 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
   const [summarizeError, setSummarizeError] = useState<string | null>(null);
   const [verifyingDoctrine, setVerifyingDoctrine] = useState(false);
   const [doctrineResult, setDoctrineResult] = useState<{ match: boolean; reason: string | null } | null>(null);
-  const [tab, setTab] = useState<"original" | "extracted">("original");
+  // A search hit links here with `?at=<offset>&q=<term>`. Opening on the
+  // original tab would drop the reader at the top of the PDF and lose the
+  // position they just clicked, so the arriving link decides the tab.
+  const arrivalParams = new URLSearchParams(
+    window.location.hash.split("?")[1] ?? "",
+  );
+  const arrivalAt = Number(arrivalParams.get("at"));
+  const arrivalTerm = arrivalParams.get("q") ?? "";
+  const arrival =
+    arrivalTerm.length > 0 && Number.isFinite(arrivalAt) && arrivalAt >= 0
+      ? { at: arrivalAt, term: arrivalTerm }
+      : null;
+  const [tab, setTab] = useState<"original" | "extracted">(
+    arrival ? "extracted" : "original",
+  );
   const [textLoad, setTextLoad] = useState<TextLoad>({ kind: "idle" });
   // Which panel the reader is on, and what the extracted-text fetch returned.
   // Kept beside the main load rather than inside it: the text is a second,
@@ -250,7 +264,11 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
         </div>
       ) : textLoad.kind === "ready" ? (
         <div role="tabpanel" id="panel-extracted" aria-labelledby="tab-extracted">
-          <ExtractedText locale={locale} text={textLoad.value} />
+          <ExtractedText
+            locale={locale}
+            text={textLoad.value}
+            highlight={arrival}
+          />
         </div>
       ) : textLoad.kind === "error" ? (
         <div role="tabpanel" id="panel-extracted" aria-labelledby="tab-extracted">

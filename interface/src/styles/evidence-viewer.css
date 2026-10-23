@@ -118,3 +118,14 @@
   color: var(--tp-muted);
   font-style: italic;
 }
+/* The match a search hit pointed at. Fixed colours rather than theme tokens,
+   because this has to stay legible on both the light and the dark palette and
+   the tokens only give one foreground. */
+.extracted-text__hit {
+  background: #ffe08a;
+  color: #1a1a1a;
+  border-radius: 2px;
+  outline: 2px solid #d99b18;
+  /* Room for scrollIntoView, so the mark does not land under a sticky bar. */
+  scroll-margin: 4rem;
+}

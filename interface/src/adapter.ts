@@ -178,7 +178,17 @@ export type AuditEntry =
       reason: string;
       at: string;
     };
-type SearchResult = { id: string; excerpt: string; offset?: number };
+/**
+ * One search hit. `offset` and `line` are the match's position in the
+ * extracted text: without them a hit in a forty-page exhibit says what was
+ * found but not where, and "open the document" means "look for it again".
+ */
+type SearchResult = {
+  id: string;
+  excerpt: string;
+  offset?: number;
+  line?: number;
+};
 export type TimelineEvent = (typeof fixture.timeline)[number];
 
 function success<T>(value: T): AdapterResult<T> {

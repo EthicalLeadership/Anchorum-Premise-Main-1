@@ -210,11 +210,14 @@ export function App() {
           caseId={decodeURIComponent(hash.split("/")[2])}
         />
       ) : /^#\/cases\/[^/]+\/evidence\/[^/]+$/.test(path) ? (
+        // Parsed from `path`, not `hash`: a search hit links here with
+        // `?at=<offset>`, and splitting the raw hash made the evidence id
+        // "E-…?at=480", which 404s.
         <EvidenceViewer
           locale={locale}
           adapter={adapter}
-          caseId={decodeURIComponent(hash.split("/")[2])}
-          evidenceId={decodeURIComponent(hash.split("/")[4])}
+          caseId={decodeURIComponent(path.split("/")[2])}
+          evidenceId={decodeURIComponent(path.split("/")[4])}
         />
       ) : path === "#/admin" ? (
         session.role === "case_admin" ? (

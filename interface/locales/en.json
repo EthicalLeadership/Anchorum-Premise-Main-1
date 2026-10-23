@@ -211,6 +211,7 @@
   "search.unavailable": "Search is unavailable.",
   "search.result.open_exact": "Open exact version",
   "search.result.offset": "offset {offset}",
+  "search.result.line": "line {line}",
   "search.result.location": "{evidenceId} · {pageOrOffset}",
   "timeline.title": "Timeline",
   "timeline.filter.date": "Date",

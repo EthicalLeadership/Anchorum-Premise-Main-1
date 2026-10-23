@@ -101,3 +101,61 @@ describe("ExtractedText", () => {
     ).toBeInTheDocument();
   });
 });
+describe("ExtractedText — landing on a search hit", () => {
+  const text = "Medical Note\nLumbar disc herniation at L4-L5 confirmed by MRI.";
+
+  function renderAt(at: number, term: string) {
+    return render(
+      <ExtractedText
+        locale="en"
+        highlight={{ at, term }}
+        text={{
+          ...base,
+          status: "extracted",
+          chars: text.length,
+          reason: "",
+          text,
+        }}
+      />,
+    );
+  }
+
+  it("marks exactly the term the hit pointed at", () => {
+    const at = text.indexOf("herniation");
+    const { container } = renderAt(at, "herniation");
+    const mark = container.querySelector("mark.extracted-text__hit");
+    expect(mark).not.toBeNull();
+    expect(mark).toHaveTextContent("herniation");
+    // The whole text must still be there, before and after the mark.
+    expect(container.querySelector("pre")?.textContent).toBe(text);
+  });
+
+  it("renders no mark when the link carries no position", () => {
+    const { container } = render(
+      <ExtractedText
+        locale="en"
+        text={{
+          ...base,
+          status: "extracted",
+          chars: text.length,
+          reason: "",
+          text,
+        }}
+      />,
+    );
+    expect(container.querySelector("mark")).toBeNull();
+  });
+
+  it("marks nothing for an empty term rather than an empty highlight", () => {
+    const { container } = renderAt(0, "");
+    expect(container.querySelector("mark")).toBeNull();
+  });
+
+  it("clamps an offset past the end instead of throwing", () => {
+    // A hit beyond the 200,000-character cap cannot be shown; the pane must
+    // still render the text rather than fail.
+    const { container } = renderAt(text.length + 500, "herniation");
+    expect(container.querySelector("pre")?.textContent).toBe(text);
+    expect(container.querySelector("mark")?.textContent).toBe("");
+  });
+});

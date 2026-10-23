@@ -1,6 +1,7 @@
 """Local/test HTTP API for the Anchorum Prem Main shell."""
 from __future__ import annotations
 
+import bisect
 import hashlib
 import io
 import hmac
@@ -781,6 +782,10 @@ def create_app(
             if text_path is None or not text_path.is_file():
                 continue
             text = text_path.read_text(encoding="utf-8", errors="replace")
+            # Built once per document, not per hit: a common word matches
+            # thousands of times in one exhibit and re-scanning the text for
+            # each of them would be quadratic for no gain.
+            line_starts = [0] + [i + 1 for i, ch in enumerate(text) if ch == "\n"]
             for match in pattern.finditer(text):
                 window_start = max(0, match.start() - SEARCH_CONTEXT_CHARS)
                 window_end = min(len(text), match.end() + SEARCH_CONTEXT_CHARS)
@@ -789,6 +794,10 @@ def create_app(
                     "id": document.document_key,
                     "excerpt": excerpt,
                     "offset": match.start(),
+                    # 1-based, and the only part of a hit a reader can act on
+                    # in a forty-page exhibit: the excerpt shows the words, the
+                    # line says where they are.
+                    "line": bisect.bisect_right(line_starts, match.start()),
                 })
                 if len(hits) >= SEARCH_HIT_LIMIT:
                     break

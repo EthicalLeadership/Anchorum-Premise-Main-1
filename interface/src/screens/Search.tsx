@@ -5,7 +5,7 @@ import { translate } from "../i18n";
 import type { Locale } from "../types";
 
 type Props = { locale: Locale; adapter: ReturnType<typeof createAdapter>; caseId: string };
-type Hit = { id: string; excerpt: string; offset?: number };
+type Hit = { id: string; excerpt: string; offset?: number; line?: number };
 type State =
   | { kind: "idle" }
   | { kind: "loading" }
@@ -49,25 +49,34 @@ export function Search({ locale, adapter, caseId }: Props) {
       {state.kind === "ready" && state.hits.length === 0 ? <StateBlock locale={locale} kind="empty" message={t("search.no_results")} /> : null}
       {state.kind === "ready" && state.hits.length > 0 ? (
         <ul className="search-results">
-          {state.hits.map((h) => (
-            <li key={h.id}>
-              <a href={`#/cases/${encodeURIComponent(caseId)}/evidence/${encodeURIComponent(h.id)}`}>
-                {h.id}
-              </a>
-              {h.offset !== undefined ? (
-                <p className="search-result-location">
-                  {t("search.result.location", {
-                    evidenceId: h.id,
-                    pageOrOffset: t("search.result.offset", { offset: String(h.offset) }),
-                  })}
-                </p>
-              ) : null}
-              <p>{h.excerpt}</p>
-              <a href={`#/cases/${encodeURIComponent(caseId)}/evidence/${encodeURIComponent(h.id)}`}>
-                {t("search.result.open_exact")}
-              </a>
-            </li>
-          ))}
+          {state.hits.map((h) => {
+            // Several hits can share one document, so `?at=` is what
+            // distinguishes them; keying on the id alone made React reuse the
+            // first row's node for the rest.
+            const target = `#/cases/${encodeURIComponent(caseId)}/evidence/${encodeURIComponent(h.id)}${
+              h.offset === undefined
+                ? ""
+                : `?at=${h.offset}&q=${encodeURIComponent(q.trim())}`
+            }`;
+            return (
+              <li key={`${h.id}:${h.offset ?? 0}`}>
+                <a href={target}>{h.id}</a>
+                {h.offset !== undefined ? (
+                  <p className="search-result-location">
+                    {t("search.result.location", {
+                      evidenceId: h.id,
+                      pageOrOffset:
+                        h.line === undefined
+                          ? t("search.result.offset", { offset: String(h.offset) })
+                          : t("search.result.line", { line: String(h.line) }),
+                    })}
+                  </p>
+                ) : null}
+                <p>{h.excerpt}</p>
+                <a href={target}>{t("search.result.open_exact")}</a>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </section>
