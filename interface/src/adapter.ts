@@ -178,7 +178,7 @@ export type AuditEntry =
       reason: string;
       at: string;
     };
-type SearchResult = (typeof fixture.searchResults)[number];
+type SearchResult = { id: string; excerpt: string; offset?: number };
 export type TimelineEvent = (typeof fixture.timeline)[number];
 
 function success<T>(value: T): AdapterResult<T> {

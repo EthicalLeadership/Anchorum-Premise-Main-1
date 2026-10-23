@@ -5,7 +5,7 @@ import { translate } from "../i18n";
 import type { Locale } from "../types";
 
 type Props = { locale: Locale; adapter: ReturnType<typeof createAdapter>; caseId: string };
-type Hit = { id: string; excerpt: string };
+type Hit = { id: string; excerpt: string; offset?: number };
 type State =
   | { kind: "idle" }
   | { kind: "loading" }
@@ -54,6 +54,14 @@ export function Search({ locale, adapter, caseId }: Props) {
               <a href={`#/cases/${encodeURIComponent(caseId)}/evidence/${encodeURIComponent(h.id)}`}>
                 {h.id}
               </a>
+              {h.offset !== undefined ? (
+                <p className="search-result-location">
+                  {t("search.result.location", {
+                    evidenceId: h.id,
+                    pageOrOffset: t("search.result.offset", { offset: String(h.offset) }),
+                  })}
+                </p>
+              ) : null}
               <p>{h.excerpt}</p>
               <a href={`#/cases/${encodeURIComponent(caseId)}/evidence/${encodeURIComponent(h.id)}`}>
                 {t("search.result.open_exact")}

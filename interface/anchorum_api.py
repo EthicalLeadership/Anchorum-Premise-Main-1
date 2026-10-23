@@ -785,7 +785,11 @@ def create_app(
                 window_start = max(0, match.start() - SEARCH_CONTEXT_CHARS)
                 window_end = min(len(text), match.end() + SEARCH_CONTEXT_CHARS)
                 excerpt = " ".join(text[window_start:window_end].split())
-                hits.append({"id": document.document_key, "excerpt": excerpt})
+                hits.append({
+                    "id": document.document_key,
+                    "excerpt": excerpt,
+                    "offset": match.start(),
+                })
                 if len(hits) >= SEARCH_HIT_LIMIT:
                     break
         return hits
@@ -1549,10 +1553,11 @@ def create_app(
                     "message": "Provide a non-empty search query.",
                 },
             )
-        # The body stays a bare array of {id, excerpt}: that is the contract the
-        # search screen already consumes. Which method ran travels in a header,
-        # because substring and token matching do not agree and the difference
-        # has to stay visible.
+        # The body is a bare array of {id, excerpt, offset}. `offset` is the
+        # character position of the match in the sidecar, so a UI can point a
+        # reader into a long document instead of leaving them to ctrl-F. Which
+        # method ran travels in a header, because substring and token matching
+        # do not agree and the difference has to stay visible.
         response.headers["X-Anchorum-Search-Method"] = SEARCH_METHOD_SUBSTRING
         return search_documents(db, case, needle)
 

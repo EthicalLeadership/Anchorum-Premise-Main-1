@@ -210,6 +210,7 @@
   "search.index_building": "L’index de recherche est en cours de construction. Les résultats peuvent être incomplets.",
   "search.unavailable": "La recherche est indisponible.",
   "search.result.open_exact": "Ouvrir la version exacte",
+  "search.result.offset": "décalage {offset}",
   "search.result.location": "{evidenceId} · {pageOrOffset}",
   "timeline.title": "Chronologie",
   "timeline.filter.date": "Date",

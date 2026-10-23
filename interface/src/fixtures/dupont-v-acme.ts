@@ -276,7 +276,7 @@ export const fixture = {
     },
   ],
   searchResults: [
-    { id: "E-1043", excerpt: "Grievance and payroll records" },
-    { id: "E-1046", excerpt: "Witness statement" },
+    { id: "E-1043", excerpt: "Grievance and payroll records", offset: 420 },
+    { id: "E-1046", excerpt: "Witness statement", offset: 1288 },
   ],
 } as const;
