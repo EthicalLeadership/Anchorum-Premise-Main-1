@@ -1566,7 +1566,11 @@ def create_app(
         return out or None
 
     @app.post("/cases/{case_id}/export", dependencies=[local_api])
-    def export_case(case_id: str, db: Session = Depends(get_db)):
+    def export_case(
+        case_id: str,
+        include_summary: bool = True,
+        db: Session = Depends(get_db),
+    ):
         case = find_case(db, case_id)
         stamp = db.scalar(
             select(JurisdictionStamp).where(JurisdictionStamp.case_id == case.id)
@@ -1720,7 +1724,8 @@ def create_app(
                 else:
                     raw_summary = report.sanitized_text
 
-            zf.writestr("SUMMARY.md", raw_summary)
+            if include_summary:
+                zf.writestr("SUMMARY.md", raw_summary)
 
             try:
                 from dossier_pipeline.disclaimer import format_disclaimer_block

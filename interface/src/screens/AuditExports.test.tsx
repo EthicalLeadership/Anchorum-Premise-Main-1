@@ -67,4 +67,16 @@ describe("AuditExports", () => {
     expect(badge).toHaveTextContent(/Chain broken at ID A-9/i);
     expect(badge.className).toContain("audit-chain-summary--broken");
   });
+
+  it("renders include-summary checkbox default-checked", async () => {
+    render(
+      <AuditExports
+        locale="en"
+        adapter={createAdapter({ backend: null })}
+        caseId="CASE-2024-018"
+      />,
+    );
+    const checkbox = await screen.findByRole("checkbox", { name: /SUMMARY\.md/i });
+    expect(checkbox).toBeChecked();
+  });
 });

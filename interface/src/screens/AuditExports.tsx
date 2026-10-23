@@ -31,6 +31,7 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
   const [preview, setPreview] = useState<PreviewLoad>({ kind: "loading" });
   const [exportType, setExportType] = useState<ExportType>(exportTypes[0]);
   const [attempt, setAttempt] = useState(0);
+  const [includeSummary, setIncludeSummary] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
@@ -162,7 +163,7 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
     setExporting(true);
     setExportError(null);
     setExportSuccess(null);
-    const result = await adapter.exports.generate(caseId);
+    const result = await adapter.exports.generate(caseId, { includeSummary });
     setExporting(false);
     if (!result.ok) {
       setExportError(t(`error.${result.error.toLowerCase()}`));
@@ -260,6 +261,11 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
                 })}
               </p>
             ) : null}
+            <label className="export-summary-toggle">
+              <input type="checkbox" checked={includeSummary} onChange={(e) => setIncludeSummary(e.target.checked)} />
+              {t("export.summary.toggle")}
+            </label>
+
             <button
               type="button"
               className="btn btn--primary"

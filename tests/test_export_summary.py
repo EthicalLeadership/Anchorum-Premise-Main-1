@@ -58,3 +58,13 @@ def test_manifest_still_has_content_hash(client):
     z = zipfile.ZipFile(io.BytesIO(r.content))
     manifest = json.loads(z.read("manifest.json"))
     assert "content_hash" in manifest["documents"][0]
+
+
+def test_zip_omits_summary_when_disabled(client):
+    r = client.post("/cases/SUM1/export?include_summary=false")
+    assert r.status_code == 200, r.text
+    z = zipfile.ZipFile(io.BytesIO(r.content))
+    assert "SUMMARY.md" not in z.namelist()
+    # manifest and DISCLAIMER still present — only the prose summary is opted out
+    assert "manifest.json" in z.namelist()
+    assert "DISCLAIMER.md" in z.namelist()

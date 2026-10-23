@@ -250,6 +250,7 @@
   "export.gate.disclaimer": "Disclaimer",
   "export.gate.barreau": "Barreau check",
   "export.blocked": "Export blocked: {gate} {item}",
+  "export.summary.toggle": "Include SUMMARY.md (sanitized narrative)",
   "export.action.export": "Export",
   "export.action.download": "Download",
   "administration.title": "Administration",

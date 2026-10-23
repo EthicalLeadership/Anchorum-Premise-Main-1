@@ -250,6 +250,7 @@
   "export.gate.disclaimer": "Avis",
   "export.gate.barreau": "Vérification du Barreau",
   "export.blocked": "Exportation bloquée : {gate} {item}",
+  "export.summary.toggle": "Inclure SUMMARY.md (récit sanitizé)",
   "export.action.export": "Exporter",
   "export.action.download": "Télécharger",
   "administration.title": "Administration",

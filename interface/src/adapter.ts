@@ -689,11 +689,11 @@ export function createAdapter(config: AdapterConfig) {
       },
     },
     exports: {
-      async generate(caseId: string): Promise<AdapterResult<{ blob: Blob; filename: string }>> {
+      async generate(caseId: string, opts?: { includeSummary?: boolean }): Promise<AdapterResult<{ blob: Blob; filename: string }>> {
         if (config.backend) {
           try {
             const res = await fetch(
-              `${config.backend.baseUrl}/cases/${encodeURIComponent(caseId)}/export`,
+              `${config.backend.baseUrl}/cases/${encodeURIComponent(caseId)}/export${opts?.includeSummary === false ? "?include_summary=false" : ""}`,
               { method: "POST" },
             );
             if (!res.ok) return failure(`HTTP_${res.status}`);
