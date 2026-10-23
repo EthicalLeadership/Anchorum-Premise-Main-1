@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen , waitFor , waitFor , waitFor , waitFor , waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createAdapter } from "../adapter";
 import { EvidenceViewer } from "./EvidenceViewer";
 import { translate } from "../i18n";
@@ -68,7 +68,10 @@ describe("EvidenceViewer", () => {
       if (!el) throw new Error("metadata block not rendered yet");
       return el;
     });
-    // Last custody row is A-3, hmac c3c3... → truncated c3c3c3c3…c3c3
+    // The last *custody* row (C-1047-2, not the audit row A-3) carries
+    // hmac c3c3…, which the metadata block truncates to c3c3c3c3…c3c3.
+    // The HMAC belongs to CustodyEntry; putting it on an audit row left
+    // latestHmac empty and the block said "unsigned".
     expect(meta.textContent).toMatch(/c3c3c3c3…c3c3/i);
     // SHA-256 line present (either a hash or "unavailable")
     expect(meta.textContent).toMatch(/SHA-256/i);

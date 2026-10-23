@@ -140,6 +140,7 @@ export const fixture = {
         action: "uploaded",
         at: "2026-01-17T10:00:00Z",
         chain: "linked",
+        hmac: "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
       },
       {
         id: "C-1047-2",
@@ -148,6 +149,7 @@ export const fixture = {
         at: "2026-01-17T10:01:00Z",
         chain: "broken",
         failingStep: "hash_mismatch_at_readback",
+        hmac: "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
       },
     ],
   },
@@ -233,7 +235,6 @@ export const fixture = {
       evidenceId: "E-1047",
       chain: "broken",
       failingStep: "hash_mismatch_at_readback",
-      hmac: "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
     },
     {
       id: "A-3",
