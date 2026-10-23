@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** `292494f18a1af7671c0fefbf74f6d6c81155deab`, branch
+**Tree stamp:** `ae13487e6066177324804b3315bac7304d5daff7`, branch
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
@@ -11,7 +11,7 @@ checkable is: `git diff --name-only <stamp>..HEAD -- ':!docs/audit/CAPABILITY_AU
 is empty. Any future check must apply that exclusion, otherwise it reports drift
 the moment this file is committed and every subsequent revision.
 
-**Test state at stamp:** `605 passed, 0 failed` (pytest, `pytest.ini`);
+**Test state at stamp:** `606 passed, 0 failed` (pytest, `pytest.ini`);
 `123 passed / 123` (Vitest, 18 files); `tsc --noEmit` clean.
 
 **Correction: the previous revision's test claim was false.** This header
@@ -642,6 +642,7 @@ a closure, delegating to a second closure `stored_path` that reads the
 all inside `create_app`. Because it is not a module-level symbol, `from
 interface.anchorum_api import stored_evidence_path` cannot resolve; an earlier
 version of `tests/test_verify_doctrine.py` did exactly that and failed on the
+
 import before reaching its own assertions. The wire itself was never broken:
 the closure is in scope where the routes are defined. The storage root is
 published on `app.state.evidence_directory` (set at `:452`), which is how the
@@ -653,10 +654,10 @@ the only write path. `EmailIntake` dedups via `EmailSeenSet`.
 
 ## 15. Honest inventory of gaps
 
-Findings reflect commit `cf13235a63442be6d4657ad9285372db3af9e02f`. Items resolved after that stamp are not
+Findings reflect commit `ae13487e6066177324804b3315bac7304d5daff7`. Items resolved after that stamp are not
 represented.
 
-Δ 22dc62c → cf13235: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
+Δ 22dc62c → ae13487: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
 
 ### Critical (1)
 
