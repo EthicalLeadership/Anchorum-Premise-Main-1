@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** `605dcd4e4b324584abdaf69273e63e0ba96f503e`, branch
+**Tree stamp:** `cf51f125ca22bda0b218448b627798ebc9af52ca`, branch
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
@@ -11,8 +11,8 @@ checkable is: `git diff --name-only <stamp>..HEAD -- ':!docs/audit/CAPABILITY_AU
 is empty. Any future check must apply that exclusion, otherwise it reports drift
 the moment this file is committed and every subsequent revision.
 
-**Test state at stamp:** `599 passed, 0 failed` (pytest, `pytest.ini`);
-`122 passed / 122` (Vitest, 18 files); `tsc --noEmit` clean.
+**Test state at stamp:** `605 passed, 0 failed` (pytest, `pytest.ini`);
+`123 passed / 123` (Vitest, 18 files); `tsc --noEmit` clean.
 
 **History note:** `4eb0e57` was committed with a TS2554 error that
 `tsc --noEmit` catches; it is fixed in `6af79f3`. Vitest transpiles without
@@ -635,10 +635,10 @@ the only write path. `EmailIntake` dedups via `EmailSeenSet`.
 
 ## 15. Honest inventory of gaps
 
-Findings reflect commit `605dcd4e4b324584abdaf69273e63e0ba96f503e`. Items resolved after that stamp are not
+Findings reflect commit `cf51f125ca22bda0b218448b627798ebc9af52ca`. Items resolved after that stamp are not
 represented.
 
-Δ 22dc62c → 605dcd4: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
+Δ 22dc62c → cf51f12: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
 
 ### Critical (1)
 
