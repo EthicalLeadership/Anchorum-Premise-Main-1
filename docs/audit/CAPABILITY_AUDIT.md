@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** `4db5fec38e9895184037f577f354fdbd31972137`, branch
+**Tree stamp:** `bd046cc3e3ad70592f2fdcc3a84365848bd0dfb5`, branch
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
@@ -11,7 +11,7 @@ checkable is: `git diff --name-only <stamp>..HEAD -- ':!docs/audit/CAPABILITY_AU
 is empty. Any future check must apply that exclusion, otherwise it reports drift
 the moment this file is committed and every subsequent revision.
 
-**Test state at stamp:** `618 passed, 0 failed` (pytest, `pytest.ini`);
+**Test state at stamp:** `625 passed, 0 failed` (pytest, `pytest.ini`);
 `132 passed / 132` (Vitest, 18 files); `tsc --noEmit` clean.
 
 **Correction: the previous revision's test claim was false.** This header
@@ -654,10 +654,10 @@ the only write path. `EmailIntake` dedups via `EmailSeenSet`.
 
 ## 15. Honest inventory of gaps
 
-Findings reflect commit `4db5fec38e9895184037f577f354fdbd31972137`. Items resolved after that stamp are not
+Findings reflect commit `bd046cc3e3ad70592f2fdcc3a84365848bd0dfb5`. Items resolved after that stamp are not
 represented.
 
-Δ 22dc62c → 4db5fec: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
+Δ 22dc62c → bd046cc: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
 
 ### Critical (1)
 
