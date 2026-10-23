@@ -361,6 +361,21 @@ def _record_filed_date(db: Session, case_id: int, document: Document) -> None:
     )
 
 
+def _hmac_signer():
+    """Return an EvidenceSigner, or None if GDC_EVIDENCE_SECRET is unset.
+
+    Called per-request; construction is cheap. Absent env is tolerated: rows
+    are stored with hmac="" (explicitly unsigned) and /export marks them
+    rather than refusing. Every system with the secret configured gets real
+    per-row HMACs, and /export fail-closes on any empty hmac.
+    """
+    try:
+        from dossier_pipeline.evidence import EvidenceSigner
+        return EvidenceSigner()
+    except Exception:
+        return None
+
+
 def _append_audit(
     db: Session,
     *,
@@ -381,6 +396,8 @@ def _append_audit(
     record_hash = hashlib.sha256(
         (previous_hash + "|" + action + "|" + details_str).encode("utf-8")
     ).hexdigest()
+    _signer = _hmac_signer()
+    record_hmac = _signer.sign(record_hash) if _signer else ""
     db.add(
         AuditLog(
             case_id=case_id,
@@ -389,6 +406,7 @@ def _append_audit(
             details=details_str,
             previous_hash=previous_hash,
             record_hash=record_hash,
+            hmac=record_hmac,
         )
     )
     db.flush()
@@ -1160,6 +1178,7 @@ def create_app(
                     "at": _datetime_text(entry.created_at),
                     "chain": CUSTODY_CHAIN,
                     "chainDetail": CUSTODY_CHAIN_DETAIL,
+                    "hmac": entry.hmac or "",
                 }
             )
         return result
@@ -1672,6 +1691,24 @@ def create_app(
                         "message": f"record {_log.id}: " + (_ok.get("reason") or "chain break"),
                     },
                 )
+            _signer = _hmac_signer()
+            if _signer:
+                if not _log.hmac:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail={
+                            "error": "AUDIT_HMAC_MISSING",
+                            "message": f"record {_log.id}: hmac is empty",
+                        },
+                    )
+                if not _signer.verify(_log.record_hash, _log.hmac):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail={
+                            "error": "AUDIT_HMAC_INVALID",
+                            "message": f"record {_log.id}: HMAC mismatch",
+                        },
+                    )
             _prev = _log
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:

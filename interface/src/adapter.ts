@@ -33,6 +33,10 @@ export type CustodyEntry = {
   at: string;
   chain: string;
   failingStep?: string | null;
+  /** HMAC of this row's record_hash (Wire 4). Empty string when the
+   *  deployment has no GDC_EVIDENCE_SECRET configured — the row was written
+   *  unsigned, and the metadata block must say so rather than show a blank. */
+  hmac?: string;
 };
 /**
  * What analysis did to an artifact's bytes, as the API reports it. This is the
@@ -116,6 +120,9 @@ export type Evidence = {
   category?: string | null;
   source?: string | null;
   consultation?: string | null;
+  /** SHA-256 of the original file bytes (server: document.content_hash).
+   *  Optional because older fixtures and some statuses don't carry it. */
+  sha256?: string;
 };
 export interface IngestInput {
   name: string;

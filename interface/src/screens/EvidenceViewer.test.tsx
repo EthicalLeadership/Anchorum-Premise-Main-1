@@ -53,4 +53,25 @@ describe("EvidenceViewer", () => {
       await screen.findByText(translate("en", "evidence.text.error")),
     ).toBeTruthy();
   });
+
+  it("shows truncated SHA-256 and HMAC in metadata", async () => {
+    const { container } = render(
+      <EvidenceViewer
+        locale="en"
+        adapter={createAdapter({ backend: null })}
+        caseId="CASE-2024-018"
+        evidenceId="E-1047"
+      />,
+    );
+    const meta = await waitFor(() => {
+      const el = container.querySelector('[data-testid="evidence-metadata"]');
+      if (!el) throw new Error("metadata block not rendered yet");
+      return el;
+    });
+    // Last custody row is A-3, hmac c3c3... → truncated c3c3c3c3…c3c3
+    expect(meta.textContent).toMatch(/c3c3c3c3…c3c3/i);
+    // SHA-256 line present (either a hash or "unavailable")
+    expect(meta.textContent).toMatch(/SHA-256/i);
+    expect(meta.textContent).toMatch(/HMAC/i);
+  });
 });

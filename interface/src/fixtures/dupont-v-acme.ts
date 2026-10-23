@@ -233,6 +233,7 @@ export const fixture = {
       evidenceId: "E-1047",
       chain: "broken",
       failingStep: "hash_mismatch_at_readback",
+      hmac: "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
     },
     {
       id: "A-3",

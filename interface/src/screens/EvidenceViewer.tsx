@@ -14,6 +14,11 @@ function isPdf(name: string): boolean {
   return /\.pdf$/i.test(name);
 }
 
+
+function truncateHash(h: string): string {
+  return h.length > 16 ? `${h.slice(0, 8)}…${h.slice(-4)}` : h;
+}
+
 type Props = { locale: Locale; adapter: ReturnType<typeof createAdapter>; caseId: string; evidenceId: string };
 type TextLoad =
   | { kind: "idle" }
@@ -183,11 +188,28 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
     },
   ];
 
+  const latestHmac =
+    custody.length > 0 ? (custody[custody.length - 1].hmac ?? "") : "";
+
   return (
     <section className="evidence-viewer">
       {back}
       <h1>{t("evidence.viewer.title")}: {evidence.id}</h1>
       <p>{evidence.name}</p>
+      <dl className="evidence-metadata" data-testid="evidence-metadata">
+        <dt>{t("evidence.viewer.metadata.sha256")}</dt>
+        <dd title={evidence.sha256 ?? ""}>
+          {evidence.sha256
+            ? truncateHash(evidence.sha256)
+            : t("evidence.viewer.metadata.unavailable")}
+        </dd>
+        <dt>{t("evidence.viewer.metadata.hmac")}</dt>
+        <dd title={latestHmac || ""}>
+          {latestHmac
+            ? truncateHash(latestHmac)
+            : t("evidence.viewer.metadata.unsigned")}
+        </dd>
+      </dl>
       <div className="evidence-tabs" role="tablist" aria-label={t("evidence.viewer.title")}>
         <button
           type="button"
