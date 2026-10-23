@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen , waitFor , waitFor , waitFor , waitFor , waitFor } from "@testing-library/react";
 import { createAdapter } from "../adapter";
 import { EvidenceViewer } from "./EvidenceViewer";
 import { translate } from "../i18n";
