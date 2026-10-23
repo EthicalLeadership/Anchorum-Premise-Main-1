@@ -22,7 +22,9 @@ the §15 frontend-build-gate row exists.
 **Method.** Symbol inventories came from `grep -nE '^(class|def) '` per file,
 and for `dossier_pipeline/` from an AST walk emitting each module docstring
 first line, top-level `def`/`class` names and line count. Route inventories
-came from `grep -n '@app\.\(get\|post\|put\|delete\|patch\)'`. Every negative
+came from parsing each decorator in both its one-line and two-line form — a
+single-line `grep '@app.*("'` misses two routes and undercounts 31 as 29, which
+is how the earlier revision of this audit understated the route total. Every negative
 finding names the probe that produced it. Where a capture was truncated the
 row says so instead of asserting absence — an earlier truncated capture
 produced a wrong `MISSING` for two CLI subcommands that exist at
@@ -43,8 +45,8 @@ performance/adversarial harness (`ARCHITECTURE_SUMMARY.md`;
 `interface/node_modules/`, `.venv/`, `.git/`), **63 Python test modules** (62 in
 `tests/` plus `tests/invariants/test_state_machine_invariants.py`), and **18
 Vitest files** in `interface/src/`. At the stamp, `interface/anchorum_api.py`
-declares **29 routes**, the Python suite is green, and the frontend type-checks
-and builds. The system mixes genuinely implemented capability (29 live routes,
+declares **31 routes**, the Python suite is green, and the frontend type-checks
+and builds. The system mixes genuinely implemented capability (31 live routes,
 EICAR scanning, a CEL policy runtime, Ed25519 factory signing) with
 specification documents describing controls the code does not contain.
 
@@ -81,23 +83,24 @@ Status: implemented · partial · absent · stubbed with documented reason.
 | Capability | Subsystem | Entry point | Status | Evidence |
 |---|---|---|---|---|
 | UI | interface | `interface/src/App.tsx`, `interface/src/screens/` | implemented | 10 screens incl. `Register`, `EvidenceIntake`, `EvidenceViewer`, `Timeline`, `Search`, `AuditExports`, `Administration` |
-| Case CRUD | interface | `interface/anchorum_api.py:541,546,842,846` | implemented | `GET/POST /cases`, `GET/PATCH /cases/{case_id}` |
-| Evidence upload | interface | `interface/anchorum_api.py:907` | partial | allowlist bypass when both form fields are omitted (§14, §15) |
-| Evidence remove | interface | `interface/anchorum_api.py:1093` | implemented | `DELETE /evidence/{evidence_id}` |
-| Evidence verification | interface | `interface/anchorum_api.py:1178` | implemented | `POST /evidence/{evidence_id}/verify` |
-| Evidence custody | interface | `interface/anchorum_api.py:1118` | implemented | `GET /evidence/{evidence_id}/custody` |
-| Timeline | interface | `interface/anchorum_api.py:1411` | implemented | falls back to `record.get("date")` when metadata absent |
-| Search | interface | `interface/anchorum_api.py:1416` | implemented | author match, `date` equality, `documentType` filter |
-| Audit | interface | `interface/anchorum_api.py:1759` | implemented | `GET /cases/{case_id}/audit` |
-| Exports ZIP | interface | `interface/anchorum_api.py:1468` | implemented | imports `invariants_bridge` at `:1486`, `:1533` |
-| Exports preview | interface | `interface/anchorum_api.py:1646` | implemented | no `invariants_bridge` call in its body |
-| Jurisdiction stamp | interface | `interface/anchorum_api.py:1700,1716` | implemented | `GET`/`POST /cases/{case_id}/stamp` |
-| Admin invite | interface | `interface/anchorum_api.py:1811` | implemented | writes `member_invited` audit row |
-| Admin role change | interface | `interface/anchorum_api.py:1892` | partial | writes `member_role_changed`; no allowlist on the role value |
-| Case settings | interface | `interface/anchorum_api.py:846` | implemented | status ∈ `open/closed/on_hold` |
-| Saul / consultation | interface | `interface/anchorum_api.py:1228` | partial | calls `llm_classifier.llm_classify` at `:1270`; `_not_implemented` still defined at `:193` |
-| Evidence summarize (LLM) | interface | `interface/anchorum_api.py:1275` | partial | `llm_classifier.llm_summarize` at `:1317`; non-deterministic, documented |
-| Doctrine verification | interface | `interface/anchorum_api.py:1322` | implemented | `POST /evidence/{evidence_id}/verify-doctrine`; covered by 4 passing tests |
+| Case CRUD | interface | `interface/anchorum_api.py:569,574,870,874` | implemented | `GET/POST /cases`, `GET/PATCH /cases/{case_id}` |
+| Evidence upload | interface | `interface/anchorum_api.py:935` | partial | allowlist bypass when both form fields are omitted (§14, §15) |
+| Evidence remove | interface | `interface/anchorum_api.py:1125` | implemented | `DELETE /evidence/{evidence_id}` |
+| Evidence text | interface | `interface/anchorum_api.py:1217` | implemented | `GET /evidence/{evidence_id}/text`; 5 tests in `tests/test_evidence_text.py` |
+| Evidence verification | interface | `interface/anchorum_api.py:1276` | implemented | `POST /evidence/{evidence_id}/verify` |
+| Evidence custody | interface | `interface/anchorum_api.py:1150` | implemented | `GET /evidence/{evidence_id}/custody` |
+| Timeline | interface | `interface/anchorum_api.py:1530` | implemented | falls back to `record.get("date")` when metadata absent |
+| Search | interface | `interface/anchorum_api.py:1535` | implemented | author match, `date` equality, `documentType` filter |
+| Audit | interface | `interface/anchorum_api.py:1994` | implemented | `GET /cases/{case_id}/audit` |
+| Exports ZIP | interface | `interface/anchorum_api.py:1587` | implemented | imports `invariants_bridge` at `:1609`, `:1656` |
+| Exports preview | interface | `interface/anchorum_api.py:1802` | implemented | no `invariants_bridge` call in its body |
+| Jurisdiction stamp | interface | `interface/anchorum_api.py:1935,1951` | implemented | `GET`/`POST /cases/{case_id}/stamp` |
+| Admin invite | interface | `interface/anchorum_api.py:2065` | implemented | writes `member_invited` audit row |
+| Admin role change | interface | `interface/anchorum_api.py:2146` | partial | writes `member_role_changed`; no allowlist on the role value |
+| Case settings | interface | `interface/anchorum_api.py:874` | implemented | status ∈ `open/closed/on_hold` |
+| Saul / consultation | interface | `interface/anchorum_api.py:1326` | partial | calls `llm_classifier.llm_classify` at `:1368`; `_not_implemented` still defined at `:205` |
+| Evidence summarize (LLM) | interface | `interface/anchorum_api.py:1373` | partial | `llm_classifier.llm_summarize` at `:1415`; non-deterministic, documented |
+| Doctrine verification | interface | `interface/anchorum_api.py:1441` | implemented | `POST /evidence/{evidence_id}/verify-doctrine`; covered by 4 passing tests |
 | Document classifier | interface | `interface/classifier.py::classify_text` | implemented | 5 types + `unknown`; 25 tests in `tests/test_classifier.py` |
 | LLM classifier (second opinion) | interface | `interface/llm_classifier.py::llm_classify` | partial | docstring: "NON-DETERMINISTIC by nature"; Ollama endpoint |
 | Metadata extraction | interface | `interface/classifier.py::extract_metadata` | implemented | ISO/numeric/textual dates; `_AUTHOR`, `_ISSUER` |
@@ -136,39 +139,45 @@ Status: implemented · partial · absent · stubbed with documented reason.
 | Contracts | contracts | `contracts/CANONICAL.yaml` | implemented | `ResultStatus`, `PipelineResult` match `contracts.py` |
 ## 4. Group A — Core UI and API
 
-**Routes — `interface/anchorum_api.py`, 29 decorators:**
+**Routes — `interface/anchorum_api.py`, 31 decorators:**
+
+Two of these are declared across two lines (`@app.post(` with the path on the
+next), so a single-line `grep '@app.*("'` finds 29 and undercounts. The list
+below was generated by parsing both forms.
 
 | Route | Line |
 |---|---|
-| `GET /health` | 501 |
-| `GET /` | 514 |
-| `GET /session` | 527 |
-| `GET /cases` | 541 |
-| `POST /cases` | 546 |
-| `GET /cases/{case_id}` | 842 |
-| `PATCH /cases/{case_id}` | 846 |
-| `GET /cases/{case_id}/evidence` | 861 |
-| `POST /cases/{case_id}/evidence` | 907 |
-| `GET /evidence/{evidence_id}` | 1081 |
-| `DELETE /evidence/{evidence_id}` | 1093 |
-| `GET /evidence/{evidence_id}/custody` | 1118 |
-| `GET /evidence/{evidence_id}/download` | 1153 |
-| `POST /evidence/{evidence_id}/verify` | 1178 |
-| `POST /evidence/{evidence_id}/consult` | 1228 |
-| `POST /evidence/{evidence_id}/summarize` | 1275 |
-| `POST /evidence/{evidence_id}/verify-doctrine` | 1322 |
-| `GET /evidence/{evidence_id}/analysis` | 1382 |
-| `POST /evidence/{evidence_id}/analyse` | 1391 |
-| `GET /cases/{case_id}/timeline` | 1411 |
-| `GET /cases/{case_id}/search` | 1416 |
-| `POST /cases/{case_id}/export` | 1468 |
-| `POST /cases/{case_id}/exports/preview` | 1646 |
-| `GET /cases/{case_id}/stamp` | 1700 |
-| `POST /cases/{case_id}/stamp` | 1716 |
-| `GET /cases/{case_id}/audit` | 1759 |
-| `GET /admin/members` | 1796 |
-| `POST /admin/members/invitations` | 1811 |
-| `PATCH /admin/members/{member_id}/role` | 1892 |
+| `GET /health` | 529 |
+| `GET /` | 542 |
+| `GET /session` | 555 |
+| `GET /cases` | 569 |
+| `POST /cases` | 574 |
+| `GET /cases/{case_id}` | 870 |
+| `PATCH /cases/{case_id}` | 874 |
+| `GET /cases/{case_id}/evidence` | 889 |
+| `POST /cases/{case_id}/evidence` | 935 |
+| `GET /evidence/{evidence_id}` | 1113 |
+| `DELETE /evidence/{evidence_id}` | 1125 |
+| `GET /evidence/{evidence_id}/custody` | 1150 |
+| `GET /evidence/{evidence_id}/download` | 1186 |
+| `GET /evidence/{evidence_id}/text` | 1217 |
+| `POST /evidence/{evidence_id}/verify` | 1276 |
+| `POST /evidence/{evidence_id}/consult` | 1326 |
+| `POST /evidence/{evidence_id}/summarize` | 1373 |
+| `POST /evidence/{evidence_id}/verify-doctrine` | 1441 |
+| `GET /evidence/{evidence_id}/analysis` | 1501 |
+| `POST /evidence/{evidence_id}/analyse` | 1510 |
+| `GET /cases/{case_id}/timeline` | 1530 |
+| `GET /cases/{case_id}/search` | 1535 |
+| `POST /cases/{case_id}/export` | 1587 |
+| `POST /cases/{case_id}/exports/preview` | 1802 |
+| `POST /tools/analyse` | 1858 |
+| `GET /cases/{case_id}/stamp` | 1935 |
+| `POST /cases/{case_id}/stamp` | 1951 |
+| `GET /cases/{case_id}/audit` | 1994 |
+| `GET /admin/members` | 2050 |
+| `POST /admin/members/invitations` | 2065 |
+| `PATCH /admin/members/{member_id}/role` | 2146 |
 
 `interface/server.py` declares zero routes — no `@app.*`, no
 `add_api_route`, no `mount`. It hosts `create_app`.
@@ -294,8 +303,8 @@ The layering is incomplete at exactly one seam: `interface/anchorum_api.py`
 never imports `dossier_enforcement` (grep for that module name returns nothing),
 so gates and locks are not applied at the HTTP edge.
 The seam is partly bridged rather than fully open — the API imports
-`interface.invariants_bridge` at lines 1486 and 1533, both inside the `/export`
-route body (1468–1645); `/exports/preview` at 1646 does not call the bridge, so
+`interface.invariants_bridge` at lines 1609 and 1656, both inside the `/export`
+route body (1587–1801); `/exports/preview` at 1802 does not call the bridge, so
 the invariant registry is wired into export while gates and locks are not wired
 at all.
 
@@ -490,7 +499,7 @@ observable and one is not:
 |---|---|---|
 | `README.md` | Licence header only ("Proprietary and Confidential. Copyright (c) 2026 Egregore AI.") | yes — `LICENSE` present |
 | `ARCHITECTURE_SUMMARY.md` | FastAPI/SQLAlchemy/Pydantic/React; CLI at `python -m dossier_pipeline.main {ingest-proton, ingest-dir, export-json, verify-chain, demo, enforce}`; routes `/`, `/#/cases`, `/#/admin`, `/project`, `/document` | **yes on every point.** `cmd_ingest_proton` (361), `cmd_ingest_dir` (432), `cmd_export_json` (**528**), `cmd_verify_chain` (507), `cmd_demo` (**540**), `cmd_enforce` (312). `/project` and `/document` at `interface/gric_server.py:230,236,254,260` |
-| `docs/product/README.md` | "**The current repository has no web/API application.**" | **no** — 29 routes at `interface/anchorum_api.py`. Tracked as Medium in §15 |
+| `docs/product/README.md` | "**The current repository has no web/API application.**" | **no** — 31 routes at `interface/anchorum_api.py`. Tracked as Medium in §15 |
 | `docs/product/SYSTEM_ARCHITECTURE.md` | "Current Repository Baseline And Gaps"; "Proposed Modular Monolith" | self-labelled as a proposal; consistent as a target |
 | `docs/product/DATA_MODEL.md` | "Modeling Invariants", "Common Record Fields", "Core Identity And Case Control" | partial — `dossier_pipeline/schema.py` implements `Case`, `Document`, `User`, `AuditLog`, `JurisdictionStamp` |
 | `docs/product/SCREEN_MAP.md` | "War Room navigation, workflows, user-visible states" | partial — 10 screens; `interface/src/App.tsx` is authoritative |
@@ -541,15 +550,15 @@ observable and one is not:
 | `src/config/` | — | `EMPTY: src/config/` |
 ## 14. Every branch summary
 
-**Upload** — `POST /cases/{case_id}/evidence` (`interface/anchorum_api.py:907`):
+**Upload** — `POST /cases/{case_id}/evidence` (`interface/anchorum_api.py:935`):
 rejects an absent case; rejects oversize before writing; computes SHA-256; marks
 `duplicate` when the hash already exists in the case; validates `category`
 against `ALLOWED_CATEGORIES` and `source` against `ALLOWED_SOURCES`, returning
 422 `INVALID_CATEGORY` / `INVALID_SOURCE`; converts blank metadata to `None`;
 then analyses.
 *Reachability: the 422 branches are unreachable when both form fields are
-omitted, because `Form(None)` yields `None` and the comparison at `:947` and
-`:951` is guarded on the value being non-`None`. A client that sends neither
+omitted, because `Form(None)` yields `None` and the comparison at `:975` and
+`:979` is guarded on the value being non-`None`. A client that sends neither
 field stores a document with `category IS NULL` and `source IS NULL`.*
 
 **Analysis** — `analyse()`: size ceiling → `STATUS_FAILED`, `documentType =
