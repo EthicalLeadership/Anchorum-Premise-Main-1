@@ -65,6 +65,7 @@ def test_extracted_text_is_returned_with_its_status(client: TestClient):
     assert "L4-L5" in body["text"]
     assert body["chars"] > 0
     assert body["truncated"] is False
+    assert body["chars"] == len(body["text"])
 
 
 def test_unsupported_type_reports_why_rather_than_returning_empty_text(
@@ -115,4 +116,5 @@ def test_long_text_is_truncated_and_says_so(client: TestClient):
 
     body = client.get(f"/evidence/{created['id']}/text").json()
     assert body["truncated"] is True
+    assert body["chars"] > len(body["text"])
     assert len(body["text"]) == EXTRACTED_TEXT_LIMIT

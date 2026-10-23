@@ -1279,6 +1279,13 @@ def create_app(
             )
 
         text = text_path.read_text(encoding="utf-8", errors="replace")
+        # `chars` is the length of the text actually served, not a value
+        # recorded at extraction time. Those can differ — the DB row is a
+        # historical record, the sidecar is what is here now — and a count
+        # that disagrees with the text it labels is worse than no count.
+        # Truncation deliberately leaves `chars` at the full length: a
+        # reader needs "showing 200k of 450k", not "200k of 200k".
+        payload["chars"] = len(text)
         if len(text) > EXTRACTED_TEXT_LIMIT:
             payload["text"] = text[:EXTRACTED_TEXT_LIMIT]
             payload["truncated"] = True
