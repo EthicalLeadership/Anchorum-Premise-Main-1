@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** `cf13235a63442be6d4657ad9285372db3af9e02f`, branch
+**Tree stamp:** `292494f18a1af7671c0fefbf74f6d6c81155deab`, branch
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
@@ -13,6 +13,15 @@ the moment this file is committed and every subsequent revision.
 
 **Test state at stamp:** `605 passed, 0 failed` (pytest, `pytest.ini`);
 `123 passed / 123` (Vitest, 18 files); `tsc --noEmit` clean.
+
+**Correction: the previous revision's test claim was false.** This header
+asserted `123 passed / 123` while the stamp it named (`cf13235`) actually ran
+`122 passed, 1 failed`: `EvidenceViewer > shows truncated SHA-256 and HMAC in
+metadata` failed because the fixture put each custody row's `hmac` on the
+*audit* rows instead, so the viewer's `latestHmac` was empty and the metadata
+block read "unsigned". Fixed in `292494f`. The lesson is the one §11 already
+makes about the two CI systems: a test count in a document is only worth
+anything if the command was re-run at the commit it names, and it was not.
 
 **History note:** `4eb0e57` was committed with a TS2554 error that
 `tsc --noEmit` catches; it is fixed in `6af79f3`. Vitest transpiles without
