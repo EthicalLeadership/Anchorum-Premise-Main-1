@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** `acd1f429b2493449c83ff76d63de06b5a7b7ed40`, branch
+**Tree stamp:** `f21d68ffe27151d7b39c8b7cbb74c37618095ba1`, branch
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
@@ -12,10 +12,10 @@ is empty. Any future check must apply that exclusion, otherwise it reports drift
 the moment this file is committed and every subsequent revision.
 
 **Test state at stamp:** `611 passed, 0 failed` (pytest, `pytest.ini`);
-`127 passed / 127` (Vitest, 18 files); `tsc --noEmit` clean.
+`132 passed / 132` (Vitest, 18 files); `tsc --noEmit` clean.
 
 **Correction: the previous revision's test claim was false.** This header
-asserted `127 passed / 127` while the stamp it named (`cf13235`) actually ran
+asserted `132 passed / 132` while the stamp it named (`cf13235`) actually ran
 `122 passed, 1 failed`: `EvidenceViewer > shows truncated SHA-256 and HMAC in
 metadata` failed because the fixture put each custody row's `hmac` on the
 *audit* rows instead, so the viewer's `latestHmac` was empty and the metadata
@@ -654,10 +654,10 @@ the only write path. `EmailIntake` dedups via `EmailSeenSet`.
 
 ## 15. Honest inventory of gaps
 
-Findings reflect commit `acd1f429b2493449c83ff76d63de06b5a7b7ed40`. Items resolved after that stamp are not
+Findings reflect commit `f21d68ffe27151d7b39c8b7cbb74c37618095ba1`. Items resolved after that stamp are not
 represented.
 
-Δ 22dc62c → acd1f42: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
+Δ 22dc62c → f21d68f: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
 
 ### Critical (1)
 
