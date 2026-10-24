@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** `5d50aac1515bef9e50103f85d228409ef197bae3`, branch
+**Tree stamp:** `634e69cc97e3a7ff3e67567424b4c027597a7036`, branch
 `Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
 reflect this commit.
 
@@ -12,7 +12,7 @@ is empty. Any future check must apply that exclusion, otherwise it reports drift
 the moment this file is committed and every subsequent revision.
 
 **Test state at stamp:** `652 passed, 0 failed` (pytest, `pytest.ini`);
-`136 passed / 136` (Vitest, 19 files); `tsc --noEmit` clean.
+`138 passed / 138` (Vitest, 19 files); `tsc --noEmit` clean.
 
 **Correction: the previous revision's test claim was false.** This header
 asserted `132 passed / 132` while the stamp it named (`cf13235`) actually ran
@@ -654,10 +654,10 @@ the only write path. `EmailIntake` dedups via `EmailSeenSet`.
 
 ## 15. Honest inventory of gaps
 
-Findings reflect commit `5d50aac1515bef9e50103f85d228409ef197bae3`. Items resolved after that stamp are not
+Findings reflect commit `634e69cc97e3a7ff3e67567424b4c027597a7036`. Items resolved after that stamp are not
 represented.
 
-Δ 22dc62c → 5d50aac: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
+Δ 22dc62c → 634e69c: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
 
 ### Critical (1)
 
