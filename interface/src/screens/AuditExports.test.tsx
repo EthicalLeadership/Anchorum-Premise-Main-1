@@ -191,7 +191,7 @@ describe("AuditExports", () => {
           }),
       },
     };
-    const { container } = render(
+    render(
       <AuditExports locale="en" adapter={adapter} caseId="CASE-2024-018" />,
     );
     await screen.findByRole("table", { name: "Audit log" });
