@@ -1725,6 +1725,7 @@ def create_app(
     def export_case(
         case_id: str,
         include_summary: bool = True,
+        format: str = "zip",
         db: Session = Depends(get_db),
     ):
         case = find_case(db, case_id)
@@ -1866,6 +1867,47 @@ def create_app(
                 },
             )
         manifest["preflight"] = preflight.manifest_record(_gates)
+
+        if format not in ("zip", "pdf"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={
+                    "error": "INVALID_FORMAT",
+                    "message": f"format must be 'zip' or 'pdf', got {format!r}",
+                },
+            )
+        if format == "pdf":
+            from interface.export_pdf import build_pdf
+            try:
+                from dossier_pipeline.disclaimer import format_disclaimer_block
+                _disclaimer = format_disclaimer_block()
+            except ImportError:
+                _disclaimer = "This document is a preparation aid, not legal advice."
+            _pdf_bytes = build_pdf(
+                case_key=case.case_key,
+                title=case.title,
+                exported_at=_datetime_text(datetime.now(timezone.utc)),
+                approved_by=stamp.approved_by,
+                stamp_version=stamp.stamp_version,
+                documents=[
+                    {
+                        "document_key": d.document_key,
+                        "filename": d.filename,
+                        "byte_size": d.byte_size,
+                        "document_type": (_curated_analysis(d) or {}).get("documentType", "unknown"),
+                    }
+                    for d in documents
+                ],
+                gates=[g.as_dict() for g in _gates],
+                disclaimer=_disclaimer,
+            )
+            return Response(
+                content=_pdf_bytes,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f'attachment; filename="case_{case.case_key}_report.pdf"'
+                },
+            )
 
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:

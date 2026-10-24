@@ -1,4 +1,8 @@
 import { useEffect, useState } from "react";
+
+
+
+
 import type { AuditEntry, ExportGate, createAdapter } from "../adapter";
 import { DataTable, type Column } from "../components/DataTable";
 import { ProofsPanel } from "../components/ProofsPanel";
@@ -41,6 +45,7 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
   const [exportType, setExportType] = useState<ExportType>(exportTypes[0]);
   const [attempt, setAttempt] = useState(0);
   const [includeSummary, setIncludeSummary] = useState(true);
+  const [format, setFormat] = useState<"zip" | "pdf">("zip");
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
@@ -182,7 +187,7 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
     setExporting(true);
     setExportError(null);
     setExportSuccess(null);
-    const result = await adapter.exports.generate(caseId, { includeSummary });
+    const result = await adapter.exports.generate(caseId, { includeSummary, format });
     setExporting(false);
     if (!result.ok) {
       setExportError(t(`error.${result.error.toLowerCase()}`));
@@ -266,6 +271,16 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
           </select>
         </label>
         <h3>{t("export.preview.title")}</h3>
+          <label>
+            {t("export.format.label")}
+            <select
+              value={format}
+              onChange={(event) => setFormat(event.target.value as 'zip' | 'pdf')}
+            >
+              <option value="zip">{t('export.format.zip')}</option>
+              <option value="pdf">{t('export.format.pdf')}</option>
+            </select>
+          </label>
         {preview.kind === "loading" ? (
           <StateBlock locale={locale} kind="loading" />
         ) : preview.kind === "error" ? (
@@ -309,6 +324,18 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
                 })}
               </p>
             ) : null}
+            <label className="export-format">
+              <span>{t("export.format.label")}</span>
+              <select
+                value={format}
+                onChange={(e) => setFormat(e.target.value as "zip" | "pdf")}
+                disabled={exporting || preview.blocked}
+                aria-label={t("export.format.label")}
+              >
+                <option value="zip">{t("export.format.zip")}</option>
+                <option value="pdf">{t("export.format.pdf")}</option>
+              </select>
+            </label>
             <label className="export-summary-toggle">
               <input type="checkbox" checked={includeSummary} onChange={(e) => setIncludeSummary(e.target.checked)} />
               {t("export.summary.toggle")}

@@ -739,18 +739,24 @@ export function createAdapter(config: AdapterConfig) {
       },
     },
     exports: {
-      async generate(caseId: string, opts?: { includeSummary?: boolean }): Promise<AdapterResult<{ blob: Blob; filename: string }>> {
+      async generate(caseId: string, opts?: { includeSummary?: boolean; format?: "zip" | "pdf" }): Promise<AdapterResult<{ blob: Blob; filename: string }>> {
         if (config.backend) {
           try {
+            const params = new URLSearchParams();
+            if (opts?.includeSummary === false) params.set("include_summary", "false");
+            if (opts?.format === "pdf") params.set("format", "pdf");
+            const qs = params.toString();
             const res = await fetch(
-              `${config.backend.baseUrl}/cases/${encodeURIComponent(caseId)}/export${opts?.includeSummary === false ? "?include_summary=false" : ""}`,
+              `${config.backend.baseUrl}/cases/${encodeURIComponent(caseId)}/export${qs ? "?" + qs : ""}`,
               { method: "POST" },
             );
             if (!res.ok) return failure(`HTTP_${res.status}`);
             const blob = await res.blob();
             const disposition = res.headers.get("Content-Disposition") || "";
             const match = disposition.match(/filename="([^"]+)"/);
-            const filename = match ? match[1] : `case_${caseId}_export.zip`;
+            const fallback =
+              opts?.format === "pdf" ? `case_${caseId}_report.pdf` : `case_${caseId}_export.zip`;
+            const filename = match ? match[1] : fallback;
             return success({ blob, filename });
           } catch {
             return failure("BACKEND_UNREACHABLE");
