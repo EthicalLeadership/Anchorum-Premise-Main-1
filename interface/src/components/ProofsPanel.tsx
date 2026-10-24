@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ProofsReport, createAdapter } from "../adapter";
 import { formatDateTime, translate } from "../i18n";
 import type { Locale } from "../types";
+import "../styles/proofs-panel.css";
 
 type Props = {
   locale: Locale;

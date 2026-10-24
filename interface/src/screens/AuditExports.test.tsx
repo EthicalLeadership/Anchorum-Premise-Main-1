@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createAdapter } from "../adapter";
 import { AuditExports } from "./AuditExports";
 
@@ -78,5 +78,44 @@ describe("AuditExports", () => {
     );
     const checkbox = await screen.findByRole("checkbox", { name: /SUMMARY\.md/i });
     expect(checkbox).toBeChecked();
+  });
+
+  it("keeps proof results on screen when the audit log refreshes", async () => {
+    const base = createAdapter({ backend: null });
+    const adapter = {
+      ...base,
+      audit: {
+        ...base.audit,
+        verifyProofs: () =>
+          Promise.resolve({
+            ok: true as const,
+            value: {
+              caseId: "CASE-2024-018",
+              status: "pass" as const,
+              verifiedAt: "2026-02-01T10:00:00Z",
+              proofs: [
+                {
+                  id: "audit_chain",
+                  status: "pass" as const,
+                  code: "ok",
+                  failingItem: null,
+                  checked: 3,
+                },
+              ],
+            },
+          }),
+      },
+    };
+    render(<AuditExports locale="en" adapter={adapter} caseId="CASE-2024-018" />);
+    await screen.findByRole("table", { name: "Audit log" });
+    fireEvent.click(screen.getByRole("button", { name: "Verify cryptographic proofs" }));
+
+    const summary = await screen.findByTestId("proofs-summary");
+    expect(summary.getAttribute("data-status")).toBe("pass");
+    // The panel asks the parent to re-read the audit log, because verifying
+    // writes a row. That refresh used to remount this subtree and discard the
+    // results the reader had just earned.
+    await waitFor(() => expect(screen.getByTestId("proofs-summary")).toBe(summary));
+    expect(screen.getByText(/Audit chain/)).toBeTruthy();
   });
 });

@@ -1,0 +1,92 @@
+/* Cryptographic-proof results.
+   The three outcomes are visually distinct because they mean different things:
+   a verified check, a failed check, and a check that never ran. Giving
+   "not checked" the same treatment as "pass" would be the interface lying
+   about what the deployment proved. */
+.proofs-panel {
+  display: grid;
+  gap: var(--sp-3);
+  justify-items: start;
+}
+
+.proofs-panel__intro {
+  color: var(--tp-muted);
+  margin: 0;
+  max-width: 64ch;
+}
+
+.proofs-panel__summary {
+  font-weight: 600;
+  margin: 0;
+}
+
+.proofs-panel__summary--pass {
+  color: var(--state-ok);
+}
+
+.proofs-panel__summary--fail {
+  color: var(--state-fail);
+}
+
+.proofs-panel__summary--not_checked {
+  color: var(--state-idle);
+}
+
+.proofs-panel__list {
+  display: grid;
+  gap: var(--sp-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  inline-size: 100%;
+}
+
+.proofs-panel__item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--tp-line);
+  border-left-width: 4px;
+  padding: var(--sp-3);
+}
+
+.proofs-panel__item--pass {
+  border-left-color: var(--state-ok);
+}
+
+.proofs-panel__item--fail {
+  border-left-color: var(--state-fail);
+  background: var(--state-fail-bg);
+}
+
+.proofs-panel__item--not_checked {
+  border-left-color: var(--state-idle);
+  background: var(--state-idle-bg);
+}
+
+.proofs-panel__name {
+  font-weight: 600;
+}
+
+.proofs-panel__status {
+  font-weight: 700;
+  text-align: right;
+}
+
+.proofs-panel__status--pass {
+  color: var(--state-ok);
+}
+
+.proofs-panel__status--fail {
+  color: var(--state-fail);
+}
+
+.proofs-panel__status--not_checked {
+  color: var(--state-idle);
+}
+
+.proofs-panel__detail {
+  color: var(--tp-muted);
+  grid-column: 1 / -1;
+}

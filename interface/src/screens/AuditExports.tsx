@@ -12,6 +12,15 @@ type Props = {
   caseId: string;
 };
 type ExportType = "evidence_index" | "signed_audit_package";
+/** Gates whose outcome needs a sentence of explanation, keyed by gate then
+ *  result. A bare `not_checked` row reads like a pass that was mislabelled, so
+ *  the gates that can end that way say why. */
+const GATE_NOTE: Record<string, Record<string, string>> = {
+  provenance: { warn: "export.gate.provenance.note" },
+  audit_hmac: { not_checked: "export.gate.audit_hmac.note" },
+  projection_rules: { not_checked: "export.gate.projection_rules.note" },
+  control_chain: { not_checked: "export.gate.control_chain.note" },
+};
 type AuditLoad =
   | { kind: "loading" }
   | { kind: "error"; message: string }
@@ -42,7 +51,12 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
 
   useEffect(() => {
     let active = true;
-    setAudit({ kind: "loading" });
+    // Only the first load shows a spinner. A refresh (after a verification or
+    // an export) keeps the current rows on screen: dropping to "loading" would
+    // unmount this subtree, and anything holding state inside it — the
+    // proofs panel's results, for one — would be discarded the moment it
+    // finished its work.
+    setAudit((current) => (current.kind === "ready" ? current : { kind: "loading" }));
     Promise.all([adapter.cases.get(caseId), adapter.audit.list(caseId)]).then(
       ([caseResult, auditResult]) => {
         if (!active) return;
@@ -154,9 +168,14 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
     },
   ];
 
+  // Only a blocking failure stops the export, so only a blocking failure earns
+  // the "Export blocked" copy. An advisory gate that failed is reported in the
+  // list and recorded in the package; it is not a block.
   const failedGate =
     preview.kind === "ready"
-      ? preview.gates.find((gate) => gate.result === "fail")
+      ? preview.gates.find(
+          (gate) => gate.result === "fail" && gate.blocking !== false,
+        )
       : undefined;
 
   async function onExport() {
@@ -254,12 +273,33 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
         ) : (
           <>
             <ul className="audit-exports__gates">
-              {preview.gates.map((gate) => (
-                <li key={gate.id} data-result={gate.result}>
-                  <span>{t(`export.gate.${gate.id}`)}</span>
-                  <strong>{t(`export.gate.${gate.result}`)}</strong>
-                </li>
-              ))}
+              {preview.gates.map((gate) => {
+                const advisory = gate.blocking === false;
+                const noteKey = GATE_NOTE[gate.id]?.[gate.result];
+                return (
+                  <li
+                    key={gate.id}
+                    data-result={gate.result}
+                    data-blocking={advisory ? "false" : "true"}
+                  >
+                    <span className="audit-exports__gate-name">
+                      {t(`export.gate.${gate.id}`)}
+                      {advisory ? ` ${t("export.gate.advisory")}` : ""}
+                    </span>
+                    <strong
+                      className={`audit-exports__gate-result audit-exports__gate-result--${gate.result}`}
+                    >
+                      {t(`export.gate.${gate.result}`)}
+                    </strong>
+                    {gate.failingItem ? (
+                      <em className="audit-exports__gate-item">{gate.failingItem}</em>
+                    ) : null}
+                    {noteKey ? (
+                      <span className="audit-exports__gate-note">{t(noteKey)}</span>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
             {failedGate?.failingItem ? (
               <p role="alert">

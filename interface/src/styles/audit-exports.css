@@ -22,19 +22,81 @@
 }
 
 .audit-exports__gates li {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--sp-3);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: var(--sp-1) var(--sp-3);
   border: 1px solid var(--tp-line);
+  /* The left edge carries the verdict, so a failed gate is visible in
+     peripheral vision without reading the row. */
+  border-left-width: 4px;
   padding: var(--sp-3);
 }
 
-.audit-chain--broken,
-.audit-exports__gates [data-result="fail"] {
+.audit-exports__gates li[data-result="pass"] {
+  border-left-color: var(--state-ok);
+}
+
+.audit-exports__gates li[data-result="fail"] {
+  border-left-color: var(--state-fail);
+  background: var(--state-fail-bg);
+}
+
+/* Advisory: the check ran and found something worth showing, but that
+   condition is normal and must not look like a refusal. */
+.audit-exports__gates li[data-result="warn"] {
+  border-left-color: var(--state-warn);
+  background: var(--state-warn-bg);
+}
+
+.audit-exports__gates li[data-result="not_checked"] {
+  border-left-color: var(--state-idle);
+  background: var(--state-idle-bg);
+}
+
+.audit-exports__gate-name {
+  font-weight: 600;
+}
+
+.audit-exports__gate-result {
+  text-align: right;
+  font-weight: 700;
+}
+
+.audit-exports__gate-result--pass {
+  color: var(--state-ok);
+}
+
+.audit-exports__gate-result--fail {
   color: var(--state-fail);
 }
 
+.audit-exports__gate-result--warn {
+  color: var(--state-warn);
+}
+
+.audit-exports__gate-result--not_checked {
+  color: var(--state-idle);
+}
+
+.audit-exports__gate-item,
+.audit-exports__gate-note {
+  grid-column: 1 / -1;
+}
+
+.audit-exports__gate-item {
+  font-style: normal;
+  font-family: var(--tp-mono);
+  color: var(--tp-muted);
+}
+
+.audit-exports__gate-note {
+  color: var(--tp-muted);
+  font-size: 0.875rem;
+}
+
 .audit-chain--broken {
+  color: var(--state-fail);
   border: 1px solid currentColor;
   font-weight: 700;
   padding-inline: var(--sp-1);
