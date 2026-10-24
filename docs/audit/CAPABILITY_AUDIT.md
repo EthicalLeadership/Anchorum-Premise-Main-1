@@ -23,6 +23,18 @@ block read "unsigned". Fixed in `292494f`. The lesson is the one §11 already
 makes about the two CI systems: a test count in a document is only worth
 anything if the command was re-run at the commit it names, and it was not.
 
+**Further correction:** two commits in the current chain carry misleading
+messages rather than misleading code. `634e69c` was committed with TSC=2
+(an unused `container` destructure in a test); `ee65d7e` restamped to it,
+so for one commit the audit claimed "tsc --noEmit clean" over a tree that
+did not type-check. `f2dab7c` fixed the destructure and `bc5a097`
+restamped to it — the current stamp is honest. `bc5a097`'s own commit
+message was written as `restamp to  (AuditExports unused var fix)` with
+the SHA blank, because the `$SHORT` shell variable did not survive across
+invocations. Both are cosmetic; neither lies about code. The pattern to
+avoid is the same one that produced `cf13235` and `18b370c`: a commit
+bypassing pre-commit's `tsc` gate.
+
 **History note:** `4eb0e57` was committed with a TS2554 error that
 `tsc --noEmit` catches; it is fixed in `6af79f3`. Vitest transpiles without
 type-checking, so 104/104 tests were green over a broken build — the reason
