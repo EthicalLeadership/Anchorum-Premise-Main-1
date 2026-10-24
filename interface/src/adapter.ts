@@ -159,10 +159,43 @@ async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
     .join("");
 }
 type Verification = (typeof fixture.verification)[keyof typeof fixture.verification];
+/**
+ * One pre-flight gate. `blocking` decides what a failure means: a blocking
+ * failure stops the export, an advisory one is recorded and reported. `warn`
+ * is not "fail" — it is the normal state of evidence whose date the extractor
+ * could not read, and collapsing the two would either block every export or
+ * hide the warning.
+ */
+export type ExportGate = {
+  id: string;
+  result: "pass" | "fail" | "not_checked" | "warn";
+  blocking?: boolean;
+  failingItem: string | null;
+  detail?: string;
+};
 type ExportPreview = {
   type: string;
-  gates: typeof fixture.exportGates;
+  gates: readonly ExportGate[];
   blocked: boolean;
+};
+/**
+ * One cryptographic claim re-derived by the server. `code` is machine-readable
+ * so the interface can phrase the outcome in the reader's language; `status`
+ * distinguishes "verified" from "could not be checked", which are not the same
+ * statement and must not be rendered as one.
+ */
+export type ProofResult = {
+  id: string;
+  status: "pass" | "fail" | "not_checked";
+  code: string;
+  failingItem: string | null;
+  checked: number;
+};
+export type ProofsReport = {
+  caseId: string;
+  status: "pass" | "fail" | "not_checked";
+  verifiedAt: string;
+  proofs: readonly ProofResult[];
 };
 export type AuditEntry =
   | (typeof fixture.audit)[number]
@@ -756,6 +789,22 @@ export function createAdapter(config: AdapterConfig) {
             ? success<readonly AuditEntry[]>([...fixture.audit, ...sessionAudit])
             : success<readonly AuditEntry[]>([]),
         );
+      },
+      /**
+       * Re-derive every cryptographic claim the case makes.
+       *
+       * POST, and never answered offline: a proof computed from the sample
+       * fixture would be a proof about the sample, presented as if it were
+       * about the reader's case. There is no honest offline answer.
+       */
+      verifyProofs(caseId: string) {
+        if (config.backend) {
+          return requestJson<ProofsReport>(
+            `/cases/${encodeURIComponent(caseId)}/audit/verify-proofs`,
+            { method: "POST" },
+          );
+        }
+        return Promise.resolve(failure("FEATURE_UNAVAILABLE"));
       },
     },
     timeline: {

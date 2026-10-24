@@ -32,6 +32,7 @@ from dossier_pipeline.schema import AuditLog, Case, Document, JurisdictionStamp,
 from dossier_pipeline.barreau_gate import BarreauGate, BarreauGateError
 from interface import analysis as analysis_service
 from interface import malware_scan
+from interface import preflight, proofs
 from interface.analysis import analyse
 from interface.pdf_text import extract_text, PdfTextError, looks_like_pdf
 import logging
@@ -765,6 +766,121 @@ def create_app(
                 .order_by(Document.id.asc())
             )
         )
+
+    def audit_proof_rows(db: Session, case: Case) -> list[proofs.AuditRow]:
+        """The audit chain as plain rows, in the order it was written.
+
+        `id ASC` and not `created_at ASC`: the chain is defined by insertion
+        order, and two rows written inside one second would otherwise be
+        compared in an order the chain never claimed.
+        """
+        rows = db.scalars(
+            select(AuditLog)
+            .where(AuditLog.case_id == case.id)
+            .order_by(AuditLog.id.asc())
+        ).all()
+        return [
+            proofs.AuditRow(
+                id=int(row.id),
+                action=row.action,
+                details=row.details or "",
+                previous_hash=row.previous_hash or "",
+                record_hash=row.record_hash or "",
+                hmac=row.hmac or "",
+            )
+            for row in rows
+        ]
+
+    def dossier_items(db: Session, case: Case) -> list[preflight.DossierItem]:
+        items: list[preflight.DossierItem] = []
+        for document in case_documents(db, case):
+            curated = _curated_analysis(document) or {}
+            metadata = curated.get("metadata") or {}
+            items.append(
+                preflight.DossierItem(
+                    document_key=document.document_key,
+                    filename=document.filename,
+                    content_hash=document.content_hash,
+                    date=str(metadata.get("date") or ""),
+                    author=str(metadata.get("author") or ""),
+                    issuer=str(metadata.get("issuer") or ""),
+                )
+            )
+        return items
+
+    def content_proof_items(db: Session, case: Case) -> list[proofs.ContentItem]:
+        items: list[proofs.ContentItem] = []
+        for document in case_documents(db, case):
+            path = stored_evidence_path(document)
+            data = path.read_bytes() if path is not None and path.is_file() else None
+            items.append(
+                proofs.ContentItem(
+                    document_key=document.document_key,
+                    content_hash=document.content_hash,
+                    stored_bytes=data,
+                )
+            )
+        return items
+
+    def projection_proof_records(
+        db: Session, case: Case
+    ) -> list[proofs.ProjectionRecord]:
+        return [
+            proofs.ProjectionRecord(
+                document_key=document.document_key,
+                rules_hash=document.analysis_rules_hash or "",
+                config_hash=document.analysis_config_hash or "",
+            )
+            for document in case_documents(db, case)
+        ]
+
+    def engine_hashes() -> tuple[str, str]:
+        """The rules/config hashes the lexicon on disk derives right now.
+
+        Empty on both when the engine cannot be built (lexicon missing): the
+        projection proof then reports `not_checked` rather than a pass nobody
+        earned or a failure nobody caused.
+        """
+        try:
+            from interface import engine as engine_module
+
+            return engine_module.fingerprint()
+        except Exception:
+            return "", ""
+
+    def run_case_proofs(db: Session, case: Case) -> list[proofs.Proof]:
+        rows = audit_proof_rows(db, case)
+        signer = _hmac_signer()
+        verify = signer.verify if signer is not None else None
+        rules_hash, config_hash = engine_hashes()
+        return [
+            proofs.chain_proof(rows),
+            proofs.hmac_proof(rows, verify),
+            proofs.content_proof(content_proof_items(db, case)),
+            proofs.projection_proof(
+                projection_proof_records(db, case),
+                expected_rules_hash=rules_hash,
+                expected_config_hash=config_hash,
+            ),
+            proofs.control_chain_proof(os.getenv("ANCHORUM_CONTROL_DB_PATH")),
+        ]
+
+    def preflight_gates(db: Session, case: Case) -> list[preflight.Gate]:
+        """Every gate a package must pass, from one place.
+
+        Preview and export both call this, so a preview cannot promise an
+        export that the export route then refuses — the divergence that made
+        the old preview a decoration rather than a check.
+        """
+        by_id = {proof.id: proof for proof in run_case_proofs(db, case)}
+        return [
+            preflight.provenance_gate(dossier_items(db, case)),
+            preflight.gate_from_proof(by_id["audit_chain"], blocking=True),
+            preflight.gate_from_proof(by_id["audit_hmac"], blocking=True),
+            preflight.gate_from_proof(by_id["evidence_content"], blocking=True),
+            preflight.gate_from_proof(by_id["projection_rules"], blocking=False),
+            preflight.gate_from_proof(by_id["control_chain"], blocking=False),
+        ]
 
     def search_documents(db: Session, case: Case, needle: str) -> list[dict]:
         """Case-scoped substring search over the extracted-text sidecars.
@@ -1731,6 +1847,26 @@ def create_app(
                         },
                     )
             _prev = _log
+
+        # Pre-flight, from the same function the preview calls. The chain and
+        # content checks above already fail closed; this adds the control chain
+        # and records the advisory verdicts inside the package itself, so what
+        # a reader receives carries the caveats it was produced under.
+        _gates = preflight_gates(db, case)
+        _failed_gate = next(
+            (g for g in _gates if g.blocking and g.result == preflight.RESULT_FAIL),
+            None,
+        )
+        if _failed_gate is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": "EXPORT_PREFLIGHT_FAILED",
+                    "message": f"{_failed_gate.id}: {_failed_gate.detail or 'failed'}",
+                },
+            )
+        manifest["preflight"] = preflight.manifest_record(_gates)
+
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("manifest.json", json.dumps(manifest, indent=2))
@@ -1768,6 +1904,15 @@ def create_app(
                     f"- `{_doc.document_key}` — {_doc.filename} "
                     f"(type: {_type}, bytes: {_doc.byte_size})"
                 )
+
+            summary_lines.extend(["", "## Pre-flight", ""])
+            for _gate in _gates:
+                _line = f"- {_gate.id}: {_gate.result}"
+                if _gate.result != "pass" and _gate.detail:
+                    _line += f" ({_gate.detail})"
+                if not _gate.blocking:
+                    _line += " — advisory"
+                summary_lines.append(_line)
 
             raw_summary = "\n".join(summary_lines) + "\n"
 
@@ -1854,23 +1999,33 @@ def create_app(
             {
                 "id": "restriction",
                 "result": "fail" if restriction_fail else "pass",
+                "blocking": True,
                 "failingItem": restriction_fail,
             },
             {
                 "id": "disclaimer",
                 "result": "pass",
+                "blocking": True,
                 "failingItem": None,
             },
             {
                 "id": "barreau",
                 "result": "fail" if barreau_fail else "pass",
+                "blocking": True,
                 "failingItem": barreau_fail,
             },
         ]
+        # The cryptographic and provenance gates come from the same function
+        # the export route calls, so this preview is a prediction of the export
+        # rather than a separate, friendlier opinion.
+        gates.extend(gate.as_dict() for gate in preflight_gates(db, case))
         return {
             "type": type,
             "gates": gates,
-            "blocked": any(g["result"] == "fail" for g in gates),
+            "blocked": any(
+                gate["result"] == "fail" and gate.get("blocking", True)
+                for gate in gates
+            ),
         }
 
 
@@ -2011,6 +2166,37 @@ def create_app(
             "approved_by": stamp.approved_by,
             "applied_at": _datetime_text(stamp.applied_at),
         }
+
+    @app.post("/cases/{case_id}/audit/verify-proofs", dependencies=[local_api])
+    def verify_case_proofs(case_id: str, db: Session = Depends(get_db)) -> dict:
+        """Re-derive every cryptographic claim this case makes, and report.
+
+        POST rather than GET because a successful run records an audit row:
+        the fact that verification happened is itself part of the case's
+        history, and a GET that writes would be a lie about the verb.
+
+        Each proof is computed from the stored bytes and rows at the moment of
+        the call. Nothing here consults a previously stored verdict.
+        """
+        case = find_case(db, case_id)
+        results = run_case_proofs(db, case)
+        status_value = proofs.overall_status(results)
+        failed = [proof.id for proof in results if proof.status == proofs.STATUS_FAIL]
+        payload = {
+            "caseId": _case_id(case),
+            "status": status_value,
+            "verifiedAt": _datetime_text(datetime.now(timezone.utc)),
+            "proofs": [proof.as_dict() for proof in results],
+        }
+        _append_audit(
+            db,
+            case_id=case.id,
+            action="proofs_verified",
+            details={"status": status_value, "failed": failed},
+            actor="system",
+        )
+        db.commit()
+        return payload
 
     @app.get("/cases/{case_id}/audit", dependencies=[local_api])
     def get_case_audit(case_id: str, db: Session = Depends(get_db)):

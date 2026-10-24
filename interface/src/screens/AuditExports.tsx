@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import type { AuditEntry, createAdapter } from "../adapter";
+import type { AuditEntry, ExportGate, createAdapter } from "../adapter";
 import { DataTable, type Column } from "../components/DataTable";
+import { ProofsPanel } from "../components/ProofsPanel";
 import { StateBlock } from "../components/StateBlock";
 import { formatDateTime, translate } from "../i18n";
 import type { Locale } from "../types";
@@ -11,7 +12,6 @@ type Props = {
   caseId: string;
 };
 type ExportType = "evidence_index" | "signed_audit_package";
-type Gate = { id: string; result: "pass" | "fail"; failingItem: string | null };
 type AuditLoad =
   | { kind: "loading" }
   | { kind: "error"; message: string }
@@ -19,7 +19,7 @@ type AuditLoad =
 type PreviewLoad =
   | { kind: "loading" }
   | { kind: "error"; message: string }
-  | { kind: "ready"; gates: readonly Gate[]; blocked: boolean };
+  | { kind: "ready"; gates: readonly ExportGate[]; blocked: boolean };
 
 const exportTypes: readonly ExportType[] = [
   "evidence_index",
@@ -81,7 +81,7 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
         result.ok
           ? {
               kind: "ready",
-              gates: result.value.gates as readonly Gate[],
+              gates: result.value.gates as readonly ExportGate[],
               blocked: result.value.blocked,
             }
           : {
@@ -222,6 +222,14 @@ export function AuditExports({ locale, adapter, caseId }: Props) {
           rowKey={(entry) => entry.id}
         />
       )}
+
+      <ProofsPanel
+        locale={locale}
+        adapter={adapter}
+        caseId={caseId}
+        timeZone={audit.timeZone}
+        onVerified={() => setAttempt((n) => n + 1)}
+      />
 
       <section aria-labelledby="export-title">
         <h2 id="export-title">{t("export.title")}</h2>

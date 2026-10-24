@@ -51,7 +51,13 @@ def test_stamp_then_preview_passes(client):
 
     p = client.post("/cases/B1/exports/preview?type=evidence_index").json()
     assert p["blocked"] is False
-    assert all(g["result"] == "pass" for g in p["gates"])
+    gates = {g["id"]: g for g in p["gates"]}
+    # Gates include advisory verdicts now (provenance, control chain), so
+    # "everything passes" is no longer the contract. "Nothing blocking failed"
+    # is.
+    assert [g for g in gates.values() if g["result"] == "fail"] == []
+    assert gates["barreau"]["result"] == "pass"
+    assert gates["audit_chain"]["result"] == "pass"
 
 
 def test_stamp_then_export_downloads(client):

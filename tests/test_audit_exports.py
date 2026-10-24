@@ -91,4 +91,26 @@ def test_export_preview_passes_with_clean_evidence(tmp_path):
         assert r.status_code == 200
         body = r.json()
         assert body["blocked"] is False
-        assert all(g["result"] == "pass" for g in body["gates"])
+        gates = {g["id"]: g for g in body["gates"]}
+        # Not every gate is "pass" any more: provenance is advisory (an
+        # un-dated upload is normal) and the control chain is absent on this
+        # host. What matters is that nothing blocking failed.
+        assert [g for g in gates.values() if g["result"] == "fail"] == []
+        assert set(gates) >= {
+            "restriction",
+            "disclaimer",
+            "barreau",
+            "provenance",
+            "audit_chain",
+            "audit_hmac",
+            "evidence_content",
+            "projection_rules",
+            "control_chain",
+        }
+        # The audit chain was re-derived and matched: blocking, and passing.
+        assert gates["audit_chain"]["result"] == "pass"
+        assert gates["audit_chain"]["blocking"] is True
+        # No control plane on this host: reported, not claimed.
+        assert gates["control_chain"]["blocking"] is False
+        assert gates["control_chain"]["result"] == "not_checked"
+        assert gates["provenance"]["blocking"] is False

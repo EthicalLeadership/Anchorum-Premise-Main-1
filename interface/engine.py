@@ -81,6 +81,19 @@ def project_doctrine(text: str) -> ProjectionResponse:
     return _project(text, engine_doctrine())
 
 
+def fingerprint() -> tuple[str, str]:
+    """The (rules_hash, config_hash) the risk-register engine derives today.
+
+    Recorded on every analysed artifact as `lexiconHash` / `configHash`, and
+    re-derived by the proof route: if the two disagree for a case, the rules
+    or the engine configuration changed under that case after it was analysed.
+    Read from the same engine object the analysis used, so the pair cannot
+    drift from the values that were actually written.
+    """
+    eng = engine()
+    return eng.rules.hash, eng._config_hash()
+
+
 def lexicon_summary(lexicon_path: Path = LEXICON_PATH) -> dict:
     """Metadata for a lexicon file. Defaults to the risk register, so the
     existing caller is unchanged; pass a Path for the doctrine lexicon."""
