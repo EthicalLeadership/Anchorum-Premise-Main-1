@@ -118,4 +118,86 @@ describe("AuditExports", () => {
     await waitFor(() => expect(screen.getByTestId("proofs-summary")).toBe(summary));
     expect(screen.getByText(/Audit chain/)).toBeTruthy();
   });
+
+  it("renders advisory gates with a marker, note, and no block banner", async () => {
+    const base = createAdapter({ backend: null });
+    const adapter = {
+      ...base,
+      exports: {
+        ...base.exports,
+        preview: () =>
+          Promise.resolve({
+            ok: true as const,
+            value: {
+              type: "evidence_index",
+              gates: [
+                { id: "restriction", result: "pass" as const, blocking: true, failingItem: null },
+                { id: "barreau", result: "pass" as const, blocking: true, failingItem: null },
+                { id: "audit_chain", result: "pass" as const, blocking: true, failingItem: null },
+                // Advisory: gate runs, warns, must not block. Note comes from
+                // GATE_NOTE wiring; (advisory) marker comes from the render.
+                { id: "provenance", result: "warn" as const, blocking: false, failingItem: "1/1", detail: "incomplete" },
+                { id: "control_chain", result: "not_checked" as const, blocking: false, failingItem: null, detail: "no_control_chain" },
+              ],
+              blocked: false,
+            },
+          }),
+      },
+    };
+    const { container } = render(
+      <AuditExports locale="en" adapter={adapter} caseId="CASE-2024-018" />,
+    );
+    await screen.findByRole("table", { name: "Audit log" });
+    await screen.findByText(/Provenance/);
+
+    // Both advisory gates carry the marker.
+    expect(screen.getAllByText(/\(advisory\)/).length).toBe(2);
+
+    // data-blocking attribute lets CSS and future tests discriminate.
+    expect(container.querySelectorAll('[data-blocking="false"]').length).toBe(2);
+    expect(container.querySelectorAll('[data-blocking="true"]').length).toBe(3);
+
+    // Notes come from GATE_NOTE. If wiring is removed, this fails.
+    expect(screen.getByText(/Some document metadata is missing/)).toBeTruthy();
+    expect(screen.getByText(/No control chain exists on this host/)).toBeTruthy();
+
+    // No blocking failure means no "Export blocked" alert.
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it("picks the blocking failure, not an advisory one, for the banner", async () => {
+    const base = createAdapter({ backend: null });
+    const adapter = {
+      ...base,
+      exports: {
+        ...base.exports,
+        preview: () =>
+          Promise.resolve({
+            ok: true as const,
+            value: {
+              type: "evidence_index",
+              gates: [
+                // Advisory failure FIRST. Without the `blocking !== false`
+                // filter in `failedGate`, `find` would return this one and
+                // the banner would name "Provenance" — wrong, because the
+                // advisory gate does not stop the export.
+                { id: "provenance", result: "fail" as const, blocking: false, failingItem: "1/1" },
+                // Blocking failure SECOND. This is the gate that earns the
+                // banner.
+                { id: "audit_chain", result: "fail" as const, blocking: true, failingItem: "row-3" },
+              ],
+              blocked: true,
+            },
+          }),
+      },
+    };
+    const { container } = render(
+      <AuditExports locale="en" adapter={adapter} caseId="CASE-2024-018" />,
+    );
+    await screen.findByRole("table", { name: "Audit log" });
+    const alert = await screen.findByRole("alert");
+    // The banner names the blocking gate, not the advisory one.
+    expect(alert.textContent).toMatch(/Audit chain/);
+    expect(alert.textContent).not.toMatch(/Provenance/);
+  });
 });
