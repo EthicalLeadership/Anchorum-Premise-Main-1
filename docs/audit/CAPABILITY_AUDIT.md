@@ -35,6 +35,26 @@ invocations. Both are cosmetic; neither lies about code. The pattern to
 avoid is the same one that produced `cf13235` and `18b370c`: a commit
 bypassing pre-commit's `tsc` gate.
 
+**Further correction (messages only):** two more commits in the chain carry
+messages that do not describe their commits.
+
+- `e77cb09`'s subject is "docs: fix 'froma' typo" but the commit touches
+  only `docs/audit/CAPABILITY_AUDIT.md`; `git show e77cb09 -- interface/locales/en.json`
+  is empty. The "froma" typo was never in the committed tree —
+  `git show 5d50aac:interface/locales/en.json` already reads "from a
+  stored verdict". The typo appeared in a working summary, not in code.
+- `afc75d1`'s subject is "audit: restamp to bc5a097" but its stamp reads
+  `e77cb09`. The `$(git rev-parse --short=7 HEAD~1)` expansion ran when
+  HEAD~1 was already past the code commit. Verified by
+  `sed -n 3p docs/audit/CAPABILITY_AUDIT.md`.
+
+Neither message lies about correctness — both commits leave the tree green
+— but neither describes what it does. The pattern (a generated summary
+claims a fix; the fix is committed; the fix was not needed) is the third
+kind of process defect in this chain, after `cf13235` (bypassed tsc) and
+`bc5a097` (empty-SHA variable). All three trace to accepting a summary at
+face value rather than running the diff.
+
 **History note:** `4eb0e57` was committed with a TS2554 error that
 `tsc --noEmit` catches; it is fixed in `6af79f3`. Vitest transpiles without
 type-checking, so 104/104 tests were green over a broken build — the reason
