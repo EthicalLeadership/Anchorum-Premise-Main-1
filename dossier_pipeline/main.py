@@ -490,32 +490,6 @@ def cmd_intake_email(args, config):
 
 
 
-def cmd_intake_email(args, config):
-    """Accept .eml files and process them through the pipeline."""
-    import argparse
-    from pathlib import Path
-    
-    parser = argparse.ArgumentParser(description='Intake email files')
-    parser.add_argument('files', nargs='+', help='.eml files to process')
-    args = parser.parse_args([])  # Will be populated by argparse in main()
-    
-    pipeline = _build_pipeline(config)
-    
-    for filepath in args.files:
-        path = Path(filepath)
-        if not path.exists():
-            print(f"ERROR: File not found: {filepath}")
-            continue
-        
-        try:
-            with open(path, 'rb') as f:
-                eml_bytes = f.read()
-            
-            result = pipeline.process_email(eml_bytes, {"filename": path.name})
-            
-            print(f"Processed {path.name}:")
-            print(f"  Status: {result.status.value}")
-            print(f"  Stage: {result.stage}")
             if result.envelope:
                 print(f"  Message-ID: {result.envelope.message_id}")
                 print(f"  Classification: {result.classification}")

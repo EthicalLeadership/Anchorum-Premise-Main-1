@@ -1,4 +1,4 @@
-Contexte documentaire :
+nano prompts/v1/system.txt          # line 1 (also fix "dossierDOSSIER" → "dossier en cause")Contexte documentaire :
 {context}
 
 Sujet d’analyse : {topic}
