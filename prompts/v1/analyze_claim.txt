@@ -3,7 +3,7 @@ nano prompts/v1/system.txt          # line 1 (also fix "dossierDOSSIER" → "dos
 
 Sujet d’analyse : {topic}
 
-Produis une analyse structurée en français pour le dossier DOSSIER-PIPELINE. Structure :
+Produis une analyse structurée en français pour le dossier en cause. Structure :
 1. Faits établis par les documents
 2. Éléments manquants ou contradictoires
 3. Implications juridiques/procédurales
