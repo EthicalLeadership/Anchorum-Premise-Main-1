@@ -445,14 +445,23 @@ def cmd_intake_email(args, config):
     """Accept .eml files and process them through the pipeline with deterministic/epistemic tracking."""
     import argparse
     from pathlib import Path
+    import sys
+    import os
+    import glob
     
-    parser = argparse.ArgumentParser(description='Intake email files')
-    parser.add_argument('files', nargs='+', help='.eml files to process')
-    args = parser.parse_args([])  # Will be populated by argparse in main()
+    # Use subparser arguments (file or dir)
+    files = []
+    if hasattr(args, "file") and args.file:
+        files.append(args.file)
+    elif hasattr(args, "dir") and args.dir:
+        files.extend(glob.glob(os.path.join(args.dir, "*.eml")))
+    else:
+        print("ERROR: Provide --file or --dir", file=sys.stderr)
+        sys.exit(1)
     
     pipeline = _build_pipeline(config)
     
-    for filepath in args.files:
+    for filepath in files:
         path = Path(filepath)
         if not path.exists():
             print(f"ERROR: File not found: {filepath}")
@@ -469,32 +478,39 @@ def cmd_intake_email(args, config):
             response = {
                 "case_id": config.get("case_id"),
                 "result": result.status.value if result else "FAILED",
-                "stage": result.stage if result else None,
+                "stage": result.status.value if result else "intake",
                 "raw_sha256": result.raw_sha256 if result else None,
-                "message_id": result.envelope.message_id if result and result.envelope else None,
-                "classification": result.classification if result else None,
-                "policy_result": result.policy_decision if result else None,
+                "message_id": result.message_id,
             }
-            response = _tools.add_epistemic_fields_to_record(response)
+            print(f"Processed {path.name}:")
+            print(f"  Status: {response['result']}")
+            print(f"  Stage: {response['stage']}")
+            if response.get("message_id"):
+                print(f"  Message-ID: {response['message_id']}")
+            
+        except Exception as exc:
+            print(f"ERROR processing {path.name}: {exc}", file=sys.stderr)
+
+            # Add deterministic/epistemic metadata
+            from interface import tools as _tools
+            response = {
+                "case_id": config.get("case_id"),
+                "result": result.status.value if result else "FAILED",
+                "stage": result.status.value if result else "intake",
+                "raw_sha256": result.raw_sha256,
+                "message_id": result.message_id,
+            }
             
             print(f"Processed {path.name}:")
             print(f"  Status: {response['result']}")
             print(f"  Stage: {response['stage']}")
             if response.get('message_id'):
                 print(f"  Message-ID: {response['message_id']}")
-                print(f"  Classification: {response['classification']}")
-                print(f"  Policy decision: {response['policy_result']}")
             
         except Exception as exc:
             print(f"ERROR processing {path.name}: {type(exc).__name__}: {exc}")
 
 
-
-            if result.envelope:
-                print(f"  Message-ID: {result.envelope.message_id}")
-                print(f"  Classification: {result.classification}")
-                print(f"  Policy decision: {result.policy_decision}")
-            
         except Exception as exc:
             print(f"ERROR processing {path.name}: {type(exc).__name__}: {exc}")
 
