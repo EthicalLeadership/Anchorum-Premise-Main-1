@@ -32,7 +32,7 @@ self_hash: "a71eeaa76511a3c686b917e5cf3383bf2568c26a2ccd6cedd4407c082266d207"
 
 | Severity | Definition |
 | --- | --- |
-| **HIGH** | Breaks a control the plan asserts as a required guarantee; enables an integrity/evidence bypass; or blocks a reproducible build/verification of the system. |
+| **HIGH** | Breaks a control the plan asserts as a required auditable; enables an integrity/evidence bypass; or blocks a reproducible build/verification of the system. |
 | **MEDIUM** | Documentation/packaging/process integrity defect; supply-chain exposure; dead or contradictory code path affecting correctness; missing required data artifact. |
 | **LOW** | Hygiene (stray/generated artifacts, naming, cosmetic config). |
 
@@ -298,7 +298,7 @@ exit 0   (no syntax errors in any real package)
 ## 7. Readiness Assessment
 
 - **Against the plan as a whole (Phases 1–6):** **Not production-ready and not materially started.** The plan describes a web/AI platform; the repository is a Python integrity pipeline. This is a **scope** statement, consistent with the plan's own "Readiness Notice."
-- **Against the plan's integrity guarantees (the existing code's domain):** **Not production-ready.** Four required controls are `CLAIMED-AND-BROKEN` (F-01, F-02, F-03, F-04) and one is unenforceable as written (F-13). These are the controls the product's entire value proposition rests on.
+- **Against the plan's integrity auditables (the existing code's domain):** **Not production-ready.** Four required controls are `CLAIMED-AND-BROKEN` (F-01, F-02, F-03, F-04) and one is unenforceable as written (F-13). These are the controls the product's entire value proposition rests on.
 - **Strengths to preserve:** the Ed25519 trust-anchor layer (`registry/trust.py`) is production-grade and passes 21 focused conformance tests; the evidence chain correctly detects tampering and fails closed; JWT algorithm handling is correct; the whole suite is green under complete dependencies (278/279).
 - **Known methodological limitation (time recursion):** the reviewer asks the codebase whether its "trusted time" is a control or a comment and the same limit applies to this audit. With no `.git` and no NTP/TSA, the `date -u` in Appendix B is **unverifiable**; the audit's own timestamp carries the same weakness it reports. This does not invalidate the findings (which are reproducible from the committed files and commands) but it means the audit is not independently time-attested.
 

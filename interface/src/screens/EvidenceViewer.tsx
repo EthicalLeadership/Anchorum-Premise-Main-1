@@ -1,11 +1,18 @@
-import { useEffect, useState } from "react";
-import type { createAdapter, Evidence, CustodyEntry, EvidenceText } from "../adapter";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type {
+  createAdapter,
+  CustodyEntry,
+  Evidence,
+  EvidenceText,
+  SummaryResult,
+} from "../adapter";
 import { StateBlock } from "../components/StateBlock";
 import { DataTable, type Column } from "../components/DataTable";
 import { ChainTimeline } from "../components/ChainTimeline";
 import { VerificationTile, type VerificationView } from "../components/VerificationTile";
 import { PdfViewer } from "../components/PdfViewer";
 import { ExtractedText } from "../components/ExtractedText";
+import { SaulSummaryDrawer } from "../components/SaulSummaryDrawer";
 import { formatDateTime, translate } from "../i18n";
 import type { Locale } from "../types";
 
@@ -14,12 +21,16 @@ function isPdf(name: string): boolean {
   return /\.pdf$/i.test(name);
 }
 
-
 function truncateHash(h: string): string {
   return h.length > 16 ? `${h.slice(0, 8)}…${h.slice(-4)}` : h;
 }
 
-type Props = { locale: Locale; adapter: ReturnType<typeof createAdapter>; caseId: string; evidenceId: string };
+type Props = {
+  locale: Locale;
+  adapter: ReturnType<typeof createAdapter>;
+  caseId: string;
+  evidenceId: string;
+};
 type TextLoad =
   | { kind: "idle" }
   | { kind: "loading" }
@@ -37,20 +48,31 @@ type Load =
     };
 
 export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
+
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [consulting, setConsulting] = useState(false);
   const [consultError, setConsultError] = useState<string | null>(null);
-  const [summarizing, setSummarizing] = useState(false);
-  const [summarizeError, setSummarizeError] = useState<string | null>(null);
   const [verifyingDoctrine, setVerifyingDoctrine] = useState(false);
-  const [doctrineResult, setDoctrineResult] = useState<{ match: boolean; reason: string | null } | null>(null);
+  const [doctrineResult, setDoctrineResult] = useState<{
+    match: boolean;
+    reason: string | null;
+  } | null>(null);
+
+  // The summary drawer. `summary` is the last result the API produced, whether
+  // it came from this click or from the record; `summaryLoading` covers both
+  // paths so the drawer never shows an empty document while it waits.
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [summary, setSummary] = useState<SummaryResult | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+
+  const summaryTriggerRef = useRef<HTMLButtonElement | null>(null);
+
   // A search hit links here with `?at=<offset>&q=<term>`. Opening on the
   // original tab would drop the reader at the top of the PDF and lose the
   // position they just clicked, so the arriving link decides the tab.
-  const arrivalParams = new URLSearchParams(
-    window.location.hash.split("?")[1] ?? "",
-  );
+  const arrivalParams = new URLSearchParams(window.location.hash.split("?")[1] ?? "");
   const arrivalAt = Number(arrivalParams.get("at"));
   const arrivalTerm = arrivalParams.get("q") ?? "";
   const arrival =
@@ -61,29 +83,33 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
     arrival ? "extracted" : "original",
   );
   const [textLoad, setTextLoad] = useState<TextLoad>({ kind: "idle" });
-  // Which panel the reader is on, and what the extracted-text fetch returned.
-  // Kept beside the main load rather than inside it: the text is a second,
-  // optional read, and failing to fetch it must not blank the original.
 
   useEffect(() => {
+    // A route can be reached with a placeholder id (a link built from an item
+    // that had none). Requesting "null" would 404 and show a scare message for
+    // what is really a missing link, so nothing is fetched for it — but the
+    // check lives inside the effect, because a `return null` above the hooks
+    // would call a different number of hooks on different renders.
+    if (!evidenceId || evidenceId === "null") return;
     let active = true;
     setLoad({ kind: "loading" });
     (async () => {
-      const [c, e, cu, v] = await Promise.all([
+      const [c, e, cu] = await Promise.all([
         adapter.cases.get(caseId),
         adapter.evidence.get(evidenceId),
         adapter.evidence.custody(evidenceId),
-        adapter.evidence.verify(evidenceId),
       ]);
       if (!active) return;
       const err = [c, e, cu].find((r) => !r.ok);
-      if (err && !err.ok) return setLoad({ kind: "error", key: `error.${err.error.toLowerCase()}` });
+      if (err && !err.ok) {
+        return setLoad({ kind: "error", key: `error.${err.error.toLowerCase()}` });
+      }
       if (!c.ok || !e.ok || !cu.ok) return;
       setLoad({
         kind: "ready",
         evidence: e.value,
         custody: cu.value,
-        verification: v.ok ? (v.value as VerificationView) : null,
+        verification: null,
         timeZone: c.value.timezone,
       });
     })();
@@ -98,7 +124,7 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
   // Dependencies deliberately exclude `textLoad.kind`. Including it made the
   // effect re-run when it set "loading", and that re-run's cleanup flipped
   // `active` to false, so the resolved promise was discarded and the panel sat
-  // on "Loading…" forever - a deadlock that only appears at runtime.
+  // on "Loading…" forever — a deadlock that only appears at runtime.
   useEffect(() => {
     if (tab !== "extracted") return;
     let active = true;
@@ -124,13 +150,69 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
   // what lets call sites supply `{reason}` rather than failing at render.
   const t = (k: string, parameters?: Record<string, string | number>) =>
     translate(locale, k as never, parameters);
+
+  // Reading the stored summary is a GET: it never calls the model, so opening
+  // the drawer twice costs nothing and shows the same text both times.
+  const openStoredSummary = useCallback(async () => {
+    setSummaryOpen(true);
+    setSummaryLoading(true);
+    setSummaryError(null);
+    const result = await adapter.evidence.summary(evidenceId);
+    setSummaryLoading(false);
+    if (!result.ok) {
+      // NOT_GENERATED is the ordinary case: nothing has been asked for yet. It
+      // is not an error and must not be dressed as one.
+      if (result.error !== "HTTP_404") {
+        setSummaryError(
+          t(
+            result.error === "FEATURE_UNAVAILABLE"
+              ? "evidence.viewer.summary_unavailable"
+              : "error.generic",
+          ),
+        );
+      }
+      return;
+    }
+    setSummary(result.value);
+  }, [adapter, evidenceId, locale]);
+
+
+
+  async function onSummarize() {
+    setSummaryOpen(true);
+    setSummaryLoading(true);
+    setSummaryError(null);
+    const result = await adapter.evidence.summarize(evidenceId);
+    setSummaryLoading(false);
+    if (!result.ok) {
+      setSummaryError(
+        t(
+          result.error === "FEATURE_UNAVAILABLE"
+            ? "evidence.viewer.summary_unavailable"
+            : "error.generic",
+        ),
+      );
+      return;
+    }
+    setSummary(result.value);
+    // The custody list gained a "summarised" row; refetch so the reader sees
+    // that this just happened rather than a list that stops before it.
+    setAttempt((n) => n + 1);
+  }
+
   async function onConsult() {
     setConsulting(true);
     setConsultError(null);
     const r = await adapter.evidence.consult(evidenceId);
     setConsulting(false);
     if (!r.ok) {
-      setConsultError(t(r.error === "FEATURE_UNAVAILABLE" ? "evidence.viewer.ask_saul_unavailable" : "error.generic"));
+      setConsultError(
+        t(
+          r.error === "FEATURE_UNAVAILABLE"
+            ? "evidence.viewer.ask_saul_unavailable"
+            : "error.generic",
+        ),
+      );
       return;
     }
     setAttempt((n) => n + 1); // Refetch evidence to pick up the new consultation.
@@ -148,32 +230,27 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
     setDoctrineResult({ match: r.value.match, reason: r.value.reason });
   }
 
-  async function onSummarize() {
-    setSummarizing(true);
-    setSummarizeError(null);
-    const r = await adapter.evidence.summarize(evidenceId);
-    setSummarizing(false);
-    if (!r.ok) {
-      setSummarizeError(t(r.error === "FEATURE_UNAVAILABLE" ? "evidence.viewer.ask_summarize_unavailable" : "error.generic"));
-      return;
-    }
-    setAttempt((n) => n + 1);
-  }
+  // Rendered, not fetched: an id that cannot address an item shows nothing
+  // rather than an error that would blame the reader for a broken link.
+  if (!evidenceId || evidenceId === "null") return null;
 
   const back = (
     <nav aria-label={t("nav.evidence_actions")}>
-      <a href={`#/cases/${encodeURIComponent(caseId)}/register`}>{t("evidence.viewer.back")}</a>
+      <a href={`#/cases/${encodeURIComponent(caseId)}/register`}>
+        {t("evidence.viewer.back")}
+      </a>
       {" · "}
       <a href="#/cases">{t("case.list.browse")}</a>
     </nav>
   );
 
-  if (load.kind === "loading") return (
-    <section className="evidence-viewer">
-      {back}
-      <StateBlock locale={locale} kind="loading" />
-    </section>
-  );
+  if (load.kind === "loading")
+    return (
+      <section className="evidence-viewer">
+        {back}
+        <StateBlock locale={locale} kind="loading" />
+      </section>
+    );
   if (load.kind === "error")
     return (
       <section className="evidence-viewer">
@@ -196,9 +273,7 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
     {
       id: "chain",
       header: t("custody.column.chain"),
-      render: (r) => (
-        <span data-chain={r.chain}>{t(`chain.${r.chain}`)}</span>
-      ),
+      render: (r) => <span data-chain={r.chain}>{t(`chain.${r.chain}`)}</span>,
     },
   ];
 
@@ -208,7 +283,9 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
   return (
     <section className="evidence-viewer">
       {back}
-      <h1>{t("evidence.viewer.title")}: {evidence.id}</h1>
+      <h1>
+        {t("evidence.viewer.title")}: {evidence.id}
+      </h1>
       <p>{evidence.name}</p>
       <dl className="evidence-metadata" data-testid="evidence-metadata">
         <dt>{t("evidence.viewer.metadata.sha256")}</dt>
@@ -219,12 +296,15 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
         </dd>
         <dt>{t("evidence.viewer.metadata.hmac")}</dt>
         <dd title={latestHmac || ""}>
-          {latestHmac
-            ? truncateHash(latestHmac)
-            : t("evidence.viewer.metadata.unsigned")}
+          {latestHmac ? truncateHash(latestHmac) : t("evidence.viewer.metadata.unsigned")}
         </dd>
       </dl>
-      <div className="evidence-tabs" role="tablist" aria-label={t("evidence.viewer.title")}>
+
+      <div
+        className="evidence-tabs"
+        role="tablist"
+        aria-label={t("evidence.viewer.title")}
+      >
         <button
           type="button"
           role="tab"
@@ -248,6 +328,7 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
           {t("evidence.viewer.tab.extracted")}
         </button>
       </div>
+
       {tab === "original" ? (
         <div role="tabpanel" id="panel-original" aria-labelledby="tab-original">
           {originalUrl ? (
@@ -264,87 +345,159 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
         </div>
       ) : textLoad.kind === "ready" ? (
         <div role="tabpanel" id="panel-extracted" aria-labelledby="tab-extracted">
-          <ExtractedText
-            locale={locale}
-            text={textLoad.value}
-            highlight={arrival}
-          />
+          <ExtractedText locale={locale} text={textLoad.value} highlight={arrival} />
         </div>
       ) : textLoad.kind === "error" ? (
         <div role="tabpanel" id="panel-extracted" aria-labelledby="tab-extracted">
-          <p role="alert" className="form-error">{t(textLoad.key)}</p>
+          <p role="alert" className="form-error">
+            {t(textLoad.key)}
+          </p>
         </div>
       ) : (
         <div role="tabpanel" id="panel-extracted" aria-labelledby="tab-extracted">
           <p role="status">{t("evidence.text.loading")}</p>
         </div>
       )}
+
       <p>
         {t(`evidence.status.${evidence.status}`)}
-        {evidence.badges.length > 0 ? ` · ${evidence.badges.map((b) => t(`badge.${b}`)).join(", ")}` : ""}
+        {evidence.badges.length > 0
+          ? ` · ${evidence.badges.map((b) => t(`badge.${b}`)).join(", ")}`
+          : ""}
       </p>
-      <p className="read-only">{t("evidence.viewer.read_only")}</p>
-      <h2>{t("evidence.viewer.custody")}</h2>
-      {custody.length === 0 ? (
-        <StateBlock locale={locale} kind="empty" message={t("evidence.viewer.custody.empty")} />
-      ) : (
-        <>
-          <ChainTimeline locale={locale} entries={custody} timeZone={timeZone} />
-          <DataTable caption={t("evidence.viewer.custody")} columns={columns} rows={custody} rowKey={(r) => r.id} />
-        </>
-      )}
+
+      {/* Ask Saul — the narrative summary. Always offered, because a document
+          the deterministic analyser understood perfectly is still a document a
+          reader may want summarised. */}
+      <div className="evidence-actions">
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={() => void onSummarize()}
+          disabled={summaryLoading}
+          ref={summaryTriggerRef}
+        >
+          {summaryLoading
+            ? t("evidence.viewer.ask_summarize_loading")
+            : t("evidence.viewer.ask_summarize")}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void openStoredSummary()}
+          disabled={summaryLoading}
+        >
+          {t("evidence.viewer.summary.open")}
+        </button>
+      </div>
+      {summaryError ? (
+        <p role="alert" className="form-error">
+          {summaryError}
+        </p>
+      ) : null}
+
       {evidence.analysis?.documentType === "unknown" ? (
         <div className="ask-saul">
           {evidence.consultation ? (
             <div>
               <h3>{t("evidence.viewer.consultation_label")}</h3>
-              <pre className="consultation-text">{evidence.consultation}</pre>
+              <dl className="consultation">
+                <dt>{t("evidence.viewer.consultation_document_type")}</dt>
+                <dd>{evidence.consultation.documentType}</dd>
+                <dt>{t("evidence.viewer.consultation_model")}</dt>
+                <dd className="mono">{evidence.consultation.model ?? "—"}</dd>
+                {evidence.consultation.error ? (
+                  <>
+                    <dt>{t("evidence.viewer.consultation_error")}</dt>
+                    <dd role="alert" className="form-error">
+                      {evidence.consultation.error}
+                    </dd>
+                  </>
+                ) : null}
+              </dl>
             </div>
           ) : (
             <button
               type="button"
-              className="btn btn--primary"
-              onClick={onConsult}
+              className="btn"
+              onClick={() => void onConsult()}
               disabled={consulting}
             >
-              {consulting ? t("evidence.viewer.ask_saul_loading") : t("evidence.viewer.ask_saul")}
+              {consulting
+                ? t("evidence.viewer.ask_saul_loading")
+                : t("evidence.viewer.ask_saul")}
             </button>
           )}
-          {consultError ? <p role="alert" className="form-error">{consultError}</p> : null}
+          {consultError ? (
+            <p role="alert" className="form-error">
+              {consultError}
+            </p>
+          ) : null}
         </div>
       ) : null}
-      <div style={{ marginBottom: "1rem" }}>
+
+      <div className="evidence-actions">
         <button
           type="button"
           className="btn"
-          onClick={onVerifyDoctrine}
+          onClick={() => void onVerifyDoctrine()}
           disabled={verifyingDoctrine}
         >
-          {verifyingDoctrine ? t("evidence.viewer.verify_doctrine_loading") : t("evidence.viewer.verify_doctrine")}
+          {verifyingDoctrine
+            ? t("evidence.viewer.verify_doctrine_loading")
+            : t("evidence.viewer.verify_doctrine")}
         </button>
         {doctrineResult ? (
-          doctrineResult.match
-            ? <p role="status">{t("evidence.viewer.doctrine_match")}</p>
-            : <p role="alert" className="form-error">{t("evidence.viewer.doctrine_mismatch", { reason: doctrineResult.reason ?? "unknown" })}</p>
+          doctrineResult.match ? (
+            <p role="status">{t("evidence.viewer.doctrine_match")}</p>
+          ) : (
+            <p role="alert" className="form-error">
+              {t("evidence.viewer.doctrine_mismatch", {
+                reason: doctrineResult.reason ?? "unknown",
+              })}
+            </p>
+          )
         ) : null}
       </div>
-      <div style={{ marginBottom: "1rem" }}>
-        <button
-          type="button"
-          className="btn"
-          onClick={onSummarize}
-          disabled={summarizing}
-        >
-          {summarizing ? t("evidence.viewer.ask_summarize_loading") : t("evidence.viewer.ask_summarize")}
-        </button>
-        {summarizeError ? <p role="alert" className="form-error">{summarizeError}</p> : null}
-      </div>
+
+      <h2>{t("evidence.viewer.custody")}</h2>
+      {custody.length === 0 ? (
+        <StateBlock
+          locale={locale}
+          kind="empty"
+          message={t("evidence.viewer.custody.empty")}
+        />
+      ) : (
+        <>
+          <ChainTimeline locale={locale} entries={custody} timeZone={timeZone} />
+          <DataTable
+            caption={t("evidence.viewer.custody")}
+            columns={columns}
+            rows={custody}
+            rowKey={(r) => r.id}
+          />
+        </>
+      )}
+
       <h2>{t("evidence.viewer.verification")}</h2>
       {verification ? (
         <VerificationTile locale={locale} timeZone={timeZone} verification={verification} />
       ) : (
         <p role="status">{t("verification.not_yet_verified")}</p>
       )}
+
+      <SaulSummaryDrawer
+        locale={locale}
+        open={summaryOpen}
+        loading={summaryLoading}
+        summary={summary}
+        timeZone={timeZone}
+        onClose={() => {
+          setSummaryOpen(false);
+          summaryTriggerRef.current?.focus();
+        }}
+      />
+
     </section>
   );
 }

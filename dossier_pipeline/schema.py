@@ -52,6 +52,10 @@ class Case(Base):
     timezone: Mapped[str] = mapped_column(String(128), nullable=False, default="UTC")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
     owner_user_id: Mapped[str] = mapped_column(String(128), nullable=False, default="local-operator")
+    #: The exported anchor record (JSON), once an operator has published this
+    #: case's digest to a public zone. Empty means "not anchored" — never "we
+    #: tried and it probably worked".
+    anchor_json: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     documents: Mapped[list["Document"]] = relationship(
@@ -85,6 +89,11 @@ class Document(Base):
     category: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     source: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     consultation_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    #: The Saul narrative for this document, stored apart from
+    #: `consultation_json`. The two are different answers to different
+    #: questions — a second-opinion document type, and a cited summary — and
+    #: keeping them in one column meant whichever ran last erased the other.
+    summary_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     byte_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
@@ -156,6 +165,7 @@ def init_schema(engine) -> None:
             "timezone": "VARCHAR(128) NOT NULL DEFAULT 'UTC'",
             "status": "VARCHAR(32) NOT NULL DEFAULT 'open'",
             "owner_user_id": "VARCHAR(128) NOT NULL DEFAULT 'local-operator'",
+            "anchor_json": "TEXT NOT NULL DEFAULT ''",
         }
         existing = {
             column["name"] for column in inspect(engine).get_columns("cases")
@@ -182,6 +192,7 @@ def init_schema(engine) -> None:
             "category": "VARCHAR(64)",
             "source": "VARCHAR(64)",
             "consultation_json": "TEXT",
+            "summary_json": "TEXT",
             "previous_hash": "VARCHAR(64) NOT NULL DEFAULT ''",
             "record_hash": "VARCHAR(64) NOT NULL DEFAULT ''",
         }

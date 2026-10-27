@@ -40,6 +40,22 @@ describe("translation catalogs", () => {
     }
   });
 
+  it("uses single braces for placeholders", () => {
+    // `{{name}}` is not a placeholder here: the renderer substitutes `{name}`
+    // and leaves the doubled braces on screen. A parity check alone cannot see
+    // this, because `{{name}}` still contains a match for `{name}`.
+    for (const [locale, catalog] of [
+      ["en", en],
+      ["fr", fr],
+    ] as const) {
+      for (const [key, value] of catalogValues(catalog)) {
+        expect(value, `${locale}.${key} must not double its braces`).not.toMatch(
+          /\{\{|\}\}/,
+        );
+      }
+    }
+  });
+
   it("contains non-empty, complete messages", () => {
     for (const [locale, catalog] of [
       ["en", en],

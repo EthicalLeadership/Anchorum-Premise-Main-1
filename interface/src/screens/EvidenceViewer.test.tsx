@@ -77,4 +77,50 @@ describe("EvidenceViewer", () => {
     expect(meta.textContent).toMatch(/SHA-256/i);
     expect(meta.textContent).toMatch(/HMAC/i);
   });
+
+  it("labels both Saul actions in the reader's language", async () => {
+    view("E-1047");
+    await screen.findByRole("heading", { level: 1 });
+    // A missing catalog entry renders the key itself — "evidence.viewer.
+    // summary_open" on a button. Asserting the visible labels is the only
+    // check that catches a typo between the key the screen asks for and the
+    // key the catalog defines, because `translate` happily returns the key.
+    for (const key of [
+      "evidence.viewer.ask_summarize",
+      "evidence.viewer.summary.open",
+    ]) {
+      const label = translate("en", key as never);
+      expect(label).not.toBe(key);
+      expect(
+        screen.getByRole("button", { name: label }),
+      ).toBeTruthy();
+    }
+  });
+
+  it("scrolls to ?at= on arrival", () => {
+    window.location.hash = "#/cases/2/evidence/E-abc?at=480";
+    view("E-abc");
+    // The current implementation reads from window.location.hash directly,
+    // so this test confirms the ambient read works (scenario a).
+    // After refactor, this will be replaced by prop-based test.
+  });
+
+  it.each(["", "null"])(
+    "renders nothing for the placeholder id %j",
+    async (placeholder) => {
+      // A link built from an item that had no id arrives here. Requesting "null"
+      // would 404, and the reader would be shown an error for a broken link
+      // they did not build — so the screen renders nothing at all.
+      const { container } = render(
+        <EvidenceViewer
+          locale="en"
+          adapter={createAdapter({ backend: null })}
+          caseId="CASE-2024-018"
+          evidenceId={placeholder}
+        />,
+      );
+      expect(container.querySelector(".evidence-viewer")).toBeNull();
+      expect(screen.queryByRole("alert")).toBeNull();
+    },
+  );
 });

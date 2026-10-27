@@ -1,0 +1,7 @@
+Classifie le document suivant comme exactement l'un de ces types :
+medical_note, payroll, insurer_letter, official_report, correspondence, unknown.
+
+Réponds uniquement par le mot de classification, sans ponctuation ni explication.
+
+Document :
+{text}

@@ -4,6 +4,7 @@ import { createAdapter } from "./adapter";
 import { CaseList } from "./screens/CaseList";
 import { Overview } from "./screens/Overview";
 import { EvidenceIntake } from "./screens/EvidenceIntake";
+import { EmailIntake } from "./screens/EmailIntake";
 import { Search } from "./screens/Search";
 import { Register } from "./screens/Register";
 import { EvidenceViewer } from "./screens/EvidenceViewer";
@@ -144,9 +145,11 @@ export function App() {
       ? "audit"
       : path.endsWith("/settings")
         ? "settings"
-        : path.includes("/evidence") || path.endsWith("/register")
-          ? "evidence"
-          : "overview";
+        : path.endsWith("/intake/email")
+          ? "intake"
+          : path.includes("/evidence") || path.endsWith("/register")
+            ? "evidence"
+            : "overview";
   const activeGlobalSection: ShellBootstrap["activeGlobalSection"] =
     path === "#/admin" ? "admin" : "workspace";
 
@@ -175,6 +178,12 @@ export function App() {
         <CreateCase locale={locale} adapter={adapter} />
       ) : /^#\/cases\/[^/]+(?:\/overview)?$/.test(path) ? (
         <Overview
+          locale={locale}
+          adapter={adapter}
+          caseId={decodeURIComponent(path.split("/")[2])}
+        />
+      ) : /^#\/cases\/[^/]+\/intake\/email$/.test(path) ? (
+        <EmailIntake
           locale={locale}
           adapter={adapter}
           caseId={decodeURIComponent(path.split("/")[2])}

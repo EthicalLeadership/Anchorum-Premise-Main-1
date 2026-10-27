@@ -124,7 +124,7 @@ Defines:
 - the output boundaries
 - the allowed processing posture
 
-### GOV guarantees
+### GOV auditables
 - hashes are stable
 - paths are authoritative
 - rules are declarative only

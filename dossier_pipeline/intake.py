@@ -6,6 +6,9 @@ MIME parsing, attachment extraction, cryptographic fingerprinting.
 import base64
 import datetime
 import email
+import email.errors
+import email.header
+import email.utils
 import hashlib
 import io
 import sqlite3
@@ -359,14 +362,38 @@ class EmailIntake:
 
         return report
 
+    @staticmethod
+    def _header_text(msg, name: str) -> str:
+        """One header as a plain `str`.
+
+        `msg.get` returns an `email.header.Header` rather than a `str` when the
+        header carried an RFC 2047 encoded word — which every accented French
+        subject does. That object is not JSON-serializable and does not compare
+        equal to the text it stands for, so an envelope built from it cannot be
+        returned by an HTTP API or matched against anything. Decoding here means
+        every consumer downstream sees the subject a person would read.
+        """
+        raw = msg.get(name, "")
+        if not raw:
+            return ""
+        if isinstance(raw, str):
+            return raw.strip()
+        try:
+            return str(email.header.make_header(email.header.decode_header(raw))).strip()
+        except (email.errors.HeaderParseError, ValueError, LookupError, TypeError):
+            # A header this parser cannot decode is still reported, in whatever
+            # form it arrived: silently dropping it would lose the subject
+            # entirely and make the message look as though it had none.
+            return str(raw).strip()
+
     def parse_email_bytes(self, raw_bytes: bytes) -> EmailEnvelope:
         msg = email.message_from_bytes(raw_bytes)
 
-        message_id = msg.get("Message-ID", "").strip()
-        subject = msg.get("Subject", "")
-        sender = msg.get("From", "")
-        recipient = msg.get("To", "")
-        date = msg.get("Date", "")
+        message_id = self._header_text(msg, "Message-ID")
+        subject = self._header_text(msg, "Subject")
+        sender = self._header_text(msg, "From")
+        recipient = self._header_text(msg, "To")
+        date = self._header_text(msg, "Date")
 
         received_headers = [h.strip() for h in (msg.get_all("Received", []) or []) if h and h.strip()]
         received_count = len(received_headers)

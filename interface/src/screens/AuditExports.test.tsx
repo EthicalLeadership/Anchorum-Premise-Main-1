@@ -200,4 +200,76 @@ describe("AuditExports", () => {
     expect(alert.textContent).toMatch(/Audit chain/);
     expect(alert.textContent).not.toMatch(/Provenance/);
   });
+
+  it("renders the export format select with both options", async () => {
+    render(
+      <AuditExports
+        locale="en"
+        adapter={createAdapter({ backend: null })}
+        caseId="CASE-2024-018"
+      />,
+    );
+    await screen.findByRole("table", { name: "Audit log" });
+    const select = screen.getByRole("combobox", {
+      name: /format/i,
+    }) as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    const values = [...select.querySelectorAll("option")].map((o) => o.value);
+    expect(values).toEqual(["zip", "pdf"]);
+  });
+
+  it("defaults the export format to zip", async () => {
+    render(
+      <AuditExports
+        locale="en"
+        adapter={createAdapter({ backend: null })}
+        caseId="CASE-2024-018"
+      />,
+    );
+    await screen.findByRole("table", { name: "Audit log" });
+    const select = screen.getByRole("combobox", {
+      name: /format/i,
+    }) as HTMLSelectElement;
+    expect(select.value).toBe("zip");
+  });
+
+  it("passes format=pdf to the adapter when pdf is selected", async () => {
+    const base = createAdapter({ backend: null });
+    const generate = vi.fn().mockResolvedValue({
+      ok: true as const,
+      value: { blob: new Blob(), filename: "case_CASE-2024-018_report.pdf" },
+    });
+    const adapter = {
+      ...base,
+      exports: {
+        ...base.exports,
+        generate,
+        // Empty blocking gate list so the Export button is enabled.
+        preview: () =>
+          Promise.resolve({
+            ok: true as const,
+            value: { type: "evidence_index", gates: [], blocked: false },
+          }),
+      },
+    };
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+
+    render(
+      <AuditExports locale="en" adapter={adapter} caseId="CASE-2024-018" />,
+    );
+    await screen.findByRole("table", { name: "Audit log" });
+
+    const select = screen.getByRole("combobox", {
+      name: /format/i,
+    }) as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "pdf" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /^Export$/i }));
+    await waitFor(() => expect(generate).toHaveBeenCalled());
+
+    const [, opts] = generate.mock.calls[0];
+    expect(opts.format).toBe("pdf");
+    expect(opts.includeSummary).toBe(true);
+  });
 });

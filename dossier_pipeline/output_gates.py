@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Iterable
 
 GOVERNANCE_RULESET_VERSION = "1.0.0"
 
@@ -55,6 +56,16 @@ _SENSITIVE_LINE_MARKERS = (
     "non-public terminology",
 )
 
+#: A digest must be lowercase-or-uppercase hex and nothing else to qualify for
+#: the allowlist: anything else in a "trusted" string would be copied back into
+#: the output verbatim, including whatever an operator pasted by mistake.
+_HEX_ONLY = re.compile(r"[0-9a-f]+")
+#: A run long enough to be caught by a hash rule, wherever it sits in a value.
+#: The allowlist accepts `E-<digest>` and `sha256:<digest>` as well as a bare
+#: digest, because an evidence key is an id the reader must be able to match
+#: against the manifest, and it is suffixed to a digest rather than being one.
+_HEX_RUN = re.compile(r"[0-9a-f]{16,}")
+
 _HASH_PATTERNS = (
     re.compile(r"\b[a-f0-9]{64}\b", flags=re.IGNORECASE),
     re.compile(r"\b[a-f0-9]{32}\b", flags=re.IGNORECASE),
@@ -75,9 +86,42 @@ class LeakageReport:
     leakage_found: bool
 
 
-def sanitize_output(text: str) -> LeakageReport:
+def sanitize_output(
+    text: str,
+    *,
+    trusted_hashes: Iterable[str] = (),
+) -> LeakageReport:
+    """Redact internal vocabulary and hashes from outward-facing text.
+
+    `trusted_hashes` is the allowlist. A digest named here is verification
+    material — an artifact's own `content_hash` printed in an export line, for
+    instance — and redacting it would leave the reader holding a package they
+    cannot check. Everything not named is still redacted, so the gate keeps its
+    purpose: internal hashes stay internal, and the exemption is a decision
+    someone made explicitly rather than a pattern that happens to look alike.
+    """
     sanitized = text
     redacted: list[str] = []
+    restored: list[tuple[str, str]] = []
+
+    for index, value in enumerate(trusted_hashes):
+        digest = (value or "").strip()
+        # The caller named this value, so the question is only whether it is
+        # long enough to be caught by a rule. A prefixed id qualifies: the guard
+        # exists to reject entries that no pattern would redact anyway.
+        if not digest or _HEX_RUN.search(digest.lower()) is None:
+            continue
+        if len(digest) < 16:
+            # Shorter than the smallest hash pattern, so it cannot be caught by
+            # the rules below; nothing to protect it from.
+            continue
+        placeholder = f"<<trusted-digest-{index}>>"
+        updated = re.sub(
+            re.escape(digest), placeholder, sanitized, flags=re.IGNORECASE
+        )
+        if updated != sanitized:
+            restored.append((placeholder, digest))
+            sanitized = updated
 
     for pattern, replacement in _REPLACEMENTS:
         if re.search(pattern, sanitized, flags=re.IGNORECASE):
@@ -103,6 +147,12 @@ def sanitize_output(text: str) -> LeakageReport:
 
     if leakage_found:
         sanitized = _strip_sensitive_sections(sanitized)
+
+    # Put the allowlisted digests back exactly as they were supplied. Doing it
+    # after the section strip matters: a line was kept above because it no
+    # longer looked like a hash line, and it must read as a hash line again now.
+    for placeholder, digest in restored:
+        sanitized = sanitized.replace(placeholder, digest)
 
     return LeakageReport(
         sanitized_text=sanitized,

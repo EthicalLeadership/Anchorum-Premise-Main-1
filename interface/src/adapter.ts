@@ -119,11 +119,80 @@ export type Evidence = {
   duplicateCandidate: boolean;
   category?: string | null;
   source?: string | null;
-  consultation?: string | null;
+  consultation?: Consultation | null;
   /** SHA-256 of the original file bytes (server: document.content_hash).
    *  Optional because older fixtures and some statuses don't carry it. */
   sha256?: string;
 };
+/** The second-opinion document type the AI consultant returned, if any. */
+export type Consultation = {
+  documentType: string;
+  backend?: string;
+  model?: string;
+  cached?: boolean;
+  error?: string | null;
+  prompt?: string;
+};
+
+/**
+ * One claim the narrator made, and whether its quote was found in the document.
+ *
+ * `span_normalized` is the position of the quote in the whitespace-collapsed
+ * text. It travels because a reader checking a claim needs to know where to
+ * look, not only that someone checked.
+ */
+export type SummaryClaim = {
+  text: string;
+  quote: string | null;
+  basis: "explicit" | "absence";
+  confidence: "direct" | "inferred";
+  source: {
+    quote: string | null;
+    span_normalized: [number, number] | null;
+    match?: string;
+  };
+};
+
+/**
+ * What verification did with the claims.
+ *
+ * `notRun` is present only when the model produced no narrative at all: then
+ * nothing was checked, and reporting zero verified claims would read as "the
+ * model said nothing worth quoting" instead of "the check did not happen".
+ */
+export type SummaryValidation = {
+  verified: number;
+  inferred: number;
+  rejected: number;
+  total: number;
+  rejected_claims: Array<{
+    claim_text: string;
+    attempted_quote: string;
+    reason: string;
+  }>;
+  notRun?: string;
+};
+
+export type SummaryNarrative = {
+  narrative: string;
+  model?: string;
+  cached?: boolean;
+  error?: string | null;
+  prompt?: string;
+  promptStatus?: string;
+};
+
+export type SummaryResult = {
+  id: string;
+  narrative: SummaryNarrative | null;
+  claims: SummaryClaim[];
+  validation: SummaryValidation | null;
+  generatedAt?: string;
+  cached?: boolean;
+  reason?: string;
+  message?: string;
+};
+
 export interface IngestInput {
   name: string;
   size: number;
@@ -196,6 +265,24 @@ export type ProofsReport = {
   status: "pass" | "fail" | "not_checked";
   verifiedAt: string;
   proofs: readonly ProofResult[];
+};
+/**
+ * A case's public anchor.
+ *
+ * `stale` is the field that carries the point of the feature: the digest
+ * published to DNS and the digest the evidence produces today are both here,
+ * so a reader can see them disagree instead of trusting a stored "anchored".
+ */
+export type AnchorState = {
+  anchored: boolean;
+  configured: boolean;
+  expectedName?: string;
+  digest?: string;
+  recordName?: string;
+  recordContent?: string;
+  publishedAt?: string;
+  currentDigest?: string;
+  stale?: boolean;
 };
 export type AuditEntry =
   | (typeof fixture.audit)[number]
@@ -287,6 +374,64 @@ export interface CaseRow {
   lastActivity: string;
   timezone: string;
 }
+
+/** One stage of the email intake pipeline, as the interface draws it. */
+export type IntakeStage = {
+  id: "received" | "classified" | "policy";
+  status: "success" | "failed" | "skipped";
+  detail: string;
+  data?: Record<string, unknown>;
+};
+
+/**
+ * One submitted `.eml` and what the pipeline concluded about it.
+ *
+ * `status` is the overall verdict; the per-stage statuses are why. A policy
+ * rejection is `rejected_policy`, not `failed`: the pipeline worked and refused
+ * the message, and the two must not be shown with the same word.
+ */
+export type IntakeFileResult = {
+  filename: string;
+  status: "processed" | "rejected_policy" | "duplicate" | "failed";
+  stages: readonly IntakeStage[];
+  byteSize?: number;
+  sourceSha256?: string;
+  messageId?: string;
+  subject?: string;
+  sender?: string;
+  recipient?: string;
+  date?: string;
+  bodyPreview?: string;
+  attachmentCount?: number;
+  receivedCount?: number;
+  actor?: string;
+  labels?: readonly string[];
+  confidence?: number;
+  classificationScopeWarning?: string;
+  policy?: {
+    allowed: boolean | null;
+    quarantine: boolean | null;
+    reason: string;
+  };
+  provenance?: {
+    complete: boolean | null;
+    humanReviewRequired: boolean | null;
+  };
+  /** Present when the message became case evidence. */
+  evidenceId?: string;
+  reason?: string;
+};
+
+export type EmailIntakeResult = {
+  caseId: string;
+  files: readonly IntakeFileResult[];
+  summary: {
+    processed: number;
+    rejectedPolicy: number;
+    duplicate: number;
+    failed: number;
+  };
+};
 
 export interface AdminMember {
   id: string;
@@ -436,6 +581,46 @@ export function createAdapter(config: AdapterConfig) {
         const created = sessionCaseDetails.get(id);
         return Promise.resolve(created ? success(created) : failure("NOT_FOUND"));
       },
+      /**
+       * Submit `.eml` files to the case's intake pipeline.
+       *
+       * One request for the whole batch: the server runs each file
+       * independently and reports each outcome, so a batch is one action from
+       * the reader's side and five verdicts from the pipeline's.
+       */
+      async emailIntake(
+        caseId: string,
+        files: readonly { name: string; bytes: ArrayBuffer }[],
+      ): Promise<AdapterResult<EmailIntakeResult>> {
+        if (!config.backend) {
+          return Promise.resolve(failure("FEATURE_UNAVAILABLE"));
+        }
+        try {
+          const form = new FormData();
+          for (const file of files) {
+            form.append(
+              "files",
+              new Blob([file.bytes], { type: "message/rfc822" }),
+              file.name,
+            );
+          }
+          const response = await fetch(
+            `${config.backend.baseUrl}/cases/${encodeURIComponent(caseId)}/intake/email`,
+            { method: "POST", body: form },
+          );
+          if (!response.ok) {
+            const payload = (await response.json().catch(() => ({}))) as {
+              error?: unknown;
+            };
+            return failure(namedError(payload.error, `HTTP_${response.status}`));
+          }
+          const body = (await response.json()) as EmailIntakeResult;
+          return success(body);
+        } catch {
+          return failure("BACKEND_UNREACHABLE");
+        }
+      },
+
       async update(caseId: string, body: { status?: string }): Promise<AdapterResult<CaseSummary>> {
         if (config.backend) {
           return requestJson<CaseSummary>(
@@ -718,19 +903,36 @@ export function createAdapter(config: AdapterConfig) {
         );
       },
 
-      async summarize(id: string): Promise<AdapterResult<{ id: string; narrative: string | null }>> {
+      summarize(id: string) {
         if (config.backend) {
-          return requestJson<{ id: string; narrative: string | null }>(
+          return requestJson<SummaryResult>(
             `/evidence/${encodeURIComponent(id)}/summarize`,
             { method: "POST" },
           );
         }
-        return failure("FEATURE_UNAVAILABLE");
+        return Promise.resolve(failure("FEATURE_UNAVAILABLE"));
       },
 
-      async consult(id: string): Promise<AdapterResult<{ id: string; consultation: string | null }>> {
+      /**
+       * The summary already stored for this item.
+       *
+       * Separate from `summarize` on purpose: opening the drawer again must not
+       * cost another model call, and a reader revisiting a summary is entitled
+       * to the one that is on record rather than a fresh, slightly different
+       * one.
+       */
+      summary(id: string) {
         if (config.backend) {
-          return requestJson<{ id: string; consultation: string | null }>(
+          return requestJson<SummaryResult>(
+            `/evidence/${encodeURIComponent(id)}/summarize`,
+          );
+        }
+        return Promise.resolve(failure("FEATURE_UNAVAILABLE"));
+      },
+
+      async consult(id: string): Promise<AdapterResult<{ id: string; consultation: Consultation | null }>> {
+        if (config.backend) {
+          return requestJson<{ id: string; consultation: Consultation | null }>(
             `/evidence/${encodeURIComponent(id)}/consult`,
             { method: "POST" },
           );
@@ -739,7 +941,10 @@ export function createAdapter(config: AdapterConfig) {
       },
     },
     exports: {
-      async generate(caseId: string, opts?: { includeSummary?: boolean; format?: "zip" | "pdf" }): Promise<AdapterResult<{ blob: Blob; filename: string }>> {
+      async generate(
+        caseId: string,
+        opts?: { includeSummary?: boolean; format?: "zip" | "pdf" },
+      ): Promise<AdapterResult<{ blob: Blob; filename: string }>> {
         if (config.backend) {
           try {
             const params = new URLSearchParams();
@@ -781,6 +986,38 @@ export function createAdapter(config: AdapterConfig) {
               }),
             )
           : Promise.resolve(failure("NOT_FOUND"));
+      },
+    },
+    anchoring: {
+      /**
+       * The case's published anchor, or the reason there is none.
+       *
+       * Answered offline too, because "this build has no zone configured" is a
+       * truthful state the reader can act on — unlike a proof, which cannot be
+       * computed here without inventing a claim about their case.
+       */
+      get(caseId: string) {
+        if (config.backend) {
+          return requestJson<AnchorState>(
+            `/cases/${encodeURIComponent(caseId)}/anchor`,
+          );
+        }
+        return Promise.resolve(
+          success<AnchorState>({
+            anchored: false,
+            configured: false,
+            expectedName: `case-${caseId}.chain.creovate.digital`,
+          }),
+        );
+      },
+      publish(caseId: string) {
+        if (config.backend) {
+          return requestJson<AnchorState>(
+            `/cases/${encodeURIComponent(caseId)}/anchor`,
+            { method: "POST" },
+          );
+        }
+        return Promise.resolve(failure("FEATURE_UNAVAILABLE"));
       },
     },
     audit: {

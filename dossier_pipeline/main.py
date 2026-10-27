@@ -441,6 +441,91 @@ def cmd_ingest_dir(args, config):
         print(f"Exports: {json_path}, {md_path}")
 
 
+def cmd_intake_email(args, config):
+    """Accept .eml files and process them through the pipeline with deterministic/epistemic tracking."""
+    import argparse
+    from pathlib import Path
+    
+    parser = argparse.ArgumentParser(description='Intake email files')
+    parser.add_argument('files', nargs='+', help='.eml files to process')
+    args = parser.parse_args([])  # Will be populated by argparse in main()
+    
+    pipeline = _build_pipeline(config)
+    
+    for filepath in args.files:
+        path = Path(filepath)
+        if not path.exists():
+            print(f"ERROR: File not found: {filepath}")
+            continue
+        
+        try:
+            with open(path, 'rb') as f:
+                eml_bytes = f.read()
+            
+            result = pipeline.process_email(eml_bytes, {"filename": path.name})
+            
+            # Add deterministic/epistemic metadata
+            from interface import tools as _tools
+            response = {
+                "case_id": config.get("case_id"),
+                "result": result.status.value if result else "FAILED",
+                "stage": result.stage if result else None,
+                "raw_sha256": result.raw_sha256 if result else None,
+                "message_id": result.envelope.message_id if result and result.envelope else None,
+                "classification": result.classification if result else None,
+                "policy_result": result.policy_decision if result else None,
+            }
+            response = _tools.add_epistemic_fields_to_record(response)
+            
+            print(f"Processed {path.name}:")
+            print(f"  Status: {response['result']}")
+            print(f"  Stage: {response['stage']}")
+            if response.get('message_id'):
+                print(f"  Message-ID: {response['message_id']}")
+                print(f"  Classification: {response['classification']}")
+                print(f"  Policy decision: {response['policy_result']}")
+            
+        except Exception as exc:
+            print(f"ERROR processing {path.name}: {type(exc).__name__}: {exc}")
+
+
+
+def cmd_intake_email(args, config):
+    """Accept .eml files and process them through the pipeline."""
+    import argparse
+    from pathlib import Path
+    
+    parser = argparse.ArgumentParser(description='Intake email files')
+    parser.add_argument('files', nargs='+', help='.eml files to process')
+    args = parser.parse_args([])  # Will be populated by argparse in main()
+    
+    pipeline = _build_pipeline(config)
+    
+    for filepath in args.files:
+        path = Path(filepath)
+        if not path.exists():
+            print(f"ERROR: File not found: {filepath}")
+            continue
+        
+        try:
+            with open(path, 'rb') as f:
+                eml_bytes = f.read()
+            
+            result = pipeline.process_email(eml_bytes, {"filename": path.name})
+            
+            print(f"Processed {path.name}:")
+            print(f"  Status: {result.status.value}")
+            print(f"  Stage: {result.stage}")
+            if result.envelope:
+                print(f"  Message-ID: {result.envelope.message_id}")
+                print(f"  Classification: {result.classification}")
+                print(f"  Policy decision: {result.policy_decision}")
+            
+        except Exception as exc:
+            print(f"ERROR processing {path.name}: {type(exc).__name__}: {exc}")
+
+
+
 def cmd_import_drafts(args, config):
     if not config["password"]:
         print("ERROR: Proton IMAP password not set in env, .env, or --config file.", file=sys.stderr)

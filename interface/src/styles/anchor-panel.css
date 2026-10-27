@@ -1,0 +1,69 @@
+/* Case anchor block: the one claim in the product a reader can check outside
+   the machine that made it. Kept visually quieter than the verification tile —
+   it is a deliberate, occasional act, not a live status. */
+
+.anchor-panel {
+  border: 1px solid var(--border-subtle, #d8d3c8);
+  border-radius: var(--radius-md, 8px);
+  padding: var(--space-4, 1rem);
+  margin-block: var(--space-4, 1rem);
+  background: var(--surface-raised, #fdfcf9);
+}
+
+.anchor-panel h2 {
+  margin: 0 0 var(--space-2, 0.5rem);
+  font-size: 1rem;
+}
+
+.anchor-panel__help {
+  margin: 0 0 var(--space-3, 0.75rem);
+  color: var(--text-muted, #5c574d);
+  font-size: 0.875rem;
+  max-width: 60ch;
+}
+
+.anchor-panel__facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+  margin: 0 0 var(--space-3, 0.75rem);
+  font-size: 0.875rem;
+}
+
+.anchor-panel__facts dt {
+  color: var(--text-muted, #5c574d);
+}
+
+.anchor-panel__facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Digests and record names are compared character by character; a proportional
+   font makes that harder than it needs to be. */
+.anchor-panel__mono {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8125rem;
+}
+
+.anchor-panel__status,
+.anchor-panel__hint {
+  margin: 0 0 var(--space-3, 0.75rem);
+  font-size: 0.875rem;
+  color: var(--text-muted, #5c574d);
+}
+
+/* A published digest that no longer matches the evidence is the most important
+   sentence on this panel, so it is the loudest thing on it. */
+.anchor-panel__stale {
+  margin: 0 0 var(--space-3, 0.75rem);
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-left: 3px solid var(--state-warn, #b8860b);
+  background: var(--state-warn-surface, #fdf6e3);
+  font-size: 0.875rem;
+}
+
+.anchor-panel__actions {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+}

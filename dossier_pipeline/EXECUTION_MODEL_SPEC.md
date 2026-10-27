@@ -87,7 +87,7 @@ This means:
 - outbound reconciliation must not interleave with unrelated claim ownership for the same dossier
 
 ### Why this is required
-The current system uses SQLite-backed stores and append-only records. That gives local serialization, but not a full distributed concurrency guarantee. Without an explicit single-writer contract:
+The current system uses SQLite-backed stores and append-only records. That gives local serialization, but not a full distributed concurrency auditable. Without an explicit single-writer contract:
 - duplicate suppression can drift under timing skew
 - control-chain ordering can diverge across workers
 - replay determinism can fail under load
@@ -160,7 +160,7 @@ Runtime states:
 Execution states:
 - describe the system contract
 - define how the pipeline is allowed to behave
-- are the basis for concurrency and replay guarantees
+- are the basis for concurrency and replay auditables
 
 ## Verification Expectations
 A system conforming to this spec should be able to prove:

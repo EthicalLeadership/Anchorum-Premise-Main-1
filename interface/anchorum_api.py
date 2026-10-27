@@ -18,6 +18,11 @@ from typing import Literal, cast
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
+
+def _require_real_id(evidence_id: str) -> str:
+    if not evidence_id or evidence_id == "null":
+        raise HTTPException(422, "evidence id must be a real id, not 'null'")
+    return evidence_id
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -31,6 +36,7 @@ from sqlalchemy.engine import make_url
 from dossier_pipeline.schema import AuditLog, Case, Document, JurisdictionStamp, User, init_schema
 from dossier_pipeline.barreau_gate import BarreauGate, BarreauGateError
 from interface import analysis as analysis_service
+from interface import anchoring
 from interface import malware_scan
 from interface import preflight, proofs
 from interface.analysis import analyse
@@ -134,6 +140,11 @@ CUSTODY_ACTIONS = {
     "evidence_verified": "verified",
     "evidence_analysed": "analysed",
     "evidence_reanalysed": "reanalysed",
+    # AI actions appear in the custody list because they read the whole
+    # document and produce text a reader may act on. An output nobody can trace
+    # to a moment and an actor is worse than no output.
+    "evidence_consulted": "consulted",
+    "evidence_summarised": "summarised",
 }
 
 
@@ -266,6 +277,17 @@ def _decoded_analysis(document: Document) -> dict | None:
     return record if isinstance(record, dict) else None
 
 
+def _decoded_consultation(document: Document) -> dict | None:
+    """The stored second-opinion consultation, or None when there is none."""
+    if not document.consultation_json:
+        return None
+    try:
+        record = json.loads(document.consultation_json)
+    except (TypeError, ValueError):
+        return None
+    return record if isinstance(record, dict) else None
+
+
 def _analysis_summary(document: Document) -> dict | None:
     """The compact analysis view carried on every evidence item."""
     record = _decoded_analysis(document)
@@ -305,7 +327,14 @@ def _evidence_item(db: Session, document: Document) -> dict:
         "duplicateCandidate": int(duplicate_count or 0) > 1,
         "category": document.category,
         "source": document.source,
-        "consultation": document.consultation_json,
+        # The artifact's own digest. The viewer prints it beside the HMAC so a
+        # reader can check the file they were given; omitting it left the
+        # metadata block reading "unavailable" for an item that has a hash.
+        "sha256": document.content_hash,
+        # Decoded, not the raw column text. `/consult` returns an object, and an
+        # evidence item that returned the same answer as a JSON string meant the
+        # interface had to parse a document to show a document type.
+        "consultation": _decoded_consultation(document),
     }
 
 
@@ -1015,6 +1044,119 @@ def create_app(
             db.commit()
         return _case_summary(case)
 
+    #: Audit actions that record the anchor act itself. They are excluded from
+    #: the digest's tip on purpose: publishing a record must not change the
+    #: value it published, or the anchor would be stale the instant it existed.
+    ANCHOR_ACTIONS = frozenset({"anchor_published", "anchor_failed"})
+
+    def case_digest_now(db: Session, case: Case) -> str:
+        """The digest this case's evidence produces right now."""
+        hashes = [
+            document.content_hash
+            for document in case_documents(db, case)
+            if document.content_hash
+        ]
+        tip = db.scalar(
+            select(AuditLog)
+            .where(
+                AuditLog.case_id == case.id,
+                AuditLog.action.notin_(tuple(ANCHOR_ACTIONS)),
+            )
+            .order_by(AuditLog.id.desc())
+            .limit(1)
+        )
+        return anchoring.case_digest(hashes, tip.record_hash if tip else "")
+
+    def anchor_state(db: Session, case: Case) -> dict:
+        """What is published, what the evidence says now, and whether they differ.
+
+        Both digests are returned rather than a single verdict: a reader told
+        only "stale" cannot see what changed, and the whole point of an anchor
+        is that the comparison is theirs to make.
+        """
+        stored = anchoring.load_record(case.anchor_json)
+        current = case_digest_now(db, case)
+        configured = anchoring.credentials_configured()
+        expected = anchoring.record_name_for(case.case_key)
+        if stored is None:
+            return {
+                "anchored": False,
+                "configured": configured,
+                "expectedName": expected,
+                "currentDigest": current,
+                "stale": False,
+            }
+        return {
+            **stored.as_dict(),
+            "configured": configured,
+            "expectedName": expected,
+            "currentDigest": current,
+            "stale": stored.digest != current,
+        }
+
+    @app.get("/cases/{case_id}/anchor", dependencies=[local_api])
+    def get_anchor(case_id: str, db: Session = Depends(get_db)) -> dict:
+        return anchor_state(db, find_case(db, case_id))
+
+    @app.post("/cases/{case_id}/anchor", dependencies=[local_api])
+    def publish_anchor(case_id: str, db: Session = Depends(get_db)) -> dict:
+        case = find_case(db, case_id)
+        zone, token = anchoring.credentials()
+        if not (zone and token):
+            # 501 and not 500: nothing is broken, the deployment simply has no
+            # zone to publish into, and the reader cannot fix it from here.
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail={
+                    "error": "ANCHOR_NOT_CONFIGURED",
+                    "message": (
+                        "No DNS zone is configured for this deployment, so an "
+                        "anchor cannot be published from here."
+                    ),
+                },
+            )
+
+        hashes = [d.content_hash for d in case_documents(db, case) if d.content_hash]
+        if not hashes:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": "ANCHOR_NO_EVIDENCE",
+                    "message": "Add evidence before anchoring this case.",
+                },
+            )
+
+        record = anchoring.build_record(case_digest_now(db, case), case.case_key, zone)
+        published, reason = anchoring.publish(record, token)
+        if not published:
+            # A rejected publication is recorded as a failure and never stored
+            # as the case's anchor: the database must not claim a record the
+            # zone does not hold.
+            _append_audit(
+                db,
+                case_id=case.id,
+                action="anchor_failed",
+                details={"reason": reason[:200]},
+            )
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    "error": "ANCHOR_PUBLISH_FAILED",
+                    "message": reason,
+                },
+            )
+
+        case.anchor_json = record.to_json()
+        _append_audit(
+            db,
+            case_id=case.id,
+            action="anchor_published",
+            details={"digest": record.digest, "recordName": record.record_name},
+        )
+        db.commit()
+        return anchor_state(db, case)
+
     @app.get("/cases/{case_id}/evidence", dependencies=[local_api])
     def list_evidence(
         case_id: str,
@@ -1241,6 +1383,7 @@ def create_app(
 
     @app.get("/evidence/{evidence_id}", dependencies=[local_api])
     def get_evidence(evidence_id: str, db: Session = Depends(get_db)):
+        evidence_id = _require_real_id(evidence_id)
         document = db.scalar(
             select(Document).where(Document.document_key == evidence_id)
         )
@@ -1278,9 +1421,11 @@ def create_app(
 
     @app.get("/evidence/{evidence_id}/custody", dependencies=[local_api])
     def get_evidence_custody(evidence_id: str, db: Session = Depends(get_db)):
+        evidence_id = _require_real_id(evidence_id)
         document = db.scalar(
             select(Document).where(Document.document_key == evidence_id)
         )
+
         if document is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1411,6 +1556,7 @@ def create_app(
 
     @app.post("/evidence/{evidence_id}/verify", dependencies=[local_api])
     def verify_evidence(evidence_id: str, db: Session = Depends(get_db)):
+        evidence_id = _require_real_id(evidence_id)
         document = db.scalar(
             select(Document).where(Document.document_key == evidence_id)
         )
@@ -1510,19 +1656,16 @@ def create_app(
     def summarize_evidence(evidence_id: str, db: Session = Depends(get_db)):
         from interface import llm_classifier
 
-        document = db.scalar(
-            select(Document).where(Document.document_key == evidence_id)
-        )
-        if document is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={"error": "NOT_FOUND", "message": "Evidence not found."},
-            )
+        document = find_document(db, evidence_id)
 
         if os.environ.get("ANCHORUM_LLM_ENABLED") != "1":
+            # This is a true statement about the installation, not a failure:
+            # the button exists, the model is off, and the reader is told which.
             return {
                 "id": evidence_id,
                 "narrative": None,
+                "claims": [],
+                "validation": None,
                 "reason": "LLM_DISABLED",
                 "message": "Set ANCHORUM_LLM_ENABLED=1 to enable the AI summariser.",
             }
@@ -1548,31 +1691,104 @@ def create_app(
                 },
             ) from None
 
-        result = llm_classifier.llm_summarize(text)
+        # The filename travels with the text so the prompt's citation format
+        # ("[source: nom_du_fichier, page X]") can name the document the
+        # narrative is about. Without it the model invents a placeholder and
+        # every citation in the output points at nothing.
+        result = llm_classifier.llm_summarize(text, filename=document.filename)
 
-        # Validate the source, not the narrative. Same citation contract as
-        # /tools/analyse: every explicit claim's quote must be verbatim in
-        # the extracted text, or it's rejected with attempted_quote. The
-        # narrative is a readable guide; the claims below are what a reader
-        # can actually trust. Without this, 'Ask Saul to summarize' returns
-        # an unverified narrative — the same Critical gap /tools/analyse
-        # closed for the analysis path.
+        # Validate the source, not the narrative. Every explicit claim's quote
+        # must be verbatim in the extracted text or it is rejected and shown as
+        # rejected. The narrative is a readable guide; the claims below are what
+        # a reader can actually check, and a summary whose claims were never
+        # checked is a summary nobody can challenge.
         from interface import tools as _tools
-        _raw_claims, _meta = _tools.extract_claims(text, "inbound-analysis", "")
-        _claims, _validation = _tools.validate_claims(_raw_claims, text)
 
-        document.consultation_json = json.dumps({
-            "narrative": result,
-            "claims": _claims,
-            "validation": _validation,
-        })
+        if result["error"]:
+            # The narrative is absent, so there is nothing to check claims
+            # against. Saying so is the honest answer; returning zero-verified
+            # claims would read as "the model produced nothing worth quoting".
+            claims: list[dict] = []
+            validation: dict = {
+                "verified": 0,
+                "inferred": 0,
+                "rejected": 0,
+                "total": 0,
+                "rejected_claims": [],
+                "notRun": result["error"],
+            }
+        else:
+            raw_claims, _meta = _tools.extract_claims(text, "inbound-analysis", "")
+            claims, validation = _tools.validate_claims(raw_claims, text)
+
+        generated_at = _datetime_text(datetime.now(timezone.utc))
+        # Stored apart from `consultation_json`: the consultation is a
+        # second-opinion document type, this is a cited narrative. Writing both
+        # into one column meant whichever ran last erased the other.
+        document.summary_json = json.dumps(
+            {
+                "narrative": result,
+                "claims": claims,
+                "validation": validation,
+                "generatedAt": generated_at,
+                "filename": document.filename,
+                "textSha256": document.extract_sha256 or "",
+            },
+            separators=(",", ":"),
+        )
+        _custody_log(
+            db,
+            case_id=document.case_id,
+            evidence_id=document.document_key,
+            action="evidence_summarised",
+        )
         db.commit()
         return {
             "id": evidence_id,
             "narrative": result,
-            "claims": _claims,
-            "validation": _validation,
+            "claims": claims,
+            "validation": validation,
+            "generatedAt": generated_at,
+            "cached": bool(result.get("cached")),
         }
+
+    @app.get("/evidence/{evidence_id}/summarize", dependencies=[local_api])
+    def get_evidence_summary(evidence_id: str, db: Session = Depends(get_db)) -> dict:
+        """The stored Saul narrative for this item, if one has been produced.
+
+        A GET so the drawer can be reopened without paying for a second model
+        call, and so a reader can see that a summary they were shown earlier is
+        still the one on record. `generatedAt` is what makes that checkable.
+        """
+        document = find_document(db, evidence_id)
+        if not document.summary_json:
+            return {
+                "id": evidence_id,
+                "narrative": None,
+                "claims": [],
+                "validation": None,
+                "reason": "NOT_GENERATED",
+                "message": "No summary has been generated for this item.",
+            }
+        try:
+            stored = json.loads(document.summary_json)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    "error": "STORED_SUMMARY_CORRUPT",
+                    "message": "The stored summary could not be read.",
+                },
+            ) from None
+        if not isinstance(stored, dict):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    "error": "STORED_SUMMARY_CORRUPT",
+                    "message": "The stored summary could not be read.",
+                },
+            )
+        return {"id": evidence_id, "cached": True, **stored}
 
     @app.post("/evidence/{evidence_id}/verify-doctrine", dependencies=[local_api])
     def verify_doctrine(evidence_id: str, db: Session = Depends(get_db)):
@@ -1661,7 +1877,11 @@ def create_app(
         )
         _record_filed_date(db, document.case_id, document)
         db.commit()
-        return analysis_response(document)
+        response = analysis_response(document)
+        # Add deterministic/epistemic metadata
+        from interface import tools as _tools
+        response = _tools.add_epistemic_fields_to_record(response)
+        return response
 
     @app.get("/cases/{case_id}/timeline", dependencies=[local_api])
     def get_timeline(case_id: str, db: Session = Depends(get_db)):
@@ -1942,9 +2162,14 @@ def create_app(
             for _doc in documents:
                 _cur = _curated_analysis(_doc) or {}
                 _type = _cur.get("documentType", "unknown")
+                # The hash is printed beside the id because the narrative is the
+                # human-readable half of the package: a reader who cannot match
+                # a line here to a manifest entry has been handed two documents
+                # about the same case and no way to join them.
                 summary_lines.append(
                     f"- `{_doc.document_key}` — {_doc.filename} "
-                    f"(type: {_type}, bytes: {_doc.byte_size})"
+                    f"(type: {_type}, bytes: {_doc.byte_size}, "
+                    f"sha256: {_doc.content_hash})"
                 )
 
             summary_lines.extend(["", "## Pre-flight", ""])
@@ -1959,7 +2184,17 @@ def create_app(
             raw_summary = "\n".join(summary_lines) + "\n"
 
             if sanitize_output is not None:
-                report = sanitize_output(raw_summary)
+                # The ids and hashes just written are verification material, not
+                # leaked state: they name artifacts this package ships. They are
+                # handed over as an exact allowlist, so every *other* digest in
+                # the prose is still redacted.
+                _shipped = [
+                    value
+                    for _doc in documents
+                    for value in (_doc.document_key, _doc.content_hash)
+                    if value
+                ]
+                report = sanitize_output(raw_summary, trusted_hashes=_shipped)
                 if report.leakage_found:
                     raw_summary = (
                         "> **Note**: some text was redacted before export "
@@ -2417,6 +2652,291 @@ def create_app(
             "role": user.role,
             "status": "active",
             "caseIds": [],
+        }
+
+    # ------------------------------------------------------------------
+    # Wire 8 — email intake (the case's front door for .eml)
+    # ------------------------------------------------------------------
+
+    def intake_seen_set(case: Case):
+        """The per-case dedupe set for submitted messages.
+
+        Kept on disk beside the evidence rather than in memory, because "have I
+        already processed this email" is a question that has to survive a
+        restart. The database is keyed by case so two cases can hold the same
+        message without either hiding the other.
+        """
+        from dossier_pipeline.intake import EmailSeenSet
+
+        directory = storage_root / "intake"
+        directory.mkdir(parents=True, exist_ok=True)
+        return EmailSeenSet(str(directory / f"case-{case.id}-seen.db"))
+
+    def store_intake_message(
+        db: Session,
+        case: Case,
+        raw_bytes: bytes,
+        filename: str,
+        body_text: str,
+        source_sha256: str,
+    ) -> Document:
+        """Store a submitted .eml as case evidence, with its body readable.
+
+        The bytes go through the same guard as any other artifact: a uuid4
+        storage key, a hash of what was written, and a readback that must match.
+        The difference is the extracted text: analysis has no MIME reader, so an
+        .eml would otherwise open as an unreadable artifact even though the
+        intake stage just parsed it. The body the parser produced is written as
+        the text sidecar, which is the text that was actually read.
+        """
+        storage_key = uuid.uuid4().hex
+        target = storage_root / f"{storage_key}.bin"
+        storage_root.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            mode="wb", prefix=".intake-", dir=storage_root, delete=False
+        ) as destination:
+            temporary = Path(destination.name)
+            destination.write(raw_bytes)
+            destination.flush()
+            os.fsync(destination.fileno())
+        try:
+            os.replace(temporary, target)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+        digest = hashlib.sha256(target.read_bytes()).hexdigest()
+        document = Document(
+            case_id=case.id,
+            document_key=f"E-{storage_key}",
+            filename=filename,
+            content_hash=digest,
+            storage_key=storage_key,
+            media_type="message/rfc822",
+            category="correspondence",
+            source="other",
+            byte_size=len(raw_bytes),
+        )
+        db.add(document)
+        db.flush()
+
+        text_path = stored_text_path(document)
+        if text_path is not None and body_text.strip():
+            text_path.write_text(body_text, encoding="utf-8")
+            document.extract_text_path = text_path.name
+            document.extract_status = "extracted"
+            document.extract_sha256 = hashlib.sha256(
+                body_text.encode("utf-8")
+            ).hexdigest()
+            document.extract_chars = len(body_text)
+            document.analysed_at = datetime.now(timezone.utc)
+        else:
+            # No readable body: run the ordinary analysis so the row says why
+            # rather than claiming a read that produced nothing.
+            run_analysis(document)
+
+        _custody_log(
+            db,
+            case_id=case.id,
+            evidence_id=document.document_key,
+            action="evidence_uploaded",
+        )
+        return document
+
+    @app.post("/cases/{case_id}/intake/email", dependencies=[local_api])
+    async def intake_email(
+        case_id: str,
+        files: list[UploadFile] = File(...),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        """Run uploaded `.eml` files through envelope → classifier → policy.
+
+        One message's failure does not abort the batch: each file is processed
+        and reported on its own, because a reader dropping five emails expects
+        four verdicts and one error, not one error.
+
+        A message that passes policy is stored as case evidence and its custody
+        recorded. A message that policy rejects is stored too — the point of a
+        quarantine is that the artifact is kept and not acted on, and dropping it
+        would destroy the evidence of the decision. A duplicate is neither
+        stored again nor re-classified.
+        """
+        from interface import email_intake
+
+        case = find_case(db, case_id)
+        if not files:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={
+                    "error": "EMPTY_INTAKE",
+                    "message": "Attach at least one .eml file.",
+                },
+            )
+
+        results: list[dict] = []
+        seen = intake_seen_set(case)
+        try:
+            for upload in files:
+                filename = (
+                    (upload.filename or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
+                )
+                if (
+                    not filename
+                    or filename in (".", "..")
+                    or any(ord(c) < 0x20 or ord(c) == 0x7F for c in filename)
+                    or len(filename) > MAX_FILENAME_LENGTH
+                ):
+                    results.append(
+                        {
+                            "filename": filename or "(unnamed)",
+                            "status": email_intake.OUTCOME_FAILED,
+                            "stages": [
+                                {
+                                    "id": email_intake.STAGE_RECEIVED,
+                                    "status": email_intake.STATUS_FAILED,
+                                    "detail": "Upload a file with a valid name.",
+                                    "data": {"error": "INVALID_FILENAME"},
+                                }
+                            ],
+                            "reason": "INVALID_FILENAME",
+                        }
+                    )
+                    continue
+
+                data = await upload.read()
+                if not data:
+                    results.append(
+                        {
+                            "filename": filename,
+                            "status": email_intake.OUTCOME_FAILED,
+                            "stages": [
+                                {
+                                    "id": email_intake.STAGE_RECEIVED,
+                                    "status": email_intake.STATUS_FAILED,
+                                    "detail": "The file is empty.",
+                                    "data": {"error": "EMPTY_UPLOAD"},
+                                }
+                            ],
+                            "reason": "EMPTY_UPLOAD",
+                        }
+                    )
+                    continue
+                if len(data) > MAX_UPLOAD_BYTES:
+                    results.append(
+                        {
+                            "filename": filename,
+                            "status": email_intake.OUTCOME_FAILED,
+                            "stages": [
+                                {
+                                    "id": email_intake.STAGE_RECEIVED,
+                                    "status": email_intake.STATUS_FAILED,
+                                    "detail": (
+                                        f"The message exceeds the "
+                                        f"{MAX_UPLOAD_BYTES} byte limit."
+                                    ),
+                                    "data": {"error": "MESSAGE_TOO_LARGE"},
+                                }
+                            ],
+                            "reason": "MESSAGE_TOO_LARGE",
+                        }
+                    )
+                    continue
+
+                outcome = email_intake.run(data, filename, seen)
+                payload = outcome.as_dict()
+
+                if outcome.status == email_intake.OUTCOME_DUPLICATE:
+                    _append_audit(
+                        db,
+                        case_id=case.id,
+                        action="email_intake_duplicate",
+                        details={
+                            "messageId": outcome.message_id,
+                            "sourceSha256": outcome.source_sha256,
+                            "filename": filename,
+                        },
+                    )
+                    db.commit()
+                    results.append(payload)
+                    continue
+
+                if outcome.status in (
+                    email_intake.OUTCOME_PROCESSED,
+                    email_intake.OUTCOME_REJECTED_POLICY,
+                ):
+                    # The raw message is the artifact; the body text is what the
+                    # parser read out of it. Storing both keeps the exhibit and
+                    # the text a reader can search in the same place.
+                    document = store_intake_message(
+                        db,
+                        case,
+                        data,
+                        filename,
+                        outcome.body_text,
+                        outcome.source_sha256,
+                    )
+                    payload["evidenceId"] = document.document_key
+                    seen.mark_seen(outcome.message_id, outcome.source_sha256)
+                    _append_audit(
+                        db,
+                        case_id=case.id,
+                        action=(
+                            "email_intake_processed"
+                            if outcome.status == email_intake.OUTCOME_PROCESSED
+                            else "email_intake_rejected_policy"
+                        ),
+                        details={
+                            "evidenceId": document.document_key,
+                            "messageId": outcome.message_id,
+                            "sourceSha256": outcome.source_sha256,
+                            "subject": outcome.subject,
+                            "sender": outcome.sender,
+                            "actor": outcome.actor,
+                            "labels": outcome.labels,
+                            "policyAllowed": outcome.policy_allowed,
+                            "policyQuarantine": outcome.policy_quarantine,
+                            "reason": outcome.policy_reason,
+                        },
+                    )
+                    db.commit()
+                    results.append(payload)
+                    continue
+
+                _append_audit(
+                    db,
+                    case_id=case.id,
+                    action="email_intake_failed",
+                    details={
+                        "messageId": outcome.message_id,
+                        "sourceSha256": outcome.source_sha256,
+                        "filename": filename,
+                        "reason": outcome.reason,
+                    },
+                )
+                db.commit()
+                results.append(payload)
+        finally:
+            seen.close()
+
+        counts = {
+            "processed": sum(
+                1 for r in results if r["status"] == email_intake.OUTCOME_PROCESSED
+            ),
+            "rejectedPolicy": sum(
+                1
+                for r in results
+                if r["status"] == email_intake.OUTCOME_REJECTED_POLICY
+            ),
+            "duplicate": sum(
+                1 for r in results if r["status"] == email_intake.OUTCOME_DUPLICATE
+            ),
+            "failed": sum(
+                1 for r in results if r["status"] == email_intake.OUTCOME_FAILED
+            ),
+        }
+        return {
+            "caseId": _case_id(case),
+            "files": results,
+            "summary": counts,
         }
 
     return app

@@ -36,6 +36,7 @@ interface AppShellProps extends ShellBootstrap {
 const sections: CaseSection[] = [
   "overview",
   "evidence",
+  "intake",
   "timeline",
   "audit",
   "settings",
@@ -44,10 +45,27 @@ const sections: CaseSection[] = [
 const sectionLabels: Record<CaseSection, MessageKey> = {
   overview: "nav.overview",
   evidence: "nav.evidence",
+  intake: "nav.email_intake",
   timeline: "nav.timeline",
   audit: "nav.audit",
   settings: "nav.settings",
 };
+
+/**
+ * Where a rail entry points.
+ *
+ * `intake` is the one section whose route is nested under another path, so the
+ * suffix is written here rather than pushed into `routes.caseSection`, which
+ * stays a plain concatenation for every ordinary section.
+ */
+function sectionHref(
+  routes: ShellBootstrap["routes"],
+  caseId: string,
+  section: CaseSection,
+): string {
+  const base = routes.caseSection(caseId, section);
+  return section === "intake" ? `${base}/email` : base;
+}
 
 const workspaceSections: WorkspaceSection[] = [
   "workspace",
@@ -104,8 +122,10 @@ const caseStatusLabels: Record<
 };
 
 const RAIL_BY_ROLE: Record<SessionRole, readonly CaseSection[]> = {
-  case_admin: ["overview", "evidence", "timeline", "audit", "settings"],
-  reviewer: ["overview", "evidence", "timeline", "audit"],
+  case_admin: ["overview", "evidence", "intake", "timeline", "audit", "settings"],
+  reviewer: ["overview", "evidence", "intake", "timeline", "audit"],
+  // An auditor reads; submitting new messages into a case is not a read. The
+  // intake rail entry is absent for that role on purpose.
   auditor: ["overview", "evidence", "audit"],
 };
 
@@ -382,7 +402,7 @@ export function AppShell({
                   <li key={section}>
                     <a
                       className={`rail__link${activeSection === section ? " is-active" : ""}`}
-                      href={routes.caseSection(activeCase.id, section)}
+                      href={sectionHref(routes, activeCase.id, section)}
                       aria-current={
                         activeSection === section ? "page" : undefined
                       }

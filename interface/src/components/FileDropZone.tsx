@@ -5,9 +5,16 @@ import type { Locale } from "../types";
 interface Props {
   locale: Locale;
   onFiles: (files: File[]) => void;
+  /**
+   * A MIME/extension filter for the file picker, e.g. ".eml". It is a hint for
+   * the picker only: the control still accepts a dropped file of any type,
+   * because a browser that ignores `accept` must not be the reason a legitimate
+   * message cannot be submitted. The screen decides what it can process.
+   */
+  accept?: string;
 }
 
-export function FileDropZone({ locale, onFiles }: Props) {
+export function FileDropZone({ locale, onFiles, accept }: Props) {
   const filesRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
   const take = (list: FileList | null) => {
@@ -34,6 +41,7 @@ export function FileDropZone({ locale, onFiles }: Props) {
         data-testid="file-input"
         type="file"
         multiple
+        accept={accept}
         hidden
         onChange={(e) => take(e.target.files)}
       />

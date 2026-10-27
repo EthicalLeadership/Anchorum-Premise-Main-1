@@ -51,7 +51,7 @@ single configured development identity only; it performs no authentication,
 tenant isolation, or case authorization and must not be exposed to a network.
 Timeline, search, member administration, export preview, and export generation
 routes return `501 FEATURE_UNAVAILABLE` until their application services and
-required storage/security guarantees exist.
+required storage/security auditables exist.
 
 ## What is not decided here
 

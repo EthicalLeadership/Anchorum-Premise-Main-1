@@ -70,7 +70,7 @@ stored in SQLite; original evidence files are stored under `output/evidence`
 stored bytes against their SHA-256 digest. Custody events are local audit rows
 whose chain is explicitly marked unchecked, and each entry carries a
 `chainDetail` that says so; this does not provide immutable storage,
-cryptographic custody guarantees, malware scanning, or indexing.
+cryptographic custody auditables, malware scanning, or indexing.
 
 ### Reading an artifact
 

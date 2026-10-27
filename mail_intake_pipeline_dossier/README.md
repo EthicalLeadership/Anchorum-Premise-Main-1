@@ -176,7 +176,7 @@ python -m dossier_pipeline.main export-md
 | Psychologist | QUARANTINE_REVIEW | High sensitivity review first. |
 | Legal | ESCALATE_LEGAL | Immediate counsel escalation. |
 
-## Deterministic Guarantee
+## Deterministic Auditable
 
 This system uses **only** regex keyword matching and explicit heuristics. No machine learning. No opaque models. Every classification decision can be explained in court by showing the exact pattern that matched.
 

@@ -3,6 +3,7 @@ export type Locale = "en" | "fr";
 export type CaseSection =
   | "overview"
   | "evidence"
+  | "intake"
   | "timeline"
   | "audit"
   | "settings";

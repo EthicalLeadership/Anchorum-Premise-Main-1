@@ -65,9 +65,12 @@ def test_summarize_returns_validated_claims(client_and_db, monkeypatch):
     ev_id = _upload(client, case_id)
 
     # Stub narrative (direct requests.post path)
+    # `**kwargs` because the route passes the document's filename through so the
+    # prompt's citation format can name the file it is citing. The stub stands in
+    # for the model, not for the call's exact arguments.
     monkeypatch.setattr(
         "interface.llm_classifier.llm_summarize",
-        lambda text: {
+        lambda text, **kwargs: {
             "narrative": "Benefits are approved until 2026-04-27.",
             "backend": "ollama", "model": "test", "cached": False, "error": None,
         },

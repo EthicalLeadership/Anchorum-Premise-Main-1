@@ -3,7 +3,7 @@
 These documents define the initial product and engineering contract before application implementation:
 
 - [Screen map](SCREEN_MAP.md): War Room navigation, workflows, and user-visible states.
-- [System architecture and security](SYSTEM_ARCHITECTURE.md): modular monolith, trust boundaries, integrity guarantees, threats, deployment gates, and verification requirements.
+- [System architecture and security](SYSTEM_ARCHITECTURE.md): modular monolith, trust boundaries, integrity auditables, threats, deployment gates, and verification requirements.
 - [Logical data model](DATA_MODEL.md): system-of-record entities, provenance graph, immutable lifecycle, review, audit, and retention.
 - [MVP backlog](MVP_BACKLOG.md): 90 dependency-ordered tickets with acceptance outcomes and cross-cutting definition of done.
 

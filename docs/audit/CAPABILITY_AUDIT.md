@@ -1,8 +1,8 @@
 # Capability Audit
 
-**Tree stamp:** `0d9705379ccde0436ecae06efc3df94687ffedef`, branch
-`Anchorumzero_trust-on-Prem`, working tree clean. Line numbers throughout
-reflect this commit.
+**Tree stamp:** `56a8619`, branch `Anchorumzero_trust-on-Prem`. Line numbers
+throughout reflect the stamp commit below, whose findings are inherited
+unchanged (see the Δ entry for why this stamp is a test-only advance).
 
 **How to read the stamp.** Committing this document necessarily moved `HEAD`
 past the commit it describes, so the stamp is the last commit whose *code* tree
@@ -13,6 +13,11 @@ the moment this file is committed and every subsequent revision.
 
 **Test state at stamp:** `662 passed, 0 failed` (pytest, `pytest.ini`);
 `138 passed / 138` (Vitest, 19 files); `tsc --noEmit` clean.
+**Not re-measured at `56a8619`:** that commit is test-only, so the counts above
+are inherited rather than observed. The substitute signal is the one this
+document insists on — `56a8619` touches only `interface/src/App.test.tsx`, and
+`npx vitest run` at the current tree is green, but no run was made *at* the
+stamp commit and this header does not claim one.
 
 **Correction: the previous revision's test claim was false.** This header
 asserted `132 passed / 132` while the stamp it named (`cf13235`) actually ran
@@ -477,7 +482,7 @@ audit observed.
 | `dossier_pipeline/anchor_dnssec.py::publish_txt_record` | Hash as DNS TXT | Cloudflare (`_cloudflare_headers`, `get_credentials_from_env`) | `resolve_public_anchor_name` reads it back | Yes — raises without credentials |
 | `dossier_pipeline/anchor_opentimestamps.py::verify_timestamp` | Hash into an OTS proof | Bitcoin calendar | yes | Yes — at line 124, `if not is_available(): return (TimestampStatus.UNAVAILABLE, "OpenTimestamps CLI unavailable; cannot verify")`. Absence of the CLI yields an explicit `UNAVAILABLE` status, never a pass. `create_timestamp_request` (line 82) writes a placeholder dict marked "not a proof" when the CLI is present but no proof is produced |
 | `anchorum-prem-main/registry/key_rotation_service.py::KeyRotationService` | Signing keys | Key store | `RotationEvent`, `KeyRotationOrchestrator` | Yes — raises |
-| `anchorum-prem-main/registry/zarc_journal.py::ZarcJournal` | Monotonic timestamps | Local journal | monotonicity is the guarantee | Yes |
+| `anchorum-prem-main/registry/zarc_journal.py::ZarcJournal` | Monotonic timestamps | Local journal | monotonicity is the auditable | Yes |
 | `anchorum-prem-main/registry/vault_secret_manager.py::VaultSecretManager` | Key versions | Vault / AWS (`SecretBackend`, `RotationState`) | `KeyVersion` | Yes — raises |
 | `scripts/verify_anchor.py` | A v3 trust anchor on disk | Re-derived hash | "as a fresh process" | Yes — exit code |
 | `scripts/verify_audit_chain.py` | Signed hash-chained audit log | Prior entry hash | yes | Yes — exit code |
@@ -686,8 +691,13 @@ the only write path. `EmailIntake` dedups via `EmailSeenSet`.
 
 ## 15. Honest inventory of gaps
 
-Findings reflect commit `0d9705379ccde0436ecae06efc3df94687ffedef`. Items resolved after that stamp are not
+Findings reflect commit `56a8619`. Items resolved after that stamp are not
 represented.
+
+Δ 0d97053 → 56a8619: test-only. `interface/src/App.test.tsx` gains three vitest
+cases for the `AuditExports` export-format select. No production path changed,
+so no finding below is invalidated; the stamp is advanced on that basis rather
+than on a re-run of this audit.
 
 Δ 22dc62c → 0d97053: `AuditExports` badge now consumes `chainIntegrity`; `/export` refuses empty `record_hash`; `_custody_log`, export, and `change_member_role` route through `_append_audit`. Evidence viewer gains an extracted-text panel via `GET /evidence/{id}/text` (sidecar read, 200k-char truncation with explicit `truncated`). No section-15 finding closed — the badge-honesty gap was caught by `test_audit_badge_honesty.py`, not by this audit.
 
@@ -695,7 +705,7 @@ represented.
 
 | Area | What is absent | Evidence |
 |---|---|---|
-| Prompt citation guarantee | `prompts/v1/system.txt` rule 2 mandates `[source: file, page X, lines Y-Z]`; nothing parses or validates it. Critical because the guarantee is stated as mandatory to the model and relied on by the reader of a legal answer — the system promises a property it never checks. Severity rests on the promise, not on an observed instance of a user being misled, which this audit did not witness | no symbol in `interface/` or `dossier_pipeline/` references that format |
+| Prompt citation auditable | `prompts/v1/system.txt` rule 2 mandates `[source: file, page X, lines Y-Z]`; nothing parses or validates it. Critical because the auditable is stated as mandatory to the model and relied on by the reader of a legal answer — the system promises a property it never checks. Severity rests on the promise, not on an observed instance of a user being misled, which this audit did not witness | no symbol in `interface/` or `dossier_pipeline/` references that format |
 
 ### High (5)
 
@@ -772,7 +782,7 @@ It is not a finished product, and four things constrain it most:
 - An unauthenticated client can **skip the upload allowlist** by omitting two
   form fields, and the resulting null-category document is then invisible to
   every filtered listing.
-- The system prompt makes a **citation guarantee that no code enforces**.
+- The system prompt makes a **citation auditable that no code enforces**.
 - The **LLM surface is broader than a second opinion**: it answers consultation
   and summarisation requests through `/consult` and `/summarize`, inside a
   codebase whose stated contract is determinism.

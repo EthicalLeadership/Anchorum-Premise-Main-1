@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { createAdapter } from "../adapter";
+import { AnchorPanel } from "../components/AnchorPanel";
 import { StateBlock } from "../components/StateBlock";
 import { VerificationTile, type VerificationView } from "../components/VerificationTile";
 import { translate } from "../i18n";
@@ -71,6 +72,12 @@ export function Overview({ locale, adapter, caseId }: Props) {
       ) : (
         <StateBlock locale={locale} kind="empty" />
       )}
+      <AnchorPanel
+        locale={locale}
+        adapter={adapter}
+        caseId={caseId}
+        timeZone={load.timeZone}
+      />
       <section aria-labelledby="recent-title">
         <h2 id="recent-title">{translate(locale, "overview.recent_activity.title")}</h2>
         {load.activity.length === 0 ? (
