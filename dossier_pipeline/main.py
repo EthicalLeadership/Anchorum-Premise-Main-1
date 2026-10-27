@@ -804,6 +804,10 @@ def main():
     sub.add_parser("enforce", help="Run projection/enforcement summary")
     sub.add_parser("verify", help="Run chain/replay/projection verification")
 
+    p_intake = sub.add_parser("intake-email", help="Intake .eml files for processing")
+    p_intake.add_argument("--dir", help="Directory containing .eml files")
+    p_intake.add_argument("--file", help="Single .eml file to process")
+
     args = parser.parse_args()
 
     try:
@@ -829,6 +833,8 @@ def main():
         cmd_ingest_dir(args, config)
     elif args.command == "import-drafts":
         cmd_import_drafts(args, config)
+    elif args.command == "intake-email":
+        cmd_intake_email(args, config)
     elif args.command == "audit-actors":
         cmd_audit_actors(args, config)
     elif args.command == "verify-chain":
