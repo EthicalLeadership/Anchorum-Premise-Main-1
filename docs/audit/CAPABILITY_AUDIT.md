@@ -1,8 +1,9 @@
 # Capability Audit
 
-**Tree stamp:** `56a8619`, branch `Anchorumzero_trust-on-Prem`. Line numbers
-throughout reflect the stamp commit below, whose findings are inherited
-unchanged (see the Δ entry for why this stamp is a test-only advance).
+**Tree stamp:** `027a205`, branch `Anchorumzero_trust-on-Prem`. Line numbers
+throughout reflect `56a8619`, the commit whose tree the findings were written
+against. Six commits land between that stamp and this one; the Δ entry for
+`56a8619 → 027a205` lists them and states which inventory rows they move.
 
 **How to read the stamp.** Committing this document necessarily moved `HEAD`
 past the commit it describes, so the stamp is the last commit whose *code* tree
@@ -11,13 +12,24 @@ checkable is: `git diff --name-only <stamp>..HEAD -- ':!docs/audit/CAPABILITY_AU
 is empty. Any future check must apply that exclusion, otherwise it reports drift
 the moment this file is committed and every subsequent revision.
 
-**Test state at stamp:** `662 passed, 0 failed` (pytest, `pytest.ini`);
-`138 passed / 138` (Vitest, 19 files); `tsc --noEmit` clean.
-**Not re-measured at `56a8619`:** that commit is test-only, so the counts above
-are inherited rather than observed. The substitute signal is the one this
-document insists on — `56a8619` touches only `interface/src/App.test.tsx`, and
-`npx vitest run` at the current tree is green, but no run was made *at* the
-stamp commit and this header does not claim one.
+**Test state, measured against the working tree derived from `027a205`:**
+`714 passed, 0 failed` (pytest, `pytest.ini`); `188 passed / 188` (Vitest, 23
+files); `tsc --noEmit` clean; `vite build` succeeds. The one failure in the
+first run was `tests/test_check_audit_freshness.py::test_current_tree_passes`,
+which reported `STALE` for the six commits listed in the Δ entry; restamping to
+`027a205` answers it, and the counts above are the run after that change. The
+freshness check itself prints `OK stamp=027a205`.
+
+**Not measured at a commit.** The counts above were taken on a working tree that
+carries uncommitted work (`interface/locales/{en,fr}.json`,
+`interface/src/i18n.test.ts`, `interface/src/components/SaulSummaryDrawer.*`,
+`interface/src/screens/EvidenceViewer.tsx`, `interface/src/adapter.ts`,
+`interface/src/components/AnchorPanel.tsx`, `interface/anchorum_api.py`,
+`interface/tools.py`, `dossier_pipeline/main.py`). That work is inside every
+number above and none of it is in `027a205`. The stamp is the last commit whose
+*committed* tree the findings were re-checked against, so the freshness
+invariant holds; the test counts describe the tree that was actually run, and
+this header does not claim they were observed at `027a205` itself.
 
 **Correction: the previous revision's test claim was false.** This header
 asserted `132 passed / 132` while the stamp it named (`cf13235`) actually ran
@@ -693,6 +705,64 @@ the only write path. `EmailIntake` dedups via `EmailSeenSet`.
 
 Findings reflect commit `56a8619`. Items resolved after that stamp are not
 represented.
+
+**Δ `56a8619 → 027a205`.** Six commits, restamped without rewriting §1–§14;
+this entry records what moved and what was re-measured.
+
+- `7188788`, `d55f38a`, `027a205` — `dossier_pipeline/main.py` gains and then
+  repairs a `cmd_intake_email` subcommand wired to the pipeline (a duplicate
+  definition is removed in the same series). `d55f38a` adds 6 lines and
+  `027a205` rewrites 33, so the CLI subcommand count in §3/§13 is now one higher
+  than at the stamp.
+- `86b22f2`, `79a0336` — `prompts/v1/{analyze_claim,system}.txt` replace
+  `DOSSIER-PIPELINE` with `en cause`, and `prompts/v1/manifest.json` is updated
+  to the new hashes. §12's row "no code path reads the manifest" still holds;
+  the manifest is now *correct* and still unread.
+- `67862ea` — a commit labelled "wip" that swept in work unrelated to its
+  subject. It adds a second, parallel HTTP application at `backend/`
+  (`main.py`, `routes/cases.py`, `routes/evidence.py`, `start.sh`,
+  `requirements.txt`, `IMPLEMENTATION_SUMMARY.md`; 6 route decorators), adds
+  `docs/product/{README,MVP_BACKLOG,MERGE_DECISION,WAR_ROOM_GAP_ANALYSIS}.md`,
+  `audit_report.md`, and three zero-byte files at the repository root —
+  `PYEOF`, `assert`, `cd` — left over from a shell heredoc. (Its
+  `backend/**/__pycache__/*.pyc` files are on disk but untracked; `.gitignore`
+  already covers `__pycache__/` and `*.pyc`.)
+
+  **Resolved since.** The three zero-byte files are deleted.
+  `scripts/check_integrity.py` check 6 used to run inside `_check`, which
+  returns early for any path whose suffix is not a source suffix — so three
+  files with *no* suffix passed a green gate for four days. The emptiness test
+  now runs before the suffix filter and `main` applies it to every tracked
+  path; `--selftest` gained a case for a suffixless empty file and a clean-case
+  list for inputs that must stay accepted (a zero-byte `.gitkeep`, an ordinary
+  module), since an empty "expected" substring made the first version of that
+  assertion always pass. Two duplicate top-level definitions the gate was also
+  failing on — `test_registry_error` in `tests/test_barreau_gate.py` and
+  `_find_audit_or_fail`/`_stamp_deadbeef_and_commit` in
+  `tests/test_check_audit_freshness.py` — were verbatim copy-paste pairs and are
+  removed; the shadowed copy was never collected, so the suite count is
+  unchanged at 714.
+
+  **This is the one part of the Δ that the audit does not absorb.** `backend/`
+  is a capability — a second FastAPI app mounting `/cases` and `/evidence` —
+  and §3–§14 inventory only `interface/`. It is recorded here as an
+  uninventoried subsystem rather than silently folded into the map, because
+  nothing in this revision evaluated it: it has no test module, and
+  `pytest.ini` collects `tests/` only. The same commit is the reason the
+  freshness check fired.
+
+- Counts at the working tree derived from `027a205`, re-measured with
+  `git ls-files`: **297 Python files** (§1 says 271), **78 test modules**
+  (§1 says 63), **23 Vitest files** (§1 says 18), and **36 route decorators in
+  `interface/anchorum_api.py`** (§1 and §4 say 31). The five routes §4's table
+  does not list are `GET /cases/{case_id}/anchor`, `POST /cases/{case_id}/anchor`,
+  `GET /evidence/{evidence_id}/summarize`, `POST /cases/{case_id}/audit/verify-proofs`
+  and `POST /cases/{case_id}/intake/email`. Every line number in §4–§13 is
+  relative to `56a8619` and has shifted with these additions — `/health`, for
+  instance, is at 560 now and 529 in the table.
+  §1 and §4 are therefore stale in their counts and their line numbers, and are
+  left as written rather than half-edited; this entry is the authoritative
+  correction.
 
 Δ 0d97053 → 56a8619: test-only. `interface/src/App.test.tsx` gains three vitest
 cases for the `AuditExports` export-format select. No production path changed,
