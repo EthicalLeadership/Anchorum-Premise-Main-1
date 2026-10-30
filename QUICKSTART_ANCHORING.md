@@ -50,12 +50,12 @@ python3 -m dossier_pipeline.anchor_cli dns-check
 If DNS publishing is enabled, the TXT record is published at:
 
 ```text
-dossier-02.chain.creovate.digital
+dossier-02.anchorumzero-trust.com
 ```
 
 Example query:
 ```bash
-dig TXT dossier-02.chain.creovate.digital
+dig TXT dossier-02.anchorumzero-trust.com
 ```
 
 ## Notes

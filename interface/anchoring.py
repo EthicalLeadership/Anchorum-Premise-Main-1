@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from typing import Optional, Sequence
 
 #: Where the TXT record goes unless a deployment names its own zone.
-DEFAULT_ANCHOR_DOMAIN = "chain.creovate.digital"
+DEFAULT_ANCHOR_DOMAIN = "anchorumzero-trust.com"
 
 #: Anchoring needs a zone and a token. Reported as "not configured" rather than
 #: attempted and failed, because the operator cannot fix a wrong token from a

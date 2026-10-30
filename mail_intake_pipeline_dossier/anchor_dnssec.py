@@ -74,7 +74,7 @@ def publish_txt_record(
         )
 
 
-def resolve_public_anchor_name(dossier_id: str, domain: str = "chain.creovate.digital") -> str:
+def resolve_public_anchor_name(dossier_id: str, domain: str = "anchorumzero-trust.com") -> str:
     normalized = dossier_id.strip().lower().replace(" ", "-")
     return f"{normalized}.{domain}"
 
