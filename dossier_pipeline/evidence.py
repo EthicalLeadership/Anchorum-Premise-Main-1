@@ -64,6 +64,10 @@ class CustodyEvent:
     action: CustodyAction
     timestamp_utc: str
     signature: str
+    previous_custody_hash: str
+    record_hash: str
+    content_hash: str
+    created_at: str
 
 
 @dataclass(frozen=True)
@@ -87,6 +91,8 @@ class VerificationReport:
     mismatches: List[Dict[str, Any]] = field(default_factory=list)
     tail_hash: str = ""
     anchor_hash: str = ""
+    custody_chain_ok: bool = True
+    custody_chain_problems: List[str] = field(default_factory=list)
 
 
 class EvidenceSignerUnbound(RuntimeError):
@@ -234,11 +240,26 @@ class EvidenceStore:
                 action TEXT NOT NULL,
                 timestamp_utc TEXT NOT NULL,
                 signature TEXT NOT NULL,
+                previous_custody_hash TEXT NOT NULL DEFAULT '',
+                record_hash TEXT NOT NULL DEFAULT '',
+                content_hash TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(evidence_id) REFERENCES evidence_packets(evidence_id)
             )
             """
         )
+        for column in (
+            "previous_custody_hash",
+            "record_hash",
+            "content_hash",
+        ):
+            try:
+                self.conn.execute(
+                    f"ALTER TABLE custody_events ADD COLUMN {column} TEXT NOT NULL DEFAULT ''"
+                )
+            except sqlite3.OperationalError as exc:
+                if "duplicate column name" not in str(exc).lower():
+                    raise
         self.conn.execute(
             """
             CREATE TABLE IF NOT EXISTS anchors (
@@ -285,16 +306,20 @@ class EvidenceStore:
         metadata: Dict[str, Any],
         hash_chain_id: Optional[str] = None,
         duplicate_of: Optional[str] = None,
+        evidence_id: Optional[str] = None,
     ) -> EvidencePacket:
         lock = _evidence_registry.create_hierarchical_lock(
             LockSpec(f"evidence.capture.{metadata.get('dossier_id', 'default')}.{hash_chain_id or 'chain'}", hierarchy_order=40)
         )
+        packet: Optional[EvidencePacket] = None
         with lock:
             with TransactionGate(f"evidence-{metadata.get('dossier_id', 'default')}", auto_commit=True) as gate:
                 if self.state == SystemState.LOCKED:
                     raise RuntimeError("Evidence store is LOCKED")
 
-                evidence_id = str(uuid.uuid7()) if hasattr(uuid, "uuid7") else str(uuid.uuid4())
+                evidence_id = evidence_id or (
+                    str(uuid.uuid7()) if hasattr(uuid, "uuid7") else str(uuid.uuid4())
+                )
                 timestamp_utc = _utc_now()
                 current_prev = self._tail_hash()
                 chain_id = hash_chain_id or metadata.get("hash_chain_id") or _sha256(metadata.get("dossier_id", "default"))
@@ -369,41 +394,107 @@ class EvidenceStore:
                     actual=packet.hash_self,
                     expected=_sha256(_canonical_json(packet_payload)),
                 )
-                return packet
+
+        if packet is None:
+            raise RuntimeError("Evidence packet was not created")
+        return packet
 
     def add_custody_event(self, evidence_id: str, actor_id: str, action: CustodyAction) -> CustodyEvent:
         timestamp_utc = _utc_now()
         custody_id = str(uuid.uuid4())
-        message = f"{custody_id}:{evidence_id}:{actor_id}:{action.value}:{timestamp_utc}"
-        signature = self.signer.sign(message)
-
-        custody_event = CustodyEvent(
-            custody_id=custody_id,
-            evidence_id=evidence_id,
-            actor_id=actor_id,
-            action=action,
-            timestamp_utc=timestamp_utc,
-            signature=signature,
-        )
-        self.conn.execute(
-            """
-            INSERT INTO custody_events (
-                custody_id, evidence_id, actor_id, action, timestamp_utc, signature, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                custody_event.custody_id,
-                custody_event.evidence_id,
-                custody_event.actor_id,
-                custody_event.action.value,
-                custody_event.timestamp_utc,
-                custody_event.signature,
-                timestamp_utc,
-            ),
-        )
-        self.conn.commit()
+        signer = self.signer
+        try:
+            self.conn.execute("BEGIN IMMEDIATE")
+            packet = self.conn.execute(
+                "SELECT hash_self FROM evidence_packets WHERE evidence_id = ?",
+                (evidence_id,),
+            ).fetchone()
+            if packet is None:
+                raise ValueError(f"Evidence packet not found: {evidence_id}")
+            prior = self.conn.execute(
+                """
+                SELECT record_hash FROM custody_events
+                WHERE evidence_id = ?
+                ORDER BY created_at DESC, custody_id DESC
+                LIMIT 1
+                """,
+                (evidence_id,),
+            ).fetchone()
+            previous_custody_hash = prior[0] if prior else "0" * 64
+            content_hash = packet[0]
+            record_payload = self._custody_record_payload(
+                custody_id=custody_id,
+                evidence_id=evidence_id,
+                actor_id=actor_id,
+                action=action,
+                timestamp_utc=timestamp_utc,
+                created_at=timestamp_utc,
+                previous_custody_hash=previous_custody_hash,
+                content_hash=content_hash,
+            )
+            record_hash = _sha256(_canonical_json(record_payload))
+            signature = signer.sign(record_hash)
+            custody_event = CustodyEvent(
+                custody_id=custody_id,
+                evidence_id=evidence_id,
+                actor_id=actor_id,
+                action=action,
+                timestamp_utc=timestamp_utc,
+                signature=signature,
+                previous_custody_hash=previous_custody_hash,
+                record_hash=record_hash,
+                content_hash=content_hash,
+                created_at=timestamp_utc,
+            )
+            self.conn.execute(
+                """
+                INSERT INTO custody_events (
+                    custody_id, evidence_id, actor_id, action, timestamp_utc, signature,
+                    previous_custody_hash, record_hash, content_hash, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    custody_event.custody_id,
+                    custody_event.evidence_id,
+                    custody_event.actor_id,
+                    custody_event.action.value,
+                    custody_event.timestamp_utc,
+                    custody_event.signature,
+                    custody_event.previous_custody_hash,
+                    custody_event.record_hash,
+                    custody_event.content_hash,
+                    timestamp_utc,
+                ),
+            )
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
         self.state = self._recompute_state()
         return custody_event
+
+    @staticmethod
+    def _custody_record_payload(
+        *,
+        custody_id: str,
+        evidence_id: str,
+        actor_id: str,
+        action: CustodyAction,
+        timestamp_utc: str,
+        created_at: str,
+        previous_custody_hash: str,
+        content_hash: str,
+    ) -> Dict[str, str]:
+        return {
+            "custody_id": custody_id,
+            "evidence_id": evidence_id,
+            "actor_id": actor_id,
+            "action": action.value,
+            "timestamp_utc": timestamp_utc,
+            "created_at": created_at,
+            "previous_custody_hash": previous_custody_hash,
+            "content_hash": content_hash,
+        }
 
     def create_anchor(self) -> AnchorCheckpoint:
         packets = self.get_packets()
@@ -478,14 +569,18 @@ class EvidenceStore:
             )
         return packets
 
-    def get_custody_events(self) -> List[CustodyEvent]:
-        cur = self.conn.execute(
-            """
-            SELECT custody_id, evidence_id, actor_id, action, timestamp_utc, signature
+    def get_custody_events(self, evidence_id: Optional[str] = None) -> List[CustodyEvent]:
+        sql = """
+            SELECT custody_id, evidence_id, actor_id, action, timestamp_utc, signature,
+                   previous_custody_hash, record_hash, content_hash, created_at
             FROM custody_events
-            ORDER BY timestamp_utc ASC
-            """
-        )
+        """
+        params: Tuple[str, ...] = ()
+        if evidence_id is not None:
+            sql += " WHERE evidence_id = ?"
+            params = (evidence_id,)
+        sql += " ORDER BY created_at ASC, custody_id ASC"
+        cur = self.conn.execute(sql, params)
         return [
             CustodyEvent(
                 custody_id=row[0],
@@ -494,9 +589,60 @@ class EvidenceStore:
                 action=CustodyAction(row[3]),
                 timestamp_utc=row[4],
                 signature=row[5],
+                previous_custody_hash=row[6],
+                record_hash=row[7],
+                content_hash=row[8],
+                created_at=row[9],
             )
             for row in cur.fetchall()
         ]
+
+    def verify_custody_chain(
+        self,
+        evidence_id: str,
+        *,
+        verify_signatures: bool = True,
+    ) -> Tuple[bool, List[str]]:
+        events = self.get_custody_events(evidence_id)
+        if not events:
+            return False, ["no_custody_events"]
+
+        packet = self.conn.execute(
+            "SELECT hash_self FROM evidence_packets WHERE evidence_id = ?",
+            (evidence_id,),
+        ).fetchone()
+        if packet is None:
+            return False, ["evidence_packet_missing"]
+
+        problems: List[str] = []
+        previous_hash = "0" * 64
+        for event in events:
+            if not event.record_hash:
+                problems.append(f"legacy_unlinked_event:{event.custody_id}")
+                previous_hash = event.record_hash
+                continue
+            if event.previous_custody_hash != previous_hash:
+                problems.append(f"chain_link_broken:{event.custody_id}")
+            payload = self._custody_record_payload(
+                custody_id=event.custody_id,
+                evidence_id=event.evidence_id,
+                actor_id=event.actor_id,
+                action=event.action,
+                timestamp_utc=event.timestamp_utc,
+                created_at=event.created_at,
+                previous_custody_hash=event.previous_custody_hash,
+                content_hash=event.content_hash,
+            )
+            expected_hash = _sha256(_canonical_json(payload))
+            if event.record_hash != expected_hash:
+                problems.append(f"record_hash_mismatch:{event.custody_id}")
+            if verify_signatures and not self.signer.verify(event.record_hash, event.signature):
+                problems.append(f"signature_invalid:{event.custody_id}")
+            if event.content_hash != packet[0]:
+                problems.append(f"content_hash_mismatch:{event.custody_id}")
+            previous_hash = event.record_hash
+
+        return not problems, problems
 
     def export_bundle(self, bundle_dir: str, exporter_id: str) -> str:
         bundle_path = Path(bundle_dir)
@@ -676,7 +822,13 @@ class EvidenceStore:
             previous_timestamp = packet.timestamp_utc
 
         for event in custody_events:
-            message = f"{event.custody_id}:{event.evidence_id}:{event.actor_id}:{event.action.value}:{event.timestamp_utc}"
+            if event.record_hash:
+                message = event.record_hash
+            else:
+                message = (
+                    f"{event.custody_id}:{event.evidence_id}:{event.actor_id}:"
+                    f"{event.action.value}:{event.timestamp_utc}"
+                )
             if verify_signatures and not self.signer.verify(message, event.signature):
                 mismatches.append(
                     {
@@ -686,6 +838,16 @@ class EvidenceStore:
                         "found": event.signature,
                     }
                 )
+
+        custody_chain_problems: List[str] = []
+        custody_chain_ok = True
+        for evidence_id in sorted({event.evidence_id for event in custody_events}):
+            chain_ok, problems = self.verify_custody_chain(
+                evidence_id,
+                verify_signatures=verify_signatures,
+            )
+            custody_chain_ok = custody_chain_ok and chain_ok
+            custody_chain_problems.extend(problems)
 
         state = SystemState.OK if not mismatches else SystemState.COMPROMISED
         if mismatches:
@@ -698,6 +860,8 @@ class EvidenceStore:
             mismatches=mismatches,
             tail_hash=packets[-1].hash_self if packets else "",
             anchor_hash=_merkle_root([p.hash_self for p in packets]),
+            custody_chain_ok=custody_chain_ok,
+            custody_chain_problems=custody_chain_problems,
         )
 
     def close(self) -> None:

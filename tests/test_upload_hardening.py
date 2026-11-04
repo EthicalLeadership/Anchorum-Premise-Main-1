@@ -138,3 +138,45 @@ def test_mime_normalization():
     assert normalize("text/plain; charset=utf-8") == "text/plain"
     assert normalize("TEXT/PLAIN; charset=UTF-8") == "text/plain"
     assert normalize("application/pdf") == "application/pdf"
+def test_failed_row_write_leaves_no_orphan_bytes(app_and_client):
+    """A failure between storing the bytes and committing the row leaves nothing.
+
+    This is the seam the audit records as open: gates protect the pipeline but
+    never reached the HTTP edge. The upload now journals the file and the row as
+    one reversible unit, so the failure path is a reversal rather than a cleanup
+    the `finally` block has to guess at.
+    """
+    client, ev_path, db_path = app_and_client
+    with patch("interface.anchorum_api._custody_log", side_effect=RuntimeError("row write failed")):
+        with pytest.raises(RuntimeError):
+            client.post(
+                "/cases/T1/evidence",
+                files={"file": ("gate.txt", b"bytes that must not survive", "text/plain")},
+            )
+    assert list(ev_path.glob("*.bin")) == []
+    assert list(ev_path.glob(".upload-*")) == []
+    conn = sqlite3.connect(db_path)
+    assert conn.execute("select count(*) from documents").fetchone()[0] == 0
+
+
+def test_gate_reverse_action_deletes_the_stored_file(tmp_path):
+    """The forward/reverse pair the upload journals really reverses.
+
+    Asserted on the gate directly, so the route's rollback path rests on a
+    tested primitive rather than on the assumption that an unlink inside a
+    lambda behaves.
+    """
+    from dossier_enforcement.gates import TransactionGate
+
+    target = tmp_path / "evidence.bin"
+    gate = TransactionGate("evidence-upload-unit", auto_commit=False)
+    gate.__enter__()
+    gate.execute_now(
+        lambda: target.write_bytes(b"payload"),
+        lambda: target.unlink(missing_ok=True),
+        description="store evidence bytes",
+    )
+    assert target.is_file()
+    gate.rollback()
+    assert not target.exists()
+    assert gate.is_rolled_back

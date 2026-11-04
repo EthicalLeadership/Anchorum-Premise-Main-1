@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from dossier_pipeline.main import load_config
+from dossier_pipeline.evidence import EvidenceStore
 from dossier_pipeline.pipeline import DossierPipeline, load_default_spec
 from interface import submission
 
@@ -39,6 +40,26 @@ def _config() -> dict:
     cfg.setdefault("output_dir", "./output")
     cfg.setdefault("email", "interface@localhost")
     return cfg
+
+
+def _pipeline_config() -> dict:
+    cfg = _config()
+    cfg["output_dir"] = str(Path(cfg["output_dir"]).expanduser().resolve())
+    return cfg
+
+
+def resolve_evidence_db_path() -> Path:
+    """Resolve the evidence database used by this module's pipeline factory."""
+    cfg = _pipeline_config()
+    return Path(cfg["output_dir"]) / f"{cfg['dossier_id']}_evidence.db"
+
+
+def open_evidence_store() -> EvidenceStore:
+    """Open a fresh store for the configured pipeline database; caller closes it."""
+    db_path = resolve_evidence_db_path()
+    if not db_path.is_file():
+        raise FileNotFoundError(f"Evidence database does not exist: {db_path}")
+    return EvidenceStore(str(db_path))
 
 
 #: Transport name for a submission that arrived as a document rather than mail.
@@ -102,7 +123,7 @@ def _document_source(
 
 
 def _build_pipeline() -> DossierPipeline:
-    cfg = _config()
+    cfg = _pipeline_config()
     return DossierPipeline(
         dossier_id=cfg["dossier_id"],
         output_dir=cfg["output_dir"],

@@ -8,6 +8,7 @@ import hmac
 import json
 import os
 import re
+import sqlite3
 import tempfile
 import uuid
 import zipfile
@@ -33,8 +34,15 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.engine import make_url
 
+from dossier_enforcement.gates import TransactionGate
 from dossier_pipeline.schema import AuditLog, Case, Document, JurisdictionStamp, User, init_schema
 from dossier_pipeline.barreau_gate import BarreauGate, BarreauGateError
+from dossier_pipeline.evidence import (
+    CustodyAction,
+    EvidenceSigner,
+    EvidenceSignerUnbound,
+    EvidenceStore,
+)
 from interface import analysis as analysis_service
 from interface import anchoring
 from interface import malware_scan
@@ -124,15 +132,6 @@ TIMELINE_EVENTS = {
     EVENT_EVIDENCE_FILED_WITH_DATE: EVENT_EVIDENCE_FILED_WITH_DATE,
 }
 
-#: This API slice has no control plane, so no chain is ever walked here. The
-#: value stays `not_checked` and the detail says why; `linked` would claim a
-#: check that did not happen.
-CUSTODY_CHAIN = "not_checked"
-CUSTODY_CHAIN_DETAIL = (
-    "No control chain exists on this host: this entry is the local audit row. "
-    "The tamper-evident chain lives in the dossier pipeline's own store."
-)
-
 #: Audit actions that appear in an evidence item's custody list, and the word
 #: the interface shows for each.
 CUSTODY_ACTIONS = {
@@ -145,6 +144,9 @@ CUSTODY_ACTIONS = {
     # to a moment and an actor is worse than no output.
     "evidence_consulted": "consulted",
     "evidence_summarised": "summarised",
+    # Finding lifecycle events for the war room integration
+    "finding_created": "created",
+    "finding_superseded": "superseded",
 }
 
 
@@ -457,6 +459,55 @@ def _custody_log(
         details={"evidenceId": evidence_id},
         actor="system",
     )
+
+
+def _record_pipeline_custody(document: Document, *, case_id: int) -> None:
+    from interface.document import resolve_evidence_db_path
+
+    evidence_store = EvidenceStore(str(resolve_evidence_db_path()))
+    try:
+        if evidence_store.configured_signer() is None:
+            # The evidence store signs every packet and custody event and
+            # refuses to do so with an empty key (EvidenceSignerUnbound). With
+            # no secret configured this step is skipped rather than failing the
+            # upload: the audit chain still records it, and
+            # /audit/verify-proofs reports the missing key as `not_checked`.
+            return
+        packet = evidence_store.ingest(
+            evidence_id=document.document_key,
+            event_type="document_upload",
+            raw_payload={
+                "content_hash": document.content_hash,
+                "byte_size": document.byte_size,
+            },
+            normalized_payload={
+                "filename": document.filename,
+                "media_type": document.media_type,
+                "category": document.category,
+                "source": document.source,
+            },
+            metadata={
+                "case_id": str(case_id),
+                "document_key": document.document_key,
+            },
+        )
+        evidence_store.add_custody_event(
+            packet.evidence_id,
+            "interface",
+            CustodyAction.INGESTED,
+        )
+        valid, problems = evidence_store.verify_custody_chain(packet.evidence_id)
+        if not valid:
+            raise RuntimeError(
+                f"Newly recorded evidence custody chain failed verification: {problems}"
+            )
+        evidence_store.add_custody_event(
+            packet.evidence_id,
+            "interface",
+            CustodyAction.VERIFIED,
+        )
+    finally:
+        evidence_store.close()
 
 
 def create_app(
@@ -1250,6 +1301,13 @@ def create_app(
         if source is not None and source not in ALLOWED_SOURCES:
             reject(status.HTTP_422_UNPROCESSABLE_CONTENT, "INVALID_SOURCE", "The provided source is not allowed.")
 
+        # No signing key is required to store evidence. An absent
+        # GDC_EVIDENCE_SECRET means the audit rows for this upload are stored
+        # explicitly unsigned (hmac=""), which /audit/verify-proofs reports as
+        # `not_checked` / `no_signing_key` and /export refuses to call signed.
+        # Refusing the upload instead would make the key a precondition for
+        # recording evidence, and a system that cannot record bytes without a
+        # key cannot be recovered into a state where one is set.
         storage_key = uuid.uuid4().hex
         temporary_path: Path | None = None
         stored_file = storage_root / f"{storage_key}.bin"
@@ -1293,39 +1351,67 @@ def create_app(
             if not hmac.compare_digest(readback.hexdigest(), digest.hexdigest()) or size_on_disk != byte_size:
                 reject(status.HTTP_507_INSUFFICIENT_STORAGE, "EVIDENCE_READBACK_FAILED", "The stored file could not be read back correctly.")
 
-            os.replace(temporary_path, stored_file)
-            temporary_path = None
-
             content_hash = digest.hexdigest()
-            duplicate = db.scalar(
-                select(Document.id).where(
-                    Document.case_id == case.id,
-                    Document.content_hash == content_hash,
+
+            # The two durable effects of an upload — the bytes on disk and the
+            # row that describes them — are journaled as one unit. If the insert
+            # or the commit fails, the reverse action removes the file instead of
+            # leaving an orphan whose cleanup the `finally` block can only guess
+            # at. This is the seam §6 records: `dossier_enforcement` reaching the
+            # HTTP edge, rather than gates protecting the pipeline alone.
+            upload_gate = TransactionGate(
+                f"evidence-upload-{storage_key}",
+                auto_commit=False,
+            )
+            try:
+                upload_gate.__enter__()
+                upload_gate.execute_now(
+                    lambda: os.replace(temporary_path, stored_file),
+                    lambda: stored_file.unlink(missing_ok=True),
+                    description="store evidence bytes",
                 )
-            ) is not None
-            document = Document(
-                case_id=case.id,
-                document_key=f"E-{storage_key}",
-                filename=filename,
-                content_hash=content_hash,
-                storage_key=storage_key,
-                media_type=media_type,
-                category=category,
-                source=source,
-                byte_size=byte_size,
-            )
-            db.add(document)
-            db.flush()
-            _custody_log(
-                db,
-                case_id=case.id,
-                evidence_id=document.document_key,
-                action="evidence_uploaded",
-            )
-            # The bytes and their custody row are committed before analysis
-            # runs, so an analysis failure can never lose an accepted upload.
-            db.commit()
-            committed = True
+                temporary_path = None
+                duplicate = db.scalar(
+                    select(Document.id).where(
+                        Document.case_id == case.id,
+                        Document.content_hash == content_hash,
+                    )
+                ) is not None
+                document = Document(
+                    case_id=case.id,
+                    document_key=f"E-{storage_key}",
+                    filename=filename,
+                    content_hash=content_hash,
+                    storage_key=storage_key,
+                    media_type=media_type,
+                    category=category,
+                    source=source,
+                    byte_size=byte_size,
+                )
+                db.add(document)
+                db.flush()
+                _custody_log(
+                    db,
+                    case_id=case.id,
+                    evidence_id=document.document_key,
+                    action="evidence_uploaded",
+                )
+                # The bytes and their custody row are committed before analysis
+                # runs, so an analysis failure can never lose an accepted upload.
+                db.commit()
+                committed = True
+                upload_gate.commit()
+            except BaseException:
+                # Never reverse a gate that already committed: the row is
+                # durable and unlinking the file would strand it.
+                if not upload_gate.is_committed:
+                    try:
+                        upload_gate.rollback()
+                    except Exception:
+                        logger.exception(
+                            "evidence upload rollback failed for %s", storage_key
+                        )
+                raise
 
             run_analysis(document)
             _custody_log(
@@ -1336,6 +1422,20 @@ def create_app(
             )
             _record_filed_date(db, case.id, document)
             db.commit()
+            try:
+                _record_pipeline_custody(document, case_id=case.id)
+            except sqlite3.Error as exc:
+                logger.exception("evidence was stored but custody recording failed: %s", exc)
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail={
+                        "error": "CUSTODY_STORE_UNAVAILABLE",
+                        "message": (
+                            "Evidence was stored, but its signed custody record "
+                            "could not be written."
+                        ),
+                    },
+                ) from exc
             return {
                 "id": document.document_key,
                 "hash": content_hash,
@@ -1431,31 +1531,114 @@ def create_app(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"error": "NOT_FOUND", "message": "Evidence item not found."},
             )
-        entries = db.scalars(
+        # The custody list is the audit chain, not the evidence store. The store
+        # records what happened to the bytes (INGESTED/VERIFIED); this list is
+        # what a reader did with them, and CUSTODY_ACTIONS is its vocabulary.
+        # Until this mapping was applied here it was dead code: every audit
+        # action was written and none was ever shown.
+        entries: list[dict] = []
+
+        # What can honestly be said about the chain on this host. Custody rows
+        # are hash-chained inside the audit log; whether those links were
+        # *checked* depends on a control chain being present, and an entry that
+        # claimed "linked" without one would be claiming a check nobody ran.
+        chain_status = "not_checked"
+        chain_detail = (
+            "No control chain is configured on this host, so custody links "
+            "were not checked."
+        )
+        audit_rows = db.scalars(
             select(AuditLog)
             .where(
                 AuditLog.case_id == document.case_id,
                 AuditLog.action.in_(tuple(CUSTODY_ACTIONS)),
             )
-            .order_by(AuditLog.created_at.asc(), AuditLog.id.asc())
-        )
-        result = []
-        for entry in entries:
-            details = json.loads(entry.details)
+            .order_by(AuditLog.id.asc())
+        ).all()
+        for row in audit_rows:
+            try:
+                details = json.loads(row.details or "{}")
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(details, dict):
+                continue
             if details.get("evidenceId") != evidence_id:
                 continue
-            result.append(
+            at = _datetime_text(row.created_at)
+            entries.append(
                 {
-                    "id": str(entry.id),
-                    "actor": entry.actor_username,
-                    "action": CUSTODY_ACTIONS[entry.action],
-                    "at": _datetime_text(entry.created_at),
-                    "chain": CUSTODY_CHAIN,
-                    "chainDetail": CUSTODY_CHAIN_DETAIL,
-                    "hmac": entry.hmac or "",
+                    "id": f"audit-{row.id}",
+                    "custody_id": f"audit-{row.id}",
+                    "evidence_id": evidence_id,
+                    "actor": row.actor_username or "system",
+                    "actor_id": row.actor_username or "system",
+                    "action": CUSTODY_ACTIONS[row.action],
+                    "at": at,
+                    "timestamp_utc": at,
+                    "created_at": at,
+                    "signature": row.hmac or "",
+                    "hmac": row.hmac or "",
+                    "previous_custody_hash": row.previous_hash or "",
+                    "record_hash": row.record_hash or "",
+                    "content_hash": document.content_hash,
+                    "chain": chain_status,
+                    "chainDetail": chain_detail,
                 }
             )
-        return result
+
+        entries.sort(key=lambda entry: entry.get("at") or "")
+        return entries
+
+    @app.get("/items/{evidence_id}/verify", dependencies=[local_api])
+    def verify_evidence_custody(evidence_id: str, db: Session = Depends(get_db)):
+        evidence_id = _require_real_id(evidence_id)
+        document = db.scalar(
+            select(Document).where(Document.document_key == evidence_id)
+        )
+        if document is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "not_found", "message": "Evidence item not found."},
+            )
+        try:
+            EvidenceSigner()
+        except EvidenceSignerUnbound:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "error": "signer_unbound",
+                    "message": "Verification requires the evidence signing key.",
+                },
+            ) from None
+
+        from interface.document import open_evidence_store
+
+        try:
+            evidence_store = open_evidence_store()
+        except FileNotFoundError:
+            return {"valid": False, "problems": ["no_custody_events"]}
+        try:
+            valid, problems = evidence_store.verify_custody_chain(evidence_id)
+            return {"valid": valid, "problems": problems}
+        except EvidenceSignerUnbound:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "error": "signer_unbound",
+                    "message": "Verification requires the evidence signing key.",
+                },
+            ) from None
+        except sqlite3.Error as exc:
+            logger.exception("custody verification failed: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "error": "CUSTODY_STORE_UNAVAILABLE",
+                    "message": "The evidence custody store is unavailable.",
+                },
+            ) from exc
+        finally:
+            evidence_store.close()
 
     @app.get("/evidence/{evidence_id}/download", dependencies=[local_api])
     def download_evidence(evidence_id: str, db: Session = Depends(get_db)):

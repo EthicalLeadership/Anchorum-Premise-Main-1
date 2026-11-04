@@ -100,3 +100,6 @@ REPO_MAP.md
 /home/
 dev_data/
 .projectmanager/
+interface/.env.local
+interface/node_modules/
+interface/dev_data/
