@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** `027a205`, branch `Anchorumzero_trust-on-Prem`. Line numbers
+**Tree stamp:** `5efd7fa`, branch `Anchorumzero_trust-on-Prem`. Line numbers
 throughout reflect `56a8619`, the commit whose tree the findings were written
 against. Six commits land between that stamp and this one; the Δ entry for
 `56a8619 → 027a205` lists them and states which inventory rows they move.
