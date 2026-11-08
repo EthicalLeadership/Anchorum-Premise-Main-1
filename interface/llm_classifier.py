@@ -26,6 +26,8 @@ from pathlib import Path
 from typing import Any
 
 from interface import prompts
+import logging
+from interface.citation_validator import validate_all_citations
 
 
 def _ollama_url() -> str:
@@ -222,6 +224,18 @@ def llm_classify(text: str) -> dict:
         prompt_origin = "inline"
 
     completion = generate(prompt, namespace="classify", timeout=120)
+    
+    # Validate citations in the response (Critical finding resolution)
+    citation_report = validate_all_citations(completion["text"])
+    if not citation_report["valid"]:
+        logger.warning(
+            "Citation validation failed for classify: %s. "
+            "Invalid citations: %d, Warnings: %d",
+            citation_report.get("invalid_citations", [{}])[0].get("error", "unknown"),
+            len(citation_report["invalid_citations"]),
+            citation_report["warning_count"],
+        )
+
     return {
         # A failed call yields "unknown", not a guess: the deterministic
         # classifier's "unknown" is a statement that no rule matched, and
@@ -234,6 +248,7 @@ def llm_classify(text: str) -> dict:
         "cached": completion["cached"],
         "error": completion["error"],
         "prompt": prompt_origin,
+        "_citation_validation_report": citation_report,
     }
 
 
@@ -286,6 +301,18 @@ def llm_summarize(text: str, *, filename: str = "", topic: str = "") -> dict:
         }
 
     completion = generate(prompt, namespace="summarize", timeout=240)
+    
+    # Validate citations in the response (Critical finding resolution)
+    citation_report = validate_all_citations(completion["text"])
+    if not citation_report["valid"]:
+        logger.warning(
+            "Citation validation failed for summarize: %s. "
+            "Invalid citations: %d, Warnings: %d",
+            citation_report.get("invalid_citations", [{}])[0].get("error", "unknown"),
+            len(citation_report["invalid_citations"]),
+            citation_report["warning_count"],
+        )
+
     return {
         "narrative": completion["text"].strip(),
         "backend": "ollama",
@@ -295,4 +322,5 @@ def llm_summarize(text: str, *, filename: str = "", topic: str = "") -> dict:
         "prompt": origin["prompt"],
         "promptSha256": origin["sha256"],
         "promptStatus": origin["status"],
+        "_citation_validation_report": citation_report,
     }
