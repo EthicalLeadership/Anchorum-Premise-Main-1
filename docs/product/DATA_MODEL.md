@@ -179,3 +179,6 @@ Original lifecycle: `UPLOAD_PENDING → QUARANTINED → PRESERVATION_PENDING →
 ## 10. Migration And Implementation Notes
 
 The current `Case`, `Document`, `User`, `AuditLog`, and `JurisdictionStamp` ORM models are insufficient for this domain and should not be expanded in place without a migration plan. The existing `EvidenceStore` packet/custody model can inform event semantics, but its JSON packet hash is not the raw-file digest and SQLite/HMAC does not meet the production storage/signature contract. Introduce explicit ports/adapters and migration/compatibility tests before connecting legacy records to new EvidenceObject identities. Legacy provenance gaps remain visible; never synthesize missing source history.
+
+
+
