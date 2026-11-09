@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** `7cac8e1`, branch `Anchorumzero_trust-on-Prem`. Line numbers
+**Tree stamp:** `f69cc84`, branch `Anchorumzero_trust-on-Prem`. Line numbers
 throughout reflect `56a8619`, the commit whose tree the findings were written
 against. Six commits land between that stamp and this one; the Δ entry for
 `56a8619 → 027a205` lists them and states which inventory rows they move.
@@ -41,17 +41,20 @@ only one copy could ever bind, so the duplicates were dead code that the gate
 correctly refused. Both files are deduplicated alongside this restamp; the gate
 now prints `OK integrity checks passed (396 source files)`.
 
-**Test state.** This revision re-measured the repository gates; it did not
-re-run the Python or Vitest suites by hand.
+**Test state.** Measured at `f69cc84`, the commit this header stamps:
 
+- `pytest -q -x` — the full Python suite, run by `.githooks/pre-commit` while
+  committing `f69cc84`, because two `.py` files were staged →
+  **`743 passed, 0 failed`**, 116.52s, exit 0.
 - `scripts/check_integrity.py --all` → `OK integrity checks passed (396 source
   files)`, exit 0. It was **red** at `7cac8e1` until the two duplicated test
   modules were deduplicated (Δ note above).
-- `scripts/check_audit_freshness.py --strict` → `OK` once this header names
-  `7cac8e1`, the commit whose code tree the findings describe.
-- The full Python suite is re-run by `.githooks/pre-commit` (`pytest -q -x`)
-  while committing this revision, because two `.py` files are staged. That run's
-  result is recorded in the Δ note of the commit that restamps this header to it.
+- `scripts/check_audit_freshness.py --strict` → `OK`, stamp `f69cc84`.
+
+Not re-run in this revision: Vitest, `tsc --noEmit`, `vite build`. No `.ts` or
+`.tsx` path changed between `5efd7fa` and `f69cc84`, so the last recorded
+frontend result still describes the code, but this header does not claim a fresh
+run it did not make.
 
 **Superseded counts.** The last hand-run numbers recorded in earlier revisions —
 `714 passed, 0 failed` (pytest) and `188 passed / 188` (Vitest, 23 files) with
