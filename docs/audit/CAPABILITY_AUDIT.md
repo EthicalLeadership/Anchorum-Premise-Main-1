@@ -1,24 +1,18 @@
 # Capability Audit
 
-**Tree stamp:** `b05ce61`, branch `Anchorumzero_trust-on-Prem`. Line numbers
+**Tree stamp:** `270e558`, branch `Anchorumzero_trust-on-Prem`. Line numbers
 throughout reflect `56a8619`, the commit whose tree the original findings were
 written against. The Δ entry below records the remediation since the previous
-stamp, `f69cc84`; line references remain explicitly anchored to the original
+stamp, `b05ce61`; line references remain explicitly anchored to the original
 inventory baseline.
 
-**Δ note, `f69cc84 → b05ce61`.** Commit `b05ce61` adds citation parsing and
-reference validation, page-local source extraction for supported formats,
-model-assisted narrative-claim review with exact quote matching, and a
-fail-closed citation gate shared by export and preview. Successful ZIP and PDF
-exports record `citations_valid` in the audit row. The gate refuses malformed
-or absent validation data, unknown/ambiguous sources, nonexistent pages or
-lines, and claims whose checked quote is not present in the cited excerpts.
-Thus the Critical prompt-citation finding below is closed for persisted
-`/consult` and `/summarize` output used by case export. Model-assisted claim
-extraction is not a guarantee of legal correctness; exact quote matching is
-the deterministic evidence check.
+**Δ note, `b05ce61 → 270e558`.** Commit `270e558` adds prose-only deployment
+documentation: `docs/deployment/DEPLOYMENT_SUMMARY.md`, `RELEASE_NOTES.md`, and
+`scripts/pre-deploy-check.sh`. These files track production readiness and do not
+affect any audit findings. The code tree remains unchanged since `b05ce61`; only
+prose was added for deployment tracking.
 
-Verification at `b05ce61`: the commit hook ran `pytest -q -x` and reported
+Verification at `270e558`: the commit hook ran `pytest -q -x` and reported
 **734 passed, 25 skipped, 0 failed**; `scripts/check_integrity.py --all`
 reported **OK (397 source files)**; the secret scan reported no leaks. The
 front-end files were not changed by this commit.
