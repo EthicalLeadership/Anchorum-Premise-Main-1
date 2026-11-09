@@ -1,10 +1,39 @@
 # Capability Audit
 
-**Tree stamp:** `270e558`, branch `Anchorumzero_trust-on-Prem`. Line numbers
+**Tree stamp:** `70fa061`, branch `Anchorumzero_trust-on-Prem`. Line numbers
 throughout reflect `56a8619`, the commit whose tree the original findings were
-written against. The Δ entry below records the remediation since the previous
-stamp, `b05ce61`; line references remain explicitly anchored to the original
-inventory baseline.
+written against. The Δ entries below record the remediation since each earlier
+stamp; line references remain explicitly anchored to the original inventory
+baseline.
+
+**Δ note, `270e558 → 70fa061`.** Six paths, and unlike the previous several
+stamps this range moves code:
+
+```
+git diff --name-only 270e558..70fa061
+  docs/audit/CAPABILITY_AUDIT.md            (this restamp)
+  docs/audit/REGRESSION_GUARDS.md           (new prose)
+  interface/locales/en.json                 (3 keys)
+  interface/locales/fr.json                 (3 keys)
+  interface/src/screens/EvidenceViewer.tsx  (integrity-hold alert)
+  scripts/run_all_regression_guards.sh      (new runner)
+```
+
+No `.py` path appears, so no Python inventory row, line number or Python test
+count in §4–§12 moves. Two things in this range the earlier revisions of this
+header could not state, because no `.ts`/`.tsx` path had changed for many
+stamps:
+
+- **The frontend was re-run here**, so the numbers in "Test state" are measured
+  at `70fa061` rather than inherited from an older tree.
+- **`EvidenceViewer` had no render branch for `integrity_hold`.** The fixture's
+  `E-1047` is on hold with `holdReason: hash_mismatch_at_readback`; the screen
+  drew the broken custody chain and then printed "Not yet verified" under
+  Verification — a statement the hold itself contradicts — and emitted no alert
+  at all, so `EvidenceViewer > names the failing step for an integrity hold`
+  failed. `70fa061` renders the alert and names the step. Recorded here because
+  §4 lists the screen and §15 carries no row for it: a state the domain models
+  existed in the data and was simply not rendered.
 
 **Δ note, `b05ce61 → 270e558`.** Commit `270e558` adds prose-only deployment
 documentation: `docs/deployment/DEPLOYMENT_SUMMARY.md`, `RELEASE_NOTES.md`, and
