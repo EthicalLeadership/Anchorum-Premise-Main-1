@@ -91,9 +91,3 @@ def test_registry_error():
     gate, _ = make_gate(raises=True)
     r = gate.validate(BarreauCredential(GOOD_ID, GOOD_FP), actor_id="admin1")
     assert not r.ok and r.status == Status.REGISTRY_ERROR
-
-
-def test_registry_error():
-    gate, _ = make_gate(raises=True)
-    r = gate.validate(BarreauCredential(GOOD_ID, GOOD_FP), actor_id="admin1")
-    assert not r.ok and r.status == Status.REGISTRY_ERROR

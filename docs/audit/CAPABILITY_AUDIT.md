@@ -1,6 +1,6 @@
 # Capability Audit
 
-**Tree stamp:** `5efd7fa`, branch `Anchorumzero_trust-on-Prem`. Line numbers
+**Tree stamp:** `7cac8e1`, branch `Anchorumzero_trust-on-Prem`. Line numbers
 throughout reflect `56a8619`, the commit whose tree the findings were written
 against. Six commits land between that stamp and this one; the Δ entry for
 `56a8619 → 027a205` lists them and states which inventory rows they move.
@@ -12,24 +12,55 @@ checkable is: `git diff --name-only <stamp>..HEAD -- ':!docs/audit/CAPABILITY_AU
 is empty. Any future check must apply that exclusion, otherwise it reports drift
 the moment this file is committed and every subsequent revision.
 
-**Test state, measured against the working tree derived from `027a205`:**
-`714 passed, 0 failed` (pytest, `pytest.ini`); `188 passed / 188` (Vitest, 23
-files); `tsc --noEmit` clean; `vite build` succeeds. The one failure in the
-first run was `tests/test_check_audit_freshness.py::test_current_tree_passes`,
-which reported `STALE` for the six commits listed in the Δ entry; restamping to
-`027a205` answers it, and the counts above are the run after that change. The
-freshness check itself prints `OK stamp=027a205`.
+**Δ note, `5efd7fa → 7cac8e1`.** Two commits, both prose-only:
 
-**Not measured at a commit.** The counts above were taken on a working tree that
-carries uncommitted work (`interface/locales/{en,fr}.json`,
-`interface/src/i18n.test.ts`, `interface/src/components/SaulSummaryDrawer.*`,
-`interface/src/screens/EvidenceViewer.tsx`, `interface/src/adapter.ts`,
-`interface/src/components/AnchorPanel.tsx`, `interface/anchorum_api.py`,
-`interface/tools.py`, `dossier_pipeline/main.py`). That work is inside every
-number above and none of it is in `027a205`. The stamp is the last commit whose
-*committed* tree the findings were re-checked against, so the freshness
-invariant holds; the test counts describe the tree that was actually run, and
-this header does not claim they were observed at `027a205` itself.
+```
+git log --oneline 5efd7fa..7cac8e1
+  7cac8e1 docs(deploy): add production readiness checklist
+  6b05e4c docs(audit): bump stamp to current HEAD
+
+git diff --name-only 5efd7fa..7cac8e1
+  docs/audit/CAPABILITY_AUDIT.md          (the stamp bump itself)
+  docs/deployment/PRODUCTION_READINESS.md (new prose)
+
+git diff --name-only 5efd7fa..7cac8e1 | grep -vE '\.md$'   → empty
+```
+
+No `.py`, `.ts`, `.tsx`, configuration or schema path appears, so no inventory
+row moves, no finding is invalidated and no line number shifts. The previous
+stamp was one commit behind because `6b05e4c` bumped it to its own parent and
+`7cac8e1` then added prose on top — the recurring shape this document names in
+"How to read the stamp".
+
+**Integrity gate was red at `7cac8e1`.** `scripts/check_integrity.py --all`
+rejected two test modules for duplicated top-level declarations:
+`tests/test_barreau_gate.py` declared `test_registry_error` twice
+byte-identically, and `tests/test_check_audit_freshness.py` declared
+`_find_audit_or_fail` and `_stamp_deadbeef_and_commit` twice each. In every case
+only one copy could ever bind, so the duplicates were dead code that the gate
+correctly refused. Both files are deduplicated alongside this restamp; the gate
+now prints `OK integrity checks passed (396 source files)`.
+
+**Test state.** This revision re-measured the repository gates; it did not
+re-run the Python or Vitest suites by hand.
+
+- `scripts/check_integrity.py --all` → `OK integrity checks passed (396 source
+  files)`, exit 0. It was **red** at `7cac8e1` until the two duplicated test
+  modules were deduplicated (Δ note above).
+- `scripts/check_audit_freshness.py --strict` → `OK` once this header names
+  `7cac8e1`, the commit whose code tree the findings describe.
+- The full Python suite is re-run by `.githooks/pre-commit` (`pytest -q -x`)
+  while committing this revision, because two `.py` files are staged. That run's
+  result is recorded in the Δ note of the commit that restamps this header to it.
+
+**Superseded counts.** The last hand-run numbers recorded in earlier revisions —
+`714 passed, 0 failed` (pytest) and `188 passed / 188` (Vitest, 23 files) with
+`tsc --noEmit` clean — were measured against the tree derived from `027a205`.
+They **do not describe this tree**: `6aa0528` (chain custody, `/verify`,
+`TransactionGate` at the upload edge) and `5efd7fa` (citation validation in the
+LLM classifier) both landed code afterwards. They are kept as history, not as a
+claim, and this header does not assert any frontend result for `7cac8e1` —
+Vitest, `tsc --noEmit` and `vite build` were not re-run in this revision.
 
 **Correction: the previous revision's test claim was false.** This header
 asserted `132 passed / 132` while the stamp it named (`cf13235`) actually ran
