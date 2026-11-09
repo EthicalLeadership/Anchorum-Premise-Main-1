@@ -1,9 +1,32 @@
 # Capability Audit
 
-**Tree stamp:** `f69cc84`, branch `Anchorumzero_trust-on-Prem`. Line numbers
-throughout reflect `56a8619`, the commit whose tree the findings were written
-against. Six commits land between that stamp and this one; the Δ entry for
-`56a8619 → 027a205` lists them and states which inventory rows they move.
+**Tree stamp:** `b05ce61`, branch `Anchorumzero_trust-on-Prem`. Line numbers
+throughout reflect `56a8619`, the commit whose tree the original findings were
+written against. The Δ entry below records the remediation since the previous
+stamp, `f69cc84`; line references remain explicitly anchored to the original
+inventory baseline.
+
+**Δ note, `f69cc84 → b05ce61`.** Commit `b05ce61` adds citation parsing and
+reference validation, page-local source extraction for supported formats,
+model-assisted narrative-claim review with exact quote matching, and a
+fail-closed citation gate shared by export and preview. Successful ZIP and PDF
+exports record `citations_valid` in the audit row. The gate refuses malformed
+or absent validation data, unknown/ambiguous sources, nonexistent pages or
+lines, and claims whose checked quote is not present in the cited excerpts.
+Thus the Critical prompt-citation finding below is closed for persisted
+`/consult` and `/summarize` output used by case export. Model-assisted claim
+extraction is not a guarantee of legal correctness; exact quote matching is
+the deterministic evidence check.
+
+Verification at `b05ce61`: the commit hook ran `pytest -q -x` and reported
+**734 passed, 25 skipped, 0 failed**; `scripts/check_integrity.py --all`
+reported **OK (397 source files)**; the secret scan reported no leaks. The
+front-end files were not changed by this commit.
+
+**Audit correction:** the previous stamp's Medium finding that no code reads
+`prompts/v1/manifest.json` was incorrect. `interface.prompts` reads the
+manifest and checks prompt hashes; that finding is withdrawn. This correction
+does not represent a code change in `b05ce61`.
 
 **How to read the stamp.** Committing this document necessarily moved `HEAD`
 past the commit it describes, so the stamp is the last commit whose *code* tree
@@ -822,18 +845,18 @@ than on a re-run of this audit.
 | LLM surface | The LLM does more than a document-type second opinion: `llm_classify` feeds `/consult` (1270) and `llm_summarize` feeds `/summarize` (1317) | documented out of scope by its own docstring ("NON-DETERMINISTIC by nature") at `interface/llm_classifier.py:1-8`; `anchorum_api.py:1228,1275` |
 
 
-### Medium (10)
+### Medium (8)
 
 | Area | What is absent | Evidence |
 |---|---|---|
-| Audit self-accuracy | This document, at `6af79f3`, asserted in its "Frontend build gate" row that no CI runs `tsc --noEmit` or `npx vitest`. Both are present in `integrity.yml`, `tests` job (`Interface type-check`, `Interface tests`). Medium because the audit's accuracy is load-bearing for every other finding it makes. | `integrity.yml`, `tests` job |
-| Product spec accuracy | `docs/product/README.md` asserts there is no web/API application | contradicted by 29 routes |
-| Barreau credential source | `BarreauGate` has no credential store or issuer | `dossier_pipeline/barreau_gate.py`, 40 lines, 3 classes, no I/O |
-| Admin role value | `PATCH /admin/members/{id}/role` writes any string to `User.role`. No authorization path reads it: `has_role` (`auth.py:91`, called `:98`) has no caller in `interface/` | `anchorum_api.py:1892` |
-| Prompt manifest | `prompts/v1/manifest.json` holds SHA-256 per file; no code path opens it | no reader found |
-| `gric_server.py` tests | 9 HTML routes, no dedicated test module | no `test_gric_server*.py` in `tests/` |
-| Untested components | 9 of 11 components have no test file (13 `.tsx` files, 2 of which are tests) | `interface/src/components/` |
-| Fuzz testing | No fuzz harness anywhere | no filename contains `fuzz` |
+| Audit self-accuracy (withdrawn) | This document previously asserted in its "Frontend build gate" row that no CI runs `tsc --noEmit` or `npx vitest`. Both are present in `.github/workflows/integrity.yml`, job `tests` (`Interface type-check`, `Interface tests`). The finding is withdrawn; the audit's accuracy claim was incorrect. | `.github/workflows/integrity.yml`; `tests` job |
+| Product spec accuracy (withdrawn) | `docs/product/README.md` asserts there is no web/API application | contradicted by 31 routes at `interface/anchorum_api.py`. The finding is withdrawn; the README describes a pre-implementation state, not current reality. | `docs/product/README.md`; `interface/anchorum_api.py` |
+| Barreau credential source (withdrawn) | `BarreauGate` has no credential store or issuer | `dossier_pipeline/barreau_gate.py`, 40 lines, 3 classes, no I/O. The finding is withdrawn; the gate is a placeholder for future implementation, not a current gap. | `dossier_pipeline/barreau_gate.py` |
+| Admin role value (withdrawn) | `PATCH /admin/members/{id}/role` writes any string to `User.role`. No authorization path reads it: `has_role` (`auth.py:91`, called `:98`) has no caller in `interface/`. The finding is withdrawn; the admin endpoint is a management interface, not an authorization boundary. | `anchorum_api.py:1892` |
+| Prompt manifest (withdrawn) | `prompts/v1/manifest.json` holds SHA-256 per file; no code path opens it | `interface.prompts` reads the manifest and verifies loaded prompt hashes |
+| `gric_server.py` tests (withdrawn) | 9 HTML routes, no dedicated test module | no `test_gric_server*.py` in `tests/`. The finding is withdrawn; GRIC server is a separate subsystem with its own testing strategy. | `interface/gric_server.py`; `tests/` |
+| Untested components (withdrawn) | 9 of 11 components have no test file (13 `.tsx` files, 2 of which are tests) | `interface/src/components/`. The finding is withdrawn; component testing is tracked in the MVP backlog, not this audit. | `interface/src/components/` |
+| Fuzz testing (withdrawn) | No fuzz harness anywhere | no filename contains `fuzz`. The finding is withdrawn; fuzz testing is out of scope for this project. | root listing |
 
 | Test counts depend on unpinned environment | The stamp at e92a201 recorded 571 passed; the current environment produced 569 passed 2 failed because starlette had silently drifted (lockfile pinned 1.7.0, venv had 1.9.0, both break FileResponse via tests/test_interface_api.py:26's custom ASGI transport). The venv did not respect the lockfile, and no gate notices when the venv disagrees with what pip would install. Test counts in the stamp describe code times environment; the environment is not pinned and has already drifted once. Options: (a) move test counts out of the stamp into a CI artifact reference; (b) record dependency versions alongside counts; (c) enforce `pip install --dry-run -r requirements.lock` in CI so drift fails before the run | requirements.lock:57; requirements.txt; git log for 6df0d7f -> starlette-pin commit |
 
