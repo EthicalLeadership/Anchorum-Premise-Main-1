@@ -161,6 +161,21 @@ def test_existing_sqlite_documents_get_local_storage_metadata_columns(tmp_path):
             )
             """
         )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE audit_logs (
+                id INTEGER PRIMARY KEY,
+                case_id INTEGER,
+                actor_username VARCHAR(128) NOT NULL,
+                action VARCHAR(128) NOT NULL,
+                details TEXT NOT NULL DEFAULT '',
+                previous_hash VARCHAR(64) NOT NULL DEFAULT '',
+                record_hash VARCHAR(64) NOT NULL DEFAULT '',
+                hmac VARCHAR(64) NOT NULL DEFAULT '',
+                created_at DATETIME NOT NULL
+            )
+            """
+        )
 
     init_schema(engine)
     columns = {
@@ -168,6 +183,10 @@ def test_existing_sqlite_documents_get_local_storage_metadata_columns(tmp_path):
         for column in inspect(engine).get_columns("documents")
     }
     assert {"storage_key", "media_type", "byte_size"} <= columns
+    audit_columns = {
+        column["name"] for column in inspect(engine).get_columns("audit_logs")
+    }
+    assert "citations_valid" in audit_columns
     engine.dispose()
 
 

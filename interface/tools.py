@@ -463,3 +463,52 @@ def validate_claims(
         "rejected_claims": rejected,
     }
     return verified, summary
+
+
+def review_narrative_support(narrative: str, cited_text: str) -> Dict[str, Any]:
+    """Review narrative claims against the source excerpts actually cited.
+
+    The model proposes source quotes; ``validate_claims`` then requires each
+    explicit quote to occur verbatim in the cited excerpts. Any inference,
+    missing claim set, or model/parse error is unverified.
+    """
+    from interface import prompts
+
+    try:
+        prompt = prompts.validate_citation_support(narrative)
+    except prompts.PromptError as exc:
+        return {
+            "valid": False,
+            "claims": [],
+            "validation": {"verified": 0, "inferred": 0, "rejected": 0, "total": 0},
+            "error": f"PROMPT_UNAVAILABLE: {exc}",
+        }
+
+    raw_claims, error = _call_ollama(prompt, cited_text)
+    if error:
+        return {
+            "valid": False,
+            "claims": [],
+            "validation": {"verified": 0, "inferred": 0, "rejected": 0, "total": 0},
+            "error": error,
+        }
+    if not raw_claims:
+        return {
+            "valid": False,
+            "claims": [],
+            "validation": {"verified": 0, "inferred": 0, "rejected": 0, "total": 0},
+            "error": "NO_CLAIMS_RETURNED",
+        }
+
+    verified, validation = validate_claims(raw_claims, cited_text)
+    valid = (
+        validation["verified"] == len(raw_claims)
+        and validation["rejected"] == 0
+        and validation["inferred"] == 0
+    )
+    return {
+        "valid": valid,
+        "claims": verified,
+        "validation": validation,
+        "error": None if valid else "CLAIMS_NOT_VERIFIED",
+    }

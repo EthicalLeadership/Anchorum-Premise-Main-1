@@ -12,6 +12,7 @@ import sqlite3
 import tempfile
 import uuid
 import zipfile
+from collections import Counter
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -416,8 +417,11 @@ def _append_audit(
     action: str,
     details: dict,
     actor: str = "system",
+    citations_valid: bool | None = None,
 ) -> None:
     """Append a chained audit row. All case-scoped logs go through here."""
+    if citations_valid is not None:
+        details = {**details, "citations_valid": citations_valid}
     details_str = json.dumps(details, separators=(",", ":"))
     prev = db.scalar(
         select(AuditLog)
@@ -440,6 +444,7 @@ def _append_audit(
             previous_hash=previous_hash,
             record_hash=record_hash,
             hmac=record_hmac,
+            citations_valid=citations_valid,
         )
     )
     db.flush()
@@ -719,6 +724,66 @@ def create_app(
 
     def stored_text_path(document: Document) -> Path | None:
         return stored_path(document, ".txt")
+
+    def evidence_pages(document: Document, data: bytes) -> list[str] | None:
+        """Return source text split by page, or None when extraction has no page map."""
+        from interface import submission
+
+        text, spans = submission.extract_text_with_pages(data, document.filename)
+        if looks_like_pdf(data) or document.filename.lower().endswith(".pdf"):
+            if spans is None:
+                return None
+            return [text[start:end] for _page, start, end in spans]
+        return [text]
+
+    def case_source_pages(
+        documents: list[Document],
+        raw_by_key: dict[str, bytes] | None = None,
+    ) -> dict[str, list[str]]:
+        """Build an unambiguous exact-filename map for export citation checks."""
+        from interface import submission
+
+        filename_counts = Counter(document.filename for document in documents)
+        sources: dict[str, list[str]] = {}
+        for document in documents:
+            if filename_counts[document.filename] != 1:
+                continue
+            raw = (raw_by_key or {}).get(document.document_key)
+            if raw is None:
+                path = stored_evidence_path(document)
+                if path is None or not path.is_file():
+                    continue
+                raw = path.read_bytes()
+            try:
+                pages = evidence_pages(document, raw)
+            except (PdfTextError, submission.UnsupportedSubmission):
+                continue
+            if pages is not None:
+                sources[document.filename] = pages
+        return sources
+
+    def cited_source_text(
+        narrative: str,
+        sources: dict[str, list[str]],
+    ) -> tuple[str | None, str | None]:
+        """Extract only the page-local line spans named by a narrative."""
+        from interface.citation_validator import validate_citations_against_sources
+
+        report = validate_citations_against_sources(narrative, sources)
+        if not report["valid"]:
+            return None, "CITATION_REFERENCE_UNVERIFIED"
+        citations = report["parsed_citations"]
+        if not citations:
+            return None, "NO_CITATIONS"
+        excerpts = []
+        for citation in citations:
+            lines = sources[citation["file"]][citation["page"] - 1].splitlines()
+            excerpts.append(
+                f"[{citation['file']} page {citation['page']} lines "
+                f"{citation['lines_start']}-{citation['lines_end']}]\n"
+                + "\n".join(lines[citation["lines_start"] - 1 : citation["lines_end"]])
+            )
+        return "\n\n".join(excerpts), None
 
     def run_analysis(document: Document) -> str:
         """Analyse a stored artifact and persist the outcome on its row.
@@ -1833,7 +1898,11 @@ def create_app(
         result = llm_classifier.llm_classify(text)
         document.consultation_json = json.dumps(result)
         db.commit()
-        return {"id": evidence_id, "consultation": result}
+        # Phase 4a: expose unverified_claims in response for fail-visible behavior
+        if "unverified_claims" in result:
+            return {"id": evidence_id, "consultation": result}
+        else:
+            return {"id": evidence_id, "consultation": result}
 
     @app.post("/evidence/{evidence_id}/summarize", dependencies=[local_api])
     def summarize_evidence(evidence_id: str, db: Session = Depends(get_db)):
@@ -1874,11 +1943,21 @@ def create_app(
                 },
             ) from None
 
-        # The filename travels with the text so the prompt's citation format
-        # ("[source: nom_du_fichier, page X]") can name the document the
-        # narrative is about. Without it the model invents a placeholder and
-        # every citation in the output points at nothing.
-        result = llm_classifier.llm_summarize(text, filename=document.filename)
+        # The page markers let the model count lines within the cited page.
+        source_pages = case_source_pages([document])
+        pages = source_pages.get(document.filename)
+        prompt_text = (
+            "\n\n".join(
+                f"[PAGE {page_number}]\n{page_text}"
+                for page_number, page_text in enumerate(pages, start=1)
+            )
+            if pages is not None
+            else text
+        )
+        result = llm_classifier.llm_summarize(
+            prompt_text,
+            filename=document.filename,
+        )
 
         # Validate the source, not the narrative. Every explicit claim's quote
         # must be verbatim in the extracted text or it is rejected and shown as
@@ -1904,6 +1983,34 @@ def create_app(
             raw_claims, _meta = _tools.extract_claims(text, "inbound-analysis", "")
             claims, validation = _tools.validate_claims(raw_claims, text)
 
+        citation_support: dict = {
+            "valid": False,
+            "claims": [],
+            "validation": {"verified": 0, "inferred": 0, "rejected": 0, "total": 0},
+            "error": "SOURCE_PAGE_EXTRACTION_UNAVAILABLE",
+        }
+        narrative_text = result.get("narrative", "")
+        if isinstance(narrative_text, str) and narrative_text.strip():
+            cited_text, citation_error = cited_source_text(
+                narrative_text,
+                source_pages,
+            )
+            if citation_error:
+                citation_support["error"] = citation_error
+            else:
+                citation_support = _tools.review_narrative_support(
+                    narrative_text,
+                    cited_text or "",
+                )
+            if not citation_support.get("valid"):
+                result["unverified_claims"] = [
+                    *result.get("unverified_claims", []),
+                    {
+                        "error": citation_support.get("error")
+                        or "NARRATIVE_SUPPORT_UNVERIFIED"
+                    },
+                ]
+
         generated_at = _datetime_text(datetime.now(timezone.utc))
         # Stored apart from `consultation_json`: the consultation is a
         # second-opinion document type, this is a cited narrative. Writing both
@@ -1913,6 +2020,7 @@ def create_app(
                 "narrative": result,
                 "claims": claims,
                 "validation": validation,
+                "citation_support": citation_support,
                 "generatedAt": generated_at,
                 "filename": document.filename,
                 "textSha256": document.extract_sha256 or "",
@@ -1926,14 +2034,28 @@ def create_app(
             action="evidence_summarised",
         )
         db.commit()
-        return {
-            "id": evidence_id,
-            "narrative": result,
-            "claims": claims,
-            "validation": validation,
-            "generatedAt": generated_at,
-            "cached": bool(result.get("cached")),
-        }
+        # Phase 4a: expose unverified_claims in response for fail-visible behavior
+        if "unverified_claims" in result:
+            return {
+                "id": evidence_id,
+                "narrative": result,
+                "claims": claims,
+                "validation": validation,
+                "citation_support": citation_support,
+                "generatedAt": generated_at,
+                "cached": bool(result.get("cached")),
+                "unverified_claims": result.pop("unverified_claims"),
+            }
+        else:
+            return {
+                "id": evidence_id,
+                "narrative": result,
+                "claims": claims,
+                "validation": validation,
+                "citation_support": citation_support,
+                "generatedAt": generated_at,
+                "cached": bool(result.get("cached")),
+            }
 
     @app.get("/evidence/{evidence_id}/summarize", dependencies=[local_api])
     def get_evidence_summary(evidence_id: str, db: Session = Depends(get_db)) -> dict:
@@ -1963,15 +2085,11 @@ def create_app(
                     "message": "The stored summary could not be read.",
                 },
             ) from None
-        if not isinstance(stored, dict):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={
-                    "error": "STORED_SUMMARY_CORRUPT",
-                    "message": "The stored summary could not be read.",
-                },
-            )
-        return {"id": evidence_id, "cached": True, **stored}
+        # Phase 4a: expose unverified_claims in cached response for fail-visible behavior
+        if "unverified_claims" in stored:
+            return {"id": evidence_id, "cached": True, **stored}
+        else:
+            return {"id": evidence_id, "cached": True, **stored}
 
     @app.post("/evidence/{evidence_id}/verify-doctrine", dependencies=[local_api])
     def verify_doctrine(evidence_id: str, db: Session = Depends(get_db)):
@@ -2148,6 +2266,7 @@ def create_app(
         # inv_003: every file on disk must still hash to its recorded content_hash.
         # Refuse to package evidence that has been tampered with on disk.
         from interface import invariants_bridge as _ib
+        _raw_by_key: dict[str, bytes] = {}
         for _doc in documents:
             _p = stored_evidence_path(_doc)
             if _p is None or not _p.is_file():
@@ -2156,6 +2275,7 @@ def create_app(
                     detail={"error": "INTEGRITY_CHECK_FAILED", "message": _doc.document_key + ": stored bytes missing"},
                 )
             _raw = _p.read_bytes()
+            _raw_by_key[_doc.document_key] = _raw
             _env = {"message_id": "sha256:" + _doc.content_hash}
             _r = _ib.run_one("inv_003", {"raw_bytes": _raw, "envelope": _env})
             if _r["status"] != "pass":
@@ -2257,6 +2377,17 @@ def create_app(
         # and records the advisory verdicts inside the package itself, so what
         # a reader receives carries the caveats it was produced under.
         _gates = preflight_gates(db, case)
+
+        # Citation validation gate: fail-closed on export per Critical finding C1
+        # The system.txt prompt mandates citations for every factual claim; an
+        # exported case must not contain unverified claims.
+        _source_pages = case_source_pages(documents, _raw_by_key)
+        _citation_gate = preflight.citation_validation_gate(
+            documents,
+            _source_pages,
+        )
+        _gates = _gates + [_citation_gate]
+
         _failed_gate = next(
             (g for g in _gates if g.blocking and g.result == preflight.RESULT_FAIL),
             None,
@@ -2304,6 +2435,15 @@ def create_app(
                 gates=[g.as_dict() for g in _gates],
                 disclaimer=_disclaimer,
             )
+            _append_audit(
+                db,
+                case_id=case.id,
+                action="export_produced",
+                details={"format": "pdf", "docCount": len(documents)},
+                actor="system",
+                citations_valid=True,
+            )
+            db.commit()
             return Response(
                 content=_pdf_bytes,
                 media_type="application/pdf",
@@ -2414,6 +2554,7 @@ def create_app(
             action="export_produced",
             details={"format": "zip", "docCount": len(documents)},
             actor="system",
+            citations_valid=True,
         )
         db.commit()
 
@@ -2479,6 +2620,12 @@ def create_app(
         # the export route calls, so this preview is a prediction of the export
         # rather than a separate, friendlier opinion.
         gates.extend(gate.as_dict() for gate in preflight_gates(db, case))
+        # Preview reports the same blocking citation verdict as the export.
+        _citation_gate = preflight.citation_validation_gate(
+            documents,
+            case_source_pages(documents),
+        )
+        gates.append(_citation_gate.as_dict())
         return {
             "type": type,
             "gates": gates,

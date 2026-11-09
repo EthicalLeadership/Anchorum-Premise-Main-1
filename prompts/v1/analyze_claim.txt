@@ -1,6 +1,9 @@
 nano prompts/v1/system.txt          # line 1 (also fix "dossierDOSSIER" → "dossier en cause")Contexte documentaire :
 {context}
 
+Les marqueurs [PAGE n] délimitent les pages. Les numéros de lignes d'une
+citation sont locaux à la page et excluent la ligne du marqueur [PAGE n].
+
 Sujet d’analyse : {topic}
 
 Produis une analyse structurée en français pour le dossier en cause. Structure :

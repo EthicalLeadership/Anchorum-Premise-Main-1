@@ -14,11 +14,13 @@ cannot promise an export that the export route then refuses.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import Mapping, Optional, Sequence
 
 from dossier_pipeline.contracts import ActorType, ClassificationResult, EmailEnvelope
 from dossier_pipeline.provenance import ProvenanceCurator
+from interface.citation_validator import validate_citations_against_sources
 from interface import proofs
 
 RESULT_PASS = proofs.STATUS_PASS
@@ -151,3 +153,143 @@ def manifest_record(gates: Sequence[Gate]) -> dict:
         "blocked": blocked(gates),
         "gates": [gate.as_dict() for gate in gates],
     }
+
+
+def citation_validation_gate(
+    documents: Sequence[object],
+    sources: Mapping[str, Sequence[str]] | None = None,
+) -> Gate:
+    """Block export unless persisted AI citations and support match evidence."""
+    sources = sources or {}
+    outputs = 0
+    invalid: list[str] = []
+
+    def check_report(report: object, document_key: str) -> None:
+        if not isinstance(report, dict) or not isinstance(report.get("valid"), bool):
+            invalid.append(f"{document_key}:missing_validation_report")
+        elif not report["valid"] or report.get("invalid_citations"):
+            invalid.append(f"{document_key}:unverified_citations")
+        elif not isinstance(report.get("parsed_citations"), list):
+            invalid.append(f"{document_key}:missing_parsed_citations")
+
+    for document in documents:
+        document_key = getattr(document, "document_key", "<unknown>")
+        for field in ("consultation_json", "summary_json"):
+            serialized = getattr(document, field, None)
+            if not serialized:
+                continue
+            outputs += 1
+            try:
+                record = json.loads(serialized)
+            except (TypeError, ValueError):
+                invalid.append(f"{document_key}:corrupt_{field}")
+                continue
+            if not isinstance(record, dict):
+                invalid.append(f"{document_key}:invalid_{field}")
+                continue
+
+            if field == "consultation_json":
+                report = record.get("_citation_validation_report")
+                check_report(report, document_key)
+                citations = (
+                    report.get("parsed_citations", [])
+                    if isinstance(report, dict)
+                    and isinstance(report.get("parsed_citations"), list)
+                    else []
+                )
+                if citations:
+                    if any(not isinstance(citation, dict) for citation in citations):
+                        invalid.append(f"{document_key}:invalid_parsed_citations")
+                        continue
+                    reconstructed = " ".join(
+                        "[source: {file}, page {page}, lines {start}-{end}]".format(
+                            file=citation.get("file", ""),
+                            page=citation.get("page", ""),
+                            start=citation.get("lines_start", ""),
+                            end=citation.get("lines_end", ""),
+                        )
+                        for citation in citations
+                    )
+                    source_report = validate_citations_against_sources(
+                        reconstructed, sources
+                    )
+                    if not source_report["valid"]:
+                        invalid.append(f"{document_key}:unverified_source_reference")
+                continue
+
+            narrative = record.get("narrative")
+            if isinstance(narrative, dict):
+                report = narrative.get("_citation_validation_report")
+                text = narrative.get("narrative")
+            elif isinstance(narrative, str):
+                report = None
+                text = narrative
+            else:
+                invalid.append(f"{document_key}:invalid_summary_shape")
+                continue
+
+            if (
+                isinstance(narrative, dict)
+                and narrative.get("error")
+                and not (isinstance(text, str) and text.strip())
+            ):
+                continue
+
+            fresh_report: dict = {"parsed_citations": []}
+            if report is not None:
+                check_report(report, document_key)
+            else:
+                invalid.append(f"{document_key}:missing_validation_report")
+            if isinstance(text, str) and text.strip():
+                fresh_report = validate_citations_against_sources(text, sources)
+                if not fresh_report["valid"]:
+                    invalid.append(f"{document_key}:unverified_source_reference")
+                elif not fresh_report["parsed_citations"]:
+                    invalid.append(f"{document_key}:missing_citations")
+            elif isinstance(narrative, dict) and narrative.get("error"):
+                continue
+            else:
+                invalid.append(f"{document_key}:missing_narrative")
+
+            support = record.get("citation_support")
+            claims = support.get("claims") if isinstance(support, dict) else None
+            if not isinstance(support, dict) or support.get("valid") is not True:
+                invalid.append(f"{document_key}:semantic_support_unverified")
+                continue
+            if not isinstance(claims, list) or not claims:
+                invalid.append(f"{document_key}:semantic_support_missing_claims")
+                continue
+
+            citations = fresh_report.get("parsed_citations", [])
+            cited_lines = []
+            for citation in citations:
+                pages = sources.get(citation["file"])
+                if pages is None or citation["page"] > len(pages):
+                    continue
+                lines = pages[citation["page"] - 1].splitlines()
+                cited_lines.extend(
+                    lines[citation["lines_start"] - 1 : citation["lines_end"]]
+                )
+            cited_text = " ".join(" ".join(cited_lines).split()).casefold()
+            for claim in claims:
+                quote = claim.get("quote") if isinstance(claim, dict) else None
+                if (
+                    not isinstance(claim, dict)
+                    or claim.get("confidence") != "direct"
+                    or not isinstance(quote, str)
+                    or not quote.strip()
+                    or " ".join(quote.split()).casefold() not in cited_text
+                ):
+                    invalid.append(f"{document_key}:claim_not_supported_by_cited_lines")
+                    break
+
+    if invalid:
+        return Gate(
+            "citations",
+            RESULT_FAIL,
+            True,
+            f"{len(invalid)}",
+            ",".join(invalid),
+        )
+    detail = "ok" if outputs else "no_generated_ai_outputs"
+    return Gate("citations", RESULT_PASS, True, None, detail)

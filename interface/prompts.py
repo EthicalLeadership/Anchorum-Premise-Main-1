@@ -151,6 +151,7 @@ def describe(name: str) -> dict[str, str]:
 ANALYZE_CLAIM = "analyze_claim.txt"
 CLASSIFY_DOCUMENT = "classify_document.txt"
 EXTRACT_CLAIMS = "extract_claims.txt"
+VALIDATE_CITATION_SUPPORT = "validate_citation_support.txt"
 SUMMARIZE_EMAIL = "summarize_email.txt"
 SYSTEM = "system.txt"
 
@@ -168,6 +169,14 @@ def analyze_claim(context: str, *, topic: str = "") -> str:
     return render(
         ANALYZE_CLAIM,
         {"context": context, "topic": topic.strip() or DEFAULT_TOPIC},
+    )
+
+
+def validate_citation_support(narrative: str) -> str:
+    """Ask the model for source quotes supporting a generated narrative."""
+    return render(
+        VALIDATE_CITATION_SUPPORT,
+        {"narrative": narrative},
     )
 
 

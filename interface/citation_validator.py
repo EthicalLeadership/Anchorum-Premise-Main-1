@@ -18,6 +18,7 @@ This preserves the user experience while maintaining auditability.
 """
 
 import re
+from collections.abc import Mapping, Sequence
 from typing import List, Dict, Any, Optional
 import logging
 
@@ -127,6 +128,14 @@ def validate_all_citations(text: str) -> Dict[str, Any]:
     try:
         citations = parse_citations(text)
         result["parsed_citations"] = citations
+        malformed_count = len(re.findall(r"\[source\s*:", text, re.IGNORECASE)) - len(citations)
+        if malformed_count > 0:
+            result["valid"] = False
+            result["invalid_citations"].append({
+                "citation": {"raw": "malformed citation"},
+                "error": f"{malformed_count} malformed citation marker(s)",
+            })
+            result["warning_count"] += malformed_count
 
         for citation in citations:
             if not validate_citation(citation):
@@ -148,6 +157,58 @@ def validate_all_citations(text: str) -> Dict[str, Any]:
         })
         result["warning_count"] += 1
 
+    return result
+
+
+def validate_citations_against_sources(
+    text: str,
+    sources: Mapping[str, Sequence[str]],
+) -> Dict[str, Any]:
+    """Verify each parsed citation names a known source and existing page lines.
+
+    ``sources`` maps exact evidence filenames to page-local extracted text.
+    """
+    result = validate_all_citations(text)
+    if not result["valid"]:
+        return result
+
+    for citation in result["parsed_citations"]:
+        filename = citation["file"]
+        pages = sources.get(filename)
+        if pages is None:
+            citation["source_verified"] = False
+            result["invalid_citations"].append({
+                "citation": citation,
+                "error": f"Unknown source: {filename}",
+            })
+            continue
+
+        page_number = citation["page"]
+        if page_number > len(pages):
+            citation["source_verified"] = False
+            result["invalid_citations"].append({
+                "citation": citation,
+                "error": f"Page {page_number} does not exist in {filename}",
+            })
+            continue
+
+        page_lines = pages[page_number - 1].splitlines()
+        if citation["lines_end"] > len(page_lines):
+            citation["source_verified"] = False
+            result["invalid_citations"].append({
+                "citation": citation,
+                "error": (
+                    f"Lines {citation['lines_start']}-{citation['lines_end']} "
+                    f"do not exist on page {page_number} of {filename}"
+                ),
+            })
+            continue
+
+        citation["source_verified"] = True
+
+    if result["invalid_citations"]:
+        result["valid"] = False
+        result["warning_count"] = len(result["invalid_citations"])
     return result
 
 

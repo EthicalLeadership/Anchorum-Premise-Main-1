@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import (Column, DateTime, ForeignKey, Integer, String, Text,
-                        UniqueConstraint, create_engine, inspect)
+                        UniqueConstraint, create_engine, inspect, Boolean)
 from sqlalchemy.orm import Session, relationship, sessionmaker
 
 try:
@@ -133,6 +133,7 @@ class AuditLog(Base):
     record_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     hmac: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    citations_valid: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
 
     case: Mapped["Case"] = relationship("Case", back_populates="audit_logs")
 
@@ -205,6 +206,14 @@ def init_schema(engine) -> None:
                     connection.exec_driver_sql(
                         f"ALTER TABLE documents ADD COLUMN {name} {definition}"
                     )
+        existing_audit_logs = {
+            column["name"] for column in inspect(engine).get_columns("audit_logs")
+        }
+        if "citations_valid" not in existing_audit_logs:
+            with engine.begin() as connection:
+                connection.exec_driver_sql(
+                    "ALTER TABLE audit_logs ADD COLUMN citations_valid BOOLEAN"
+                )
 
 
 def get_session(session_factory) -> Session:

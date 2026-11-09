@@ -29,6 +29,8 @@ from interface import prompts
 import logging
 from interface.citation_validator import validate_all_citations
 
+logger = logging.getLogger(__name__)
+
 
 def _ollama_url() -> str:
     """Read at call time so an operator can repoint a running process."""
@@ -75,7 +77,9 @@ FALLBACK_SUMMARIZE_PROMPT = (
     "You are assisting a legal operator reading a document in a case file. "
     "Produce a concise factual summary in 3 to 5 sentences. State only what "
     "the document says. Do not offer legal advice. Do not speculate. If the "
-    "document is too short or garbled to summarise, say so plainly.\n\n"
+    "document is too short or garbled to summarise, say so plainly. The context "
+    "uses [PAGE n] markers; count citation lines within that page and do not "
+    "count the marker itself.\n\n"
     "Document:\n"
 )
 
@@ -249,6 +253,8 @@ def llm_classify(text: str) -> dict:
         "error": completion["error"],
         "prompt": prompt_origin,
         "_citation_validation_report": citation_report,
+        # Phase 4a: expose unverified claims for fail-visible behavior
+        "unverified_claims": citation_report.get("invalid_citations", []) if not citation_report["valid"] else [],
     }
 
 
@@ -323,4 +329,6 @@ def llm_summarize(text: str, *, filename: str = "", topic: str = "") -> dict:
         "promptSha256": origin["sha256"],
         "promptStatus": origin["status"],
         "_citation_validation_report": citation_report,
+        # Phase 4a: expose unverified claims for fail-visible behavior
+        "unverified_claims": citation_report.get("invalid_citations", []) if not citation_report["valid"] else [],
     }
