@@ -25,6 +25,24 @@ function truncateHash(h: string): string {
   return h.length > 16 ? `${h.slice(0, 8)}…${h.slice(-4)}` : h;
 }
 
+const INTEGRITY_STEPS = ["hash", "signature", "chain", "anchor"] as const;
+type IntegrityStep = (typeof INTEGRITY_STEPS)[number];
+
+/**
+ * The step an integrity hold blames.
+ *
+ * `holdReason` is `<step>_<detail>`: `hash_mismatch_at_readback` means the hash
+ * step disagreed with the bytes. Returns null when the reason names no known
+ * step, so an unfamiliar reason renders as an unattributed hold rather than
+ * being mislabelled with a step that did not fail.
+ */
+function holdStepId(holdReason: string | null): IntegrityStep | null {
+  const head = (holdReason ?? "").split("_")[0];
+  return (INTEGRITY_STEPS as readonly string[]).includes(head)
+    ? (head as IntegrityStep)
+    : null;
+}
+
 type Props = {
   locale: Locale;
   adapter: ReturnType<typeof createAdapter>;
@@ -279,6 +297,11 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
 
   const latestHmac =
     custody.length > 0 ? (custody[custody.length - 1].hmac ?? "") : "";
+  // Which step the hold blames, if the reason names one. Derived rather than
+  // fetched: the reason is already on the record, and re-running verification
+  // to learn why the last one failed would mean a POST on every page view.
+  const failingStep = holdStepId(evidence.holdReason);
+  const onHold = evidence.status === "integrity_hold";
 
   return (
     <section className="evidence-viewer">
@@ -299,6 +322,16 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
           {latestHmac ? truncateHash(latestHmac) : t("evidence.viewer.metadata.unsigned")}
         </dd>
       </dl>
+
+      {onHold ? (
+        <p role="alert" className="form-error">
+          {failingStep
+            ? t("overview.integrity.hold", {
+                step: t(`overview.integrity.step.${failingStep}`),
+              })
+            : t("overview.integrity.hold_unknown")}
+        </p>
+      ) : null}
 
       <div
         className="evidence-tabs"
@@ -482,6 +515,10 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
       <h2>{t("evidence.viewer.verification")}</h2>
       {verification ? (
         <VerificationTile locale={locale} timeZone={timeZone} verification={verification} />
+      ) : onHold ? (
+        // An item on hold has a failed verification on record. Saying "not yet
+        // verified" here would contradict the hold alert higher up the page.
+        <p role="status">{t("verification.failed_on_record")}</p>
       ) : (
         <p role="status">{t("verification.not_yet_verified")}</p>
       )}
