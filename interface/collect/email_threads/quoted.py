@@ -8,7 +8,11 @@ OUTLOOK_HEADER = re.compile(
     r"^\s*Subject:\s*(?P<subject>.+?)\s*$",
     re.I | re.M
 )
-GMAIL_HEADER = re.compile(r"^\s*On\s+(?P<date>.+?),\s*(?P<from>.+?)\s+wrote:\s*$", re.I | re.M)
+
+GMAIL_HEADER = re.compile(
+    r"^\s*On\s+(?P<date>.+?),\s*(?P<from>.+?)\s+wrote:\s*$",
+    re.I | re.M
+)
 
 def extract_quoted(body_text: str) -> list[dict]:
     quoted = []
@@ -21,6 +25,7 @@ def extract_quoted(body_text: str) -> list[dict]:
     for match in GMAIL_HEADER.finditer(body_text):
         quoted.append({
             "derivation": "QUOTED", "message_id": None, "from_raw": match.group("from"),
-            "to_raw": None, "cc_raw": None, "subject": None, "date_raw": match.group("date"), "body_text": ""
+            "to_raw": None, "cc_raw": None, "subject": None,
+            "date_raw": match.group("date"), "body_text": ""
         })
     return quoted

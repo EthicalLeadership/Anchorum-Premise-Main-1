@@ -14,7 +14,6 @@ def build_threads(messages: list[dict]) -> dict[str, str]:
         if root_x != root_y:
             if root_x < root_y: parent[root_y] = root_x
             else: parent[root_x] = root_y
-                
     for msg in messages:
         mid = msg.get("message_id")
         if not mid: continue

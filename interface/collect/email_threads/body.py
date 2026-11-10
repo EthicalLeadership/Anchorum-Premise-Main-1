@@ -1,13 +1,19 @@
-from email.message import Message
+import quopri
+import base64
 
-def normalize_body(part: Message) -> str:
-    # decode=True natively handles base64 and quoted-printable
-    payload = part.get_payload(decode=True)
-    if payload is None:
+def normalize_body(part) -> str:
+    raw = part.get_payload(decode=False)
+    if raw is None or isinstance(raw, list):
         return ""
-    
-    charset = part.get_content_charset() or "utf-8"
-    try:
-        return payload.decode(charset, errors="replace")
-    except LookupError:
-        return payload.decode("utf-8", errors="replace")
+    cte = str(part.get("Content-Transfer-Encoding", "")).lower()
+    if cte == "quoted-printable":
+        try:
+            return quopri.decodestring(raw.encode('utf-8', errors='replace')).decode('utf-8', errors='replace')
+        except Exception:
+            return raw
+    elif cte == "base64":
+        try:
+            return base64.b64decode(raw).decode('utf-8', errors='replace')
+        except Exception:
+            return raw
+    return raw

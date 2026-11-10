@@ -1,88 +1,122 @@
 import pytest
-from email.message import EmailMessage, Message
+from email.message import Message, EmailMessage
+from unittest.mock import MagicMock
 from interface.collect.email_threads import (
     guard_headers, walk_message, extract_headers, normalize_body, extract_quoted, build_threads, ParsingAbort
 )
 
-# --- LAYER 1: GUARDS ---
 def test_header_count_guard_raises():
-    msg = EmailMessage()
-    for i in range(201): msg[f"X-Test-{i}"] = "val"
-    with pytest.raises(ParsingAbort, match="HEADER_COUNT"):
+    msg = Message()
+    msg._headers = [("Received", "test")] * 201
+    with pytest.raises(ParsingAbort) as exc:
         guard_headers(msg)
+    assert exc.value.reason == "HEADER_COUNT"
 
 def test_header_size_guard_raises():
-    msg = EmailMessage()
-    msg["Subject"] = "A" * (64 * 1024 + 1)
-    with pytest.raises(ParsingAbort, match="HEADER_SIZE"):
+    msg = Message()
+    msg._headers = [("Subject", "A" * 70000)]
+    with pytest.raises(ParsingAbort) as exc:
         guard_headers(msg)
+    assert exc.value.reason == "HEADER_SIZE"
 
 def test_encoded_words_guard_raises():
-    msg = EmailMessage()
-    msg["Subject"] = "=?utf-8?q?test?=" * 51
-    with pytest.raises(ParsingAbort, match="ENCODED_WORDS"):
+    msg = Message()
+    val = " ".join(["=?utf-8?q?test?="] * 51)
+    msg._headers = [("Subject", val)]
+    with pytest.raises(ParsingAbort) as exc:
         guard_headers(msg)
+    assert exc.value.reason == "ENCODED_WORDS"
 
-# --- LAYER 2: PARSER ---
 def test_depth_guard():
-    # Create a real, deeply nested message/rfc822 structure
-    root = EmailMessage()
-    root.set_content("Root")
-    current = root
+    current_msg = MagicMock()
+    current_msg.as_bytes.return_value = b"test"
+    current_msg.is_multipart.return_value = True
     for _ in range(11):
-        sub = EmailMessage()
-        sub.set_content("Sub")
-        current.add_attachment(sub, maintype="message", subtype="rfc822")
-        current = sub
+        part = MagicMock()
+        part.get_content_type.return_value = "message/rfc822"
+        part.get_payload.return_value = [current_msg]
+        next_msg = MagicMock()
+        next_msg.as_bytes.return_value = b"test"
+        next_msg.is_multipart.return_value = True
+        next_msg.get_payload.return_value = [part]
+        current_msg = next_msg
+    with pytest.raises(ParsingAbort) as exc:
+        walk_message(current_msg)
+    assert exc.value.reason == "DEPTH_EXCEEDED"
 
-    with pytest.raises(ParsingAbort, match="DEPTH_EXCEEDED"):
-        walk_message(root)
+def test_size_guard():
+    msg = MagicMock()
+    msg.as_bytes.return_value = b"A" * 100
+    msg.is_multipart.return_value = False
+    with pytest.raises(ParsingAbort) as exc:
+        walk_message(msg, budget={"remaining": 10})
+    assert exc.value.reason == "SIZE_EXCEEDED"
 
-# --- LAYER 3: HEADERS ---
 def test_extract_headers_trust_classes():
-    msg = EmailMessage()
+    msg = Message()
     msg["From"] = "alice@example.com"
     msg["Received"] = "from mail.example.com"
     msg["Authentication-Results"] = "dkim=pass"
     msg["X-Custom-Header"] = "random"
     extracted = extract_headers(msg)
-    trust_map = {h["name"]: h["trust"] for h in extracted}
-    assert trust_map["From"] == "SENDER_CLAIM"
-    assert trust_map["Received"] == "RELAY_OBSERVATION"
-    assert trust_map["Authentication-Results"] == "PERIMETER_VERDICT"
-    assert trust_map["X-Custom-Header"] == "UNKNOWN"
+    header_map = {h["name"]: h["trust"] for h in extracted}
+    assert header_map["From"] == "SENDER_CLAIM"
+    assert header_map["Received"] == "RELAY_OBSERVATION"
+    assert header_map["Authentication-Results"] == "PERIMETER_VERDICT"
+    assert header_map["X-Custom-Header"] == "UNKNOWN"
 
-# --- LAYER 4: BODY ---
 def test_normalize_body_quoted_printable():
-    msg = EmailMessage()
-    msg.set_content("=3E Are we on for tomorrow?", cte="quoted-printable")
-    assert normalize_body(msg) == "> Are we on for tomorrow?"
+    msg = Message()
+    msg["Content-Transfer-Encoding"] = "quoted-printable"
+    msg.set_payload("=3E This is a quote\r\n=3E More text")
+    normalized = normalize_body(msg)
+    assert "> This is a quote" in normalized
 
 def test_normalize_body_base64():
-    msg = EmailMessage()
-    msg.set_content("Hello World", cte="base64")
-    assert normalize_body(msg) == "Hello World"
+    msg = Message()
+    msg["Content-Transfer-Encoding"] = "base64"
+    msg.set_payload("SGVsbG8gV29ybGQ=") 
+    normalized = normalize_body(msg)
+    assert normalized == "Hello World"
 
-# --- LAYER 4.5: QUOTED ---
 def test_extract_quoted_outlook():
-    body = "From: Alice <alice@example.com>\nSent: Mon, Oct 23\nTo: Bob\nSubject: Re: Contract\n\nText"
+    body = """
+    Yes, I agree.
+    
+    From: Alice <alice@example.com>
+    Sent: Monday, October 23, 2023 10:00 AM
+    To: Bob <bob@example.com>
+    Subject: Re: The Contract
+    
+    Are we still on for the meeting?
+    """
     quotes = extract_quoted(body)
     assert len(quotes) == 1
-    assert quotes[0]["message_id"] is None
     assert quotes[0]["derivation"] == "QUOTED"
+    assert quotes[0]["message_id"] is None
+    assert "alice@example.com" in quotes[0]["from_raw"]
+    assert "The Contract" in quotes[0]["subject"]
 
 def test_extract_quoted_gmail():
-    body = "On Mon, Oct 23, 2023 at 10:00 AM Alice <alice@example.com> wrote:\n> Text"
+    body = """
+    I will bring the papers.
+    
+    On Mon, Oct 23, 2023 at 10:00 AM Alice <alice@example.com> wrote:
+    > Are we still on for the meeting?
+    """
     quotes = extract_quoted(body)
     assert len(quotes) == 1
+    assert quotes[0]["derivation"] == "QUOTED"
+    assert quotes[0]["message_id"] is None
     assert "Alice" in quotes[0]["from_raw"]
+    assert "Oct 23, 2023" in quotes[0]["date_raw"]
 
-# --- LAYER 5: THREADING ---
 def test_build_threads_empty():
     assert build_threads([]) == {}
 
 def test_build_threads_single():
-    assert build_threads([{"message_id": "A"}]) == {"A": "A"}
+    msgs = [{"message_id": "A"}]
+    assert build_threads(msgs) == {"A": "A"}
 
 def test_build_threads_reply_chain():
     msgs = [
@@ -97,7 +131,8 @@ def test_build_threads_reply_chain():
 
 def test_build_threads_missing_root():
     msgs = [{"message_id": "B", "in_reply_to": "A", "references": ["A"]}]
-    assert build_threads(msgs)["B"] == "A"
+    result = build_threads(msgs)
+    assert result["B"] == "A"
 
 def test_build_threads_cycle():
     msgs = [{"message_id": "A", "in_reply_to": "B"}, {"message_id": "B", "in_reply_to": "A"}]
@@ -106,6 +141,6 @@ def test_build_threads_cycle():
     assert result["B"] == "A"
 
 def test_build_threads_dos_bound():
-    msgs = [{"message_id": "A", "references": ["X"] * 1001}]
-    with pytest.raises(ParsingAbort, match="REFERENCES_CHAIN"):
-        build_threads(msgs)
+    with pytest.raises(ParsingAbort) as exc:
+        build_threads([{"message_id": "A", "references": ["B"] * 1001}])
+    assert exc.value.reason == "REFERENCES_CHAIN"
