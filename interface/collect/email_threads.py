@@ -1,4 +1,6 @@
 from typing import Any
+import quopri
+import base64
 
 MAX_DEPTH = 10
 MAX_TOTAL_BYTES = 500 * 1024 * 1024
@@ -50,8 +52,6 @@ def walk_message(msg: Any, derivation: str = "HEADER", depth: int = 0, budget: d
                 
     return collected
 
-# --- LAYER 3: TRUST CLASSES ---
-
 TRUST_MAP = {
     "From": "SENDER_CLAIM",
     "Sender": "SENDER_CLAIM",
@@ -67,7 +67,6 @@ TRUST_MAP = {
 }
 
 def extract_headers(msg: Any) -> list:
-    """Extracts headers and classifies them by trust level."""
     extracted = []
     for key, value in msg.items():
         trust = TRUST_MAP.get(key, "UNKNOWN")
@@ -77,3 +76,25 @@ def extract_headers(msg: Any) -> list:
             "trust": trust
         })
     return extracted
+
+def normalize_body(part: Any) -> str:
+    raw_payload = part.get_payload(decode=False)
+    if raw_payload is None or isinstance(raw_payload, list):
+        return ""
+        
+    cte = str(part.get("Content-Transfer-Encoding", "")).lower()
+    
+    if cte == "quoted-printable":
+        try:
+            decoded_bytes = quopri.decodestring(raw_payload.encode('utf-8', errors='replace'))
+            return decoded_bytes.decode('utf-8', errors='replace')
+        except Exception:
+            return raw_payload
+    elif cte == "base64":
+        try:
+            decoded_bytes = base64.b64decode(raw_payload)
+            return decoded_bytes.decode('utf-8', errors='replace')
+        except Exception:
+            return raw_payload
+            
+    return raw_payload
