@@ -114,3 +114,48 @@ def test_build_threads_cycle():
     result = build_threads(msgs)
     assert result["A"] == "A"
     assert result["B"] == "A"
+
+
+# --- LAYER 5 TESTS ---
+
+def test_build_threads_empty():
+    assert build_threads([]) == {}
+
+def test_build_threads_single():
+    msgs = [{"message_id": "A"}]
+    assert build_threads(msgs) == {"A": "A"}
+
+def test_build_threads_reply_chain():
+    msgs = [
+        {"message_id": "C", "in_reply_to": "B", "references": ["A", "B"]},
+        {"message_id": "A"},
+        {"message_id": "B", "in_reply_to": "A", "references": ["A"]}
+    ]
+    result = build_threads(msgs)
+    assert result["A"] == "A"
+    assert result["B"] == "A"
+    assert result["C"] == "A"
+
+def test_build_threads_missing_root():
+    # A is missing from the input list, but B replies to it.
+    msgs = [{"message_id": "B", "in_reply_to": "A", "references": ["A"]}]
+    result = build_threads(msgs)
+    assert result["B"] == "A"
+
+def test_build_threads_cycle():
+    # Infinite loop prevention
+    msgs = [
+        {"message_id": "A", "in_reply_to": "B"},
+        {"message_id": "B", "in_reply_to": "A"}
+    ]
+    result = build_threads(msgs)
+    assert result["A"] == "A"
+    assert result["B"] == "A"
+
+def test_build_threads_dos_bound():
+    # Exceeding MAX_REFERENCES should raise ParsingAbort
+    import pytest
+    huge_refs = ["X"] * 1001
+    msgs = [{"message_id": "A", "references": huge_refs}]
+    with pytest.raises(ParsingAbort, match="exceeds limit"):
+        build_threads(msgs)
