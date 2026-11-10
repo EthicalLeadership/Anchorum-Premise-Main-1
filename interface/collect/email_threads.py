@@ -49,3 +49,31 @@ def walk_message(msg: Any, derivation: str = "HEADER", depth: int = 0, budget: d
                 collected.extend(walk_message(payload, "ATTACHMENT", depth + 1, budget))
                 
     return collected
+
+# --- LAYER 3: TRUST CLASSES ---
+
+TRUST_MAP = {
+    "From": "SENDER_CLAIM",
+    "Sender": "SENDER_CLAIM",
+    "Reply-To": "SENDER_CLAIM",
+    "To": "SENDER_CLAIM",
+    "Cc": "SENDER_CLAIM",
+    "Subject": "SENDER_CLAIM",
+    "Date": "SENDER_CLAIM",
+    "Received": "RELAY_OBSERVATION",
+    "Authentication-Results": "PERIMETER_VERDICT",
+    "ARC-Authentication-Results": "PERIMETER_VERDICT",
+    "DKIM-Signature": "CRYPTOGRAPHIC_SIGNATURE",
+}
+
+def extract_headers(msg: Any) -> list:
+    """Extracts headers and classifies them by trust level."""
+    extracted = []
+    for key, value in msg.items():
+        trust = TRUST_MAP.get(key, "UNKNOWN")
+        extracted.append({
+            "name": key,
+            "value": str(value),
+            "trust": trust
+        })
+    return extracted
