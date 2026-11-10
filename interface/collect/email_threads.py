@@ -4,6 +4,7 @@ import base64
 
 MAX_DEPTH = 10
 MAX_TOTAL_BYTES = 500 * 1024 * 1024
+MAX_REFERENCES = 1000
 
 class ParsingAbort(Exception):
     def __init__(self, reason: str):
@@ -137,7 +138,10 @@ def build_threads(messages: list[dict]) -> dict[str, str]:
         if in_reply:
             union(mid, in_reply)
             
+
         refs = msg.get("references", [])
+        if len(refs) > MAX_REFERENCES:
+            raise ParsingAbort("REFERENCES_CHAIN")
         for ref in refs:
             union(mid, ref)
             
@@ -182,7 +186,10 @@ def build_threads(messages: list[dict]) -> dict[str, str]:
         if in_reply:
             union(mid, in_reply)
             
+
         refs = msg.get("references", [])
+        if len(refs) > MAX_REFERENCES:
+            raise ParsingAbort("REFERENCES_CHAIN")
         for ref in refs:
             union(mid, ref)
             

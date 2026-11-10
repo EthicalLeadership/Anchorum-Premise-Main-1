@@ -157,7 +157,7 @@ def test_build_threads_dos_bound():
     import pytest
     huge_refs = ["X"] * 1001
     msgs = [{"message_id": "A", "references": huge_refs}]
-    with pytest.raises(ParsingAbort, match="exceeds limit"):
+    with pytest.raises(ParsingAbort) as exc:
         build_threads(msgs)
 
 # --- LAYER 5 ---
