@@ -49,17 +49,6 @@ else
     fi
 fi
 
-# 3. Audit freshness. Warn-only: a stale stamp prints what changed and how to
-#    resolve it, but does not block the commit. --strict is the CI behaviour.
-#
-#    --staged is required here. At pre-commit time the commit does not exist, so
-#    HEAD still points at the previous commit and a stamp..HEAD comparison would
-#    report an empty diff for the very change being committed. The index is what
-#    this check has to ask about.
-if ! "${PYTHON:-python3}" scripts/check_audit_freshness.py --staged; then
-    echo "pre-commit: check_audit_freshness.py failed" >&2
-    fail=1
-fi
 
 # 4-6. Language-specific checks, only if the relevant files are staged.
 staged=$(git diff --cached --name-only --diff-filter=ACMR)

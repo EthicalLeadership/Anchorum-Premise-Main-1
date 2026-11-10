@@ -1,167 +1,180 @@
 #!/usr/bin/env python3
+"""Reproducible audit stamp for the tree.
+
+Every figure is derived from git or from the AST, never from a walk of the
+working directory. A filesystem walk counts untracked, ignored and generated
+files, so two machines at the same commit report different numbers — which is
+the opposite of what a stamp is for.
+
+The counters measure the quantities the audit names:
+
+    routes  ``@app.<method>("...")`` decorators parsed from
+            ``interface/anchorum_api.py``. Two of them are declared across two
+            physical lines; the AST does not care, a line-oriented grep does.
+    tests   test *cases* collected by pytest, not test files.
+    files   tracked ``*.py`` paths from ``git ls-files``.
+    tree    ``git rev-parse HEAD^{tree}``, the real git tree object.
+
+Nothing is written into the repository unless ``--output`` is passed. The
+generator used to write ``docs/audit/AUDIT_STAMP.json`` on every invocation and
+that file was committed, so a machine-local hash entered version control and
+churned without the tree changing.
 """
-Generate audit stamp from the tree.
 
-This script generates:
-- Route counts (from app/routes and dossier_pipeline)
-- Test counts (from tests/)
-- File counts (tracked files)
-- Audit stamp (commit SHA of last clean state)
+from __future__ import annotations
 
-Usage:
-    python scripts/generate_audit_stamp.py [--output FILE]
-"""
-
-import os
-import sys
+import argparse
+import ast
 import json
-import hashlib
+import re
+import subprocess
+import sys
 from pathlib import Path
 
-
-def count_python_files(root: str, exclude_dirs: list[str]) -> int:
-    """Count Python files excluding specified directories."""
-    count = 0
-    for dirpath, dirnames, filenames in os.walk(root):
-        # Filter out excluded directories
-        dirnames[:] = [d for d in dirnames if d not in exclude_dirs]
-        for filename in filenames:
-            if filename.endswith('.py') and not filename.startswith('__'):
-                count += 1
-    return count
+HTTP_METHODS = frozenset({"get", "post", "put", "patch", "delete", "head", "options"})
+ROUTES_MODULE = Path("interface") / "anchorum_api.py"
+# pytest renders its summary inside a run of '=' characters, so the count is
+# never at the start of the line: "==== 759 tests collected in 1.28s ====".
+# Anchoring the pattern with ^ silently matches nothing and reports zero tests,
+# which is worse than a failed count because zero is a plausible-looking number.
+COLLECTED_PATTERN = re.compile(r"(\d+)\s+tests?\s+collected")
+EXCLUDED_PARTS = frozenset({"node_modules", ".venv", ".git"})
+PROGRAM_DESCRIPTION = "Generate a reproducible audit stamp from git and the AST."
 
 
-def count_test_files(root: str) -> int:
-    """Count test files (test_*.py or *_test.py)."""
-    count = 0
-    for dirpath, dirnames, filenames in os.walk(root):
-        for filename in filenames:
-            if filename.startswith('test_') or filename.endswith('_test.py'):
-                count += 1
-    return count
+def run_git(root: Path, *arguments: str) -> str:
+    """Run a git command and return its stripped stdout."""
+    completed = subprocess.run(
+        ["git", "-C", str(root), *arguments],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return completed.stdout.strip()
 
 
-def count_routes(root: str) -> int:
-    """Count route files in app/routes and dossier_pipeline."""
-    count = 0
-    # Check app/routes
-    routes_path = os.path.join(root, 'app', 'routes')
-    if os.path.isdir(routes_path):
-        for filename in os.listdir(routes_path):
-            if filename.endswith('.py'):
-                count += 1
-    
-    # Check dossier_pipeline for gateway/route files
-    pipeline_path = os.path.join(root, 'dossier_pipeline')
-    if os.path.isdir(pipeline_path):
-        for filename in os.listdir(pipeline_path):
-            if 'gateway' in filename.lower() or 'route' in filename.lower():
-                count += 1
-    
-    return count
+def count_tracked_python_files(root: Path) -> int:
+    """Count tracked ``*.py`` paths, excluding vendored trees."""
+    paths = run_git(root, "ls-files", "*.py").splitlines()
+    return sum(
+        1 for path in paths if not (EXCLUDED_PARTS & set(Path(path).parts))
+    )
 
 
-def generate_tree_hash(root: str) -> str:
-    """Generate a hash of the current tree state."""
-    hasher = hashlib.sha256()
-    
-    # Walk through tracked files
-    for dirpath, dirnames, filenames in os.walk(root):
-        # Skip common exclude directories
-        if any(part in dirpath for part in ['.git', '.venv', 'node_modules', '__pycache__', '.pytest_cache']):
+def count_routes(root: Path) -> int:
+    """Count route registrations by walking the module's decorators.
+
+    A route is a decorator of the form ``@app.<method>("<path>")``. Parsing the
+    AST rather than grepping lines is what makes the two-line declarations
+    count: ``@app.post(`` with the path on the next line is one ``ast.Call``
+    either way.
+    """
+    module_path = root / ROUTES_MODULE
+    if not module_path.is_file():
+        return 0
+    tree = ast.parse(module_path.read_text(encoding="utf-8"), filename=str(module_path))
+    total = 0
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
-        
-        for filename in sorted(filenames):
-            filepath = os.path.join(dirpath, filename)
-            try:
-                with open(filepath, 'rb') as f:
-                    # Read file content in chunks
-                    content = f.read()
-                    hasher.update(content[:1024])  # Hash first 1KB for speed
-            except (IOError, OSError):
-                continue
-    
-    return hasher.hexdigest()[:12]
+        for decorator in node.decorator_list:
+            if _is_route_decorator(decorator):
+                total += 1
+    return total
 
 
-def get_git_commit_sha(root: str) -> str | None:
-    """Get the current HEAD commit SHA."""
-    import subprocess
-    try:
-        result = subprocess.run(
-            ['git', '-C', root, 'rev-parse', 'HEAD'],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        return result.stdout.strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
+def _is_route_decorator(decorator: ast.expr) -> bool:
+    """True when the expression is ``app.<http-method>(<string>)``."""
+    if not isinstance(decorator, ast.Call):
+        return False
+    function = decorator.func
+    if not isinstance(function, ast.Attribute) or function.attr not in HTTP_METHODS:
+        return False
+    if not isinstance(function.value, ast.Name) or function.value.id != "app":
+        return False
+    return bool(decorator.args) and isinstance(decorator.args[0], ast.Constant)
+
+
+def count_collected_tests(root: Path) -> int | None:
+    """Count test cases pytest collects, or None when collection fails.
+
+    A failure is reported as None rather than zero: zero would read as "there
+    are no tests", which is a different and much worse claim than "collection
+    did not complete".
+    """
+    completed = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider"],
+        cwd=str(root),
+        capture_output=True,
+        text=True,
+    )
+    match = COLLECTED_PATTERN.search(completed.stdout)
+    if match:
+        return int(match.group(1))
+    if completed.returncode != 0:
         return None
+    return sum(1 for line in completed.stdout.splitlines() if "::" in line)
 
 
-def generate_audit_report(root: str, output_file: str | None = None) -> dict:
-    """Generate the audit report."""
-    
-    # Get current commit
-    commit_sha = get_git_commit_sha(root)
-    
-    # Count files
-    all_py_files = count_python_files(root, ['.git', '.venv', 'node_modules', '__pycache__', '.pytest_cache'])
-    test_files = count_test_files(os.path.join(root, 'tests'))
-    route_files = count_routes(root)
-    
-    # Generate tree hash
-    tree_hash = generate_tree_hash(root)
-    
-    report = {
-        'commit_sha': commit_sha or 'unknown',
-        'tree_hash': tree_hash,
-        'file_counts': {
-            'total_python_files': all_py_files,
-            'test_files': test_files,
-            'route_files': route_files
+def tree_hash(root: Path) -> str:
+    """The git tree object for HEAD, which is what identifies the content."""
+    return run_git(root, "rev-parse", "HEAD^{tree}")
+
+
+def commit_sha(root: Path) -> str:
+    """The current HEAD commit, or ``unknown`` outside a repository."""
+    try:
+        return run_git(root, "rev-parse", "HEAD")
+    except subprocess.CalledProcessError:
+        return "unknown"
+
+
+def build_report(root: Path) -> dict:
+    """Assemble the stamp."""
+    sha = commit_sha(root)
+    return {
+        "commit": sha,
+        "commit_short": sha[:7],
+        "tree": tree_hash(root),
+        "counts": {
+            "routes": count_routes(root),
+            "tests": count_collected_tests(root),
+            "tracked_python_files": count_tracked_python_files(root),
         },
-        'audit_stamp': f"{commit_sha[:7]}-{tree_hash}" if commit_sha else 'unknown-unknown'
     }
-    
-    # Output to file if specified
-    if output_file:
-        with open(output_file, 'w') as f:
-            json.dump(report, f, indent=2)
-        print(f"Audit report written to {output_file}")
-    
-    return report
 
 
-def main():
-    """Main entry point."""
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    
-    # Default output file
-    output_file = os.path.join(root, 'docs', 'audit', 'AUDIT_STAMP.json')
-    
-    # Check for --output argument (skip first arg which is script name)
-    if len(sys.argv) > 2:
-        output_file = sys.argv[2]
-    
-    report = generate_audit_report(root, output_file)
-    
-    # Print summary
-    print("=" * 60)
-    print("AUDIT STAMP GENERATION REPORT")
-    print("=" * 60)
-    print(f"Commit SHA: {report['commit_sha']}")
-    print(f"Tree Hash: {report['tree_hash']}")
-    print(f"Audit Stamp: {report['audit_stamp']}")
-    print("-" * 60)
-    print("File Counts:")
-    print(f"  Total Python files: {report['file_counts']['total_python_files']}")
-    print(f"  Test files: {report['file_counts']['test_files']}")
-    print(f"  Route files: {report['file_counts']['route_files']}")
-    print("=" * 60)
-    
-    return report
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    """Parse arguments. ``--output`` takes a value; it is never positional."""
+    parser = argparse.ArgumentParser(description=PROGRAM_DESCRIPTION)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="write the JSON report here; omit to print it to stdout",
+    )
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=Path(__file__).resolve().parent.parent,
+        help="repository root (default: the parent of this script's directory)",
+    )
+    return parser.parse_args(argv)
 
 
-if __name__ == '__main__':
-    main()
+def main(argv: list[str] | None = None) -> int:
+    """Entry point."""
+    arguments = parse_args(sys.argv[1:] if argv is None else argv)
+    report = build_report(arguments.root)
+    serialised = json.dumps(report, indent=2, sort_keys=True)
+    if arguments.output is None:
+        print(serialised)
+        return 0
+    arguments.output.parent.mkdir(parents=True, exist_ok=True)
+    arguments.output.write_text(serialised + "\n", encoding="utf-8")
+    print(f"wrote {arguments.output}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
