@@ -1,7 +1,7 @@
 import pytest
 from email.message import Message
 from unittest.mock import MagicMock
-from interface.collect.email_threads import guard_headers, walk_message, extract_headers, normalize_body, ParsingAbort
+from interface.collect.email_threads import guard_headers, walk_message, extract_headers, normalize_body, build_threads, ParsingAbort
 
 def test_header_count_guard_raises():
     msg = Message()
@@ -76,3 +76,41 @@ def test_normalize_body_base64():
     msg.set_payload("SGVsbG8gV29ybGQ=") 
     normalized = normalize_body(msg)
     assert normalized == "Hello World"
+
+# --- LAYER 5 ---
+def test_build_threads_empty():
+    assert build_threads([]) == {}
+
+def test_build_threads_single():
+    msgs = [{"message_id": "A"}]
+    assert build_threads(msgs) == {"A": "A"}
+
+def test_build_threads_reply_chain():
+    msgs = [
+        {"message_id": "C", "in_reply_to": "B", "references": ["A", "B"]},
+        {"message_id": "A"},
+        {"message_id": "B", "in_reply_to": "A", "references": ["A"]}
+    ]
+    # C replies to B, B replies to A. All should map to A.
+    result = build_threads(msgs)
+    assert result["A"] == "A"
+    assert result["B"] == "A"
+    assert result["C"] == "A"
+
+def test_build_threads_missing_root():
+    msgs = [
+        {"message_id": "B", "in_reply_to": "A", "references": ["A"]}
+    ]
+    # A is missing, but B should still map to A as the root
+    result = build_threads(msgs)
+    assert result["B"] == "A"
+
+def test_build_threads_cycle():
+    msgs = [
+        {"message_id": "A", "in_reply_to": "B"},
+        {"message_id": "B", "in_reply_to": "A"}
+    ]
+    # Should not infinite loop. Both map to the lexicographically smaller ID ("A")
+    result = build_threads(msgs)
+    assert result["A"] == "A"
+    assert result["B"] == "A"

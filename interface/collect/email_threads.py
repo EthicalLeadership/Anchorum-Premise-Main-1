@@ -98,3 +98,48 @@ def normalize_body(part: Any) -> str:
             return raw_payload
             
     return raw_payload
+
+# --- LAYER 5: JWZ THREADING (UNION-FIND) ---
+
+def build_threads(messages: list[dict]) -> dict[str, str]:
+    """
+    Groups messages into threads using In-Reply-To and References.
+    Returns a mapping of message_id -> thread_id (the root message_id).
+    """
+    parent = {}
+    
+    def find(x):
+        if x not in parent:
+            parent[x] = x
+        if parent[x] != x:
+            parent[x] = find(parent[x])
+        return parent[x]
+        
+    def union(x, y):
+        if x not in parent: parent[x] = x
+        if y not in parent: parent[y] = y
+        root_x = find(x)
+        root_y = find(y)
+        if root_x != root_y:
+            # Deterministic: pick the lexicographically smaller ID as root
+            if root_x < root_y:
+                parent[root_y] = root_x
+            else:
+                parent[root_x] = root_y
+                
+    for msg in messages:
+        mid = msg.get("message_id")
+        if not mid:
+            continue
+        find(mid)
+        
+        in_reply = msg.get("in_reply_to")
+        if in_reply:
+            union(mid, in_reply)
+            
+        refs = msg.get("references", [])
+        for ref in refs:
+            union(mid, ref)
+            
+    # Return mapping of mid -> root
+    return {mid: find(mid) for mid in parent}
