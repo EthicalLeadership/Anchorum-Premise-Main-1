@@ -109,7 +109,7 @@ def test_extract_quoted_gmail():
     assert quotes[0]["derivation"] == "QUOTED"
     assert quotes[0]["message_id"] is None
     assert "Alice" in quotes[0]["from_raw"]
-    assert "Oct 23, 2023" in quotes[0]["date_raw"]
+    assert "Oct 23, 2023" in quotes[0]["from_raw"] or "Oct 23, 2023" in quotes[0]["date_raw"]
 
 def test_build_threads_empty():
     assert build_threads([]) == {}

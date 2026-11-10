@@ -9,7 +9,6 @@ OUTLOOK_HEADER = re.compile(
     re.I | re.M
 )
 
-# Fixed Regex: allows the "at 10:00 AM" block to be ignored before grabbing the sender
 GMAIL_HEADER = re.compile(
     r"^\s*On\s+(?P<date>.+?)\s+(?:at\s+[^<]+)?(?P<from>.+?)\s+wrote:\s*$",
     re.I | re.M
