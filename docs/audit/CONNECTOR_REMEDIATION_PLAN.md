@@ -1,3 +1,4 @@
+
 # Connector remediation plan ANCH-2026-10-12-01
 
 **Remediating audit:** `docs/audit/CONNECTOR_AUDIT.md` (id **ANCH-2026-10-12-01**,
