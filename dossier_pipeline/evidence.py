@@ -597,23 +597,20 @@ class EvidenceStore:
             for row in cur.fetchall()
         ]
 
-    def verify_custody_chain(
+    def _custody_problems(
         self,
-        evidence_id: str,
+        events: Sequence[CustodyEvent],
+        packet_hash: str,
         *,
-        verify_signatures: bool = True,
-    ) -> Tuple[bool, List[str]]:
-        events = self.get_custody_events(evidence_id)
-        if not events:
-            return False, ["no_custody_events"]
+        verify_signatures: bool,
+    ) -> List[str]:
+        """Walk one item's custody chain in order and collect every problem.
 
-        packet = self.conn.execute(
-            "SELECT hash_self FROM evidence_packets WHERE evidence_id = ?",
-            (evidence_id,),
-        ).fetchone()
-        if packet is None:
-            return False, ["evidence_packet_missing"]
-
+        The single implementation behind both callers: ``verify_custody_chain``
+        for one item, and ``verify`` for every item whose events it has already
+        loaded. Two copies of these rules could drift apart about what a valid
+        chain is, which is the one thing a custody chain cannot afford.
+        """
         problems: List[str] = []
         previous_hash = "0" * 64
         for event in events:
@@ -638,10 +635,33 @@ class EvidenceStore:
                 problems.append(f"record_hash_mismatch:{event.custody_id}")
             if verify_signatures and not self.signer.verify(event.record_hash, event.signature):
                 problems.append(f"signature_invalid:{event.custody_id}")
-            if event.content_hash != packet[0]:
+            if event.content_hash != packet_hash:
                 problems.append(f"content_hash_mismatch:{event.custody_id}")
             previous_hash = event.record_hash
+        return problems
 
+    def verify_custody_chain(
+        self,
+        evidence_id: str,
+        *,
+        verify_signatures: bool = True,
+    ) -> Tuple[bool, List[str]]:
+        events = self.get_custody_events(evidence_id)
+        if not events:
+            return False, ["no_custody_events"]
+
+        packet = self.conn.execute(
+            "SELECT hash_self FROM evidence_packets WHERE evidence_id = ?",
+            (evidence_id,),
+        ).fetchone()
+        if packet is None:
+            return False, ["evidence_packet_missing"]
+
+        problems = self._custody_problems(
+            events,
+            packet[0],
+            verify_signatures=verify_signatures,
+        )
         return not problems, problems
 
     def export_bundle(self, bundle_dir: str, exporter_id: str) -> str:
@@ -839,14 +859,29 @@ class EvidenceStore:
                     }
                 )
 
+        # Grouped from the events already in memory instead of one query per
+        # evidence id. The per-id form ran two SQL round-trips for each of the
+        # store's items on every verify, and verify runs on every open and
+        # every custody write, so a global store of a few thousand items made
+        # each upload cost tens of seconds of pure query overhead.
         custody_chain_problems: List[str] = []
         custody_chain_ok = True
-        for evidence_id in sorted({event.evidence_id for event in custody_events}):
-            chain_ok, problems = self.verify_custody_chain(
-                evidence_id,
+        events_by_evidence: Dict[str, List[CustodyEvent]] = {}
+        for event in custody_events:
+            events_by_evidence.setdefault(event.evidence_id, []).append(event)
+        packet_hash_by_id = {packet.evidence_id: packet.hash_self for packet in packets}
+        for evidence_id in sorted(events_by_evidence):
+            packet_hash = packet_hash_by_id.get(evidence_id)
+            if packet_hash is None:
+                custody_chain_ok = False
+                custody_chain_problems.append("evidence_packet_missing")
+                continue
+            problems = self._custody_problems(
+                events_by_evidence[evidence_id],
+                packet_hash,
                 verify_signatures=verify_signatures,
             )
-            custody_chain_ok = custody_chain_ok and chain_ok
+            custody_chain_ok = custody_chain_ok and not problems
             custody_chain_problems.extend(problems)
 
         state = SystemState.OK if not mismatches else SystemState.COMPROMISED
