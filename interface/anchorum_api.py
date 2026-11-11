@@ -48,6 +48,7 @@ from interface import analysis as analysis_service
 from interface import anchoring
 from interface import malware_scan
 from interface import preflight, proofs
+from interface.collect.email_threads.router import email_router
 from interface.analysis import analyse
 from interface.pdf_text import extract_text, PdfTextError, looks_like_pdf
 import logging
@@ -561,6 +562,7 @@ def create_app(
         ),
         lifespan=lifespan,
     )
+    app.include_router(email_router)
     app.state.local_api_mode = enabled
     app.state.database_engine = engine
     app.state.db_sessions = db_sessions
