@@ -235,11 +235,13 @@ class EmailClassifier:
                 if envelope.transport != "email":
                     detected_actor = ActorType.UNKNOWN
                     scope_warning = (
-                        "document transport: actor not applicable "
-                        "(a court filing has no correspondent)"
+                        f"document submission has no correspondent actor "
+                        f"(transport={envelope.transport})"
                     )
                     reasoning.append(scope_warning)
-                    rule_hits.append("scope:actor_not_applicable")
+                    rule_hits.append(
+                        f"scope:actor_not_applicable:transport={envelope.transport}"
+                    )
 
                 # ---- Label detection ----
                 for label, patterns in self.LABEL_PATTERNS.items():

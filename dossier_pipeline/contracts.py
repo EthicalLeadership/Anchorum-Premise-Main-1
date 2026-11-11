@@ -84,7 +84,7 @@ class EmailEnvelope:
     #
     # `raw_sha256` is the hash of the bytes actually ingested, which is the
     # transport envelope. For a real .eml that IS the artifact. For the document
-    # bridge the ingested bytes are a wrapper this system synthesised, so these
+    # bridge the ingested bytes are a wrapper this system synthesized, so these
     # fields carry what the submitter actually handed over. For an .eml the two
     # hashes are equal and `transport == "email"`.
     source_sha256: str = ""

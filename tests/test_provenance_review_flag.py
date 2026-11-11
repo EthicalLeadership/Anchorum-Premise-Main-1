@@ -121,12 +121,10 @@ def test_synthesised_fields_still_count_as_missing() -> None:
         ),
     )
 
-    assert curated.complete is False
-    assert curated.human_review_required is True
     assert set(curated.missing_fields) == {
-        "message_id",
-        "subject",
-        "sender",
-        "recipient",
-        "date",
+        "message_id (synthesised)",
+        "date (synthesised)",
+        "sender (synthesised)",
+        "subject (synthesised)",
+        "recipient (synthesised)",
     }

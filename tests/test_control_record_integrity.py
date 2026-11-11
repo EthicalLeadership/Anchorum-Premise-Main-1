@@ -323,7 +323,7 @@ class ArtifactIdentityInCommittedRecordTests(unittest.TestCase):
             # a nested block in the control payload, so it is asserted on the
             # pipeline's own result.
             self.assertFalse(result.data["provenance_complete"])
-            self.assertIn("message_id", result.data["missing_fields"])
+            self.assertIn("message_id (synthesised)", result.data["missing_fields"])
 
     def test_email_submission_keeps_its_own_identity(self) -> None:
         """The email path must not regress: there the artifact IS the message."""

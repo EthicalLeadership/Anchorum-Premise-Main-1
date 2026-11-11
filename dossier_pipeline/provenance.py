@@ -36,16 +36,14 @@ class ProvenanceCurator:
         # what a completeness check is for.
         synthesised = set(getattr(envelope, "synthesised_fields", ()) or ())
 
-        if not envelope.message_id or "message_id" in synthesised:
-            missing.append("message_id")
-        if not envelope.date or "date" in synthesised:
-            missing.append("date")
-        if not envelope.sender or "sender" in synthesised:
-            missing.append("sender")
-        if not envelope.subject or "subject" in synthesised:
-            missing.append("subject")
-        if not envelope.recipient or "recipient" in synthesised:
-            missing.append("recipient")
+        # Canonical field order so missing_fields is stable across runs
+        # (inv_004 requires the same envelope to yield the same result).
+        for field in ("message_id", "date", "sender", "subject", "recipient"):
+            value = getattr(envelope, field, None)
+            if not value:
+                missing.append(field)
+            elif field in synthesised:
+                missing.append(f"{field} (synthesised)")
 
         # Thread detection via Re:/Fwd:/FW: prefixes.
         # Strip ALL leading prefixes iteratively so that nested replies like
