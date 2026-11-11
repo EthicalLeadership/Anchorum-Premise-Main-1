@@ -3273,3 +3273,10 @@ def create_app(
 
 
 app = create_app()
+
+# --- EMAIL INGESTION ROUTER ---
+try:
+    from interface.collect.email_threads.router import router as email_router
+    app.include_router(email_router)
+except ImportError:
+    pass

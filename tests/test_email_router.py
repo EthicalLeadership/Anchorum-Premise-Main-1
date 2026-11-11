@@ -6,8 +6,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from interface.collect.email_threads.router import router, get_db
 from interface.collect.email_threads.db import Base
-
-# IMPORTANT: Import the model so Base.metadata knows it exists!
 from interface.collect.email_threads.ingest import EmailMessage
 
 SIMPLE_EMAIL = b"""From: alice@example.com
@@ -23,9 +21,6 @@ Hello world.
 app = FastAPI()
 app.include_router(router)
 
-# --- MOCK THE DATABASE ---
-# 1. check_same_thread=False allows FastAPI to use the DB in a threadpool
-# 2. StaticPool keeps the same in-memory DB across connections
 engine = create_engine(
     "sqlite:///:memory:",
     connect_args={"check_same_thread": False},
