@@ -7,3 +7,5 @@ from .threading import build_threads
 from .extractor import parse_email, ParsedMessage
 from .db import EmailMessage, get_engine, init_email_schema, get_session
 from .ingest import ingest
+
+from .router import router as email_router

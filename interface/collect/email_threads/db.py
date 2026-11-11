@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, DateTime, Boolean, Text, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -24,7 +24,7 @@ class EmailMessage(Base):
     derivation = Column(String, nullable=False)
     content_hash = Column(String, nullable=True, index=True)
     trust_headers = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 def get_engine(db_path="output/anchorum-local.db"):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
