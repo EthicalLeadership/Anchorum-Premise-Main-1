@@ -39,5 +39,18 @@ def ingest(case_id: str, document_id: str, raw: bytes, session) -> list[EmailMes
         session.add(row)
         rows.append(row)
     
-    session.commit()
+    
+        # GAP BOARD LOGIC: If it's a quoted row, we don't have the original.
+        # Create an expected source entry so it appears on the War Room board.
+        if derivation == "QUOTED":
+            gap = ExpectedSource(
+                id=str(uuid.uuid4()),
+                case_id=case_id,
+                description=f"Missing original email: {subject or 'No Subject'}",
+                status="REFERENCED",
+                referenced_in_message_id=msg_row.id
+            )
+            session.add(gap)
+
+        session.commit()
     return rows

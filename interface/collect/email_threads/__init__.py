@@ -9,3 +9,5 @@ from .db import EmailMessage, get_engine, init_email_schema, get_session
 from .ingest import ingest
 
 from .router import router as email_router
+from .router import router as email_router
+from .router import router as email_router

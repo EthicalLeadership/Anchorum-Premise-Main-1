@@ -57,3 +57,34 @@ def test_upload_invalid_extension():
     )
     assert response.status_code == 400
     assert "Only .eml or .msg" in response.json()["detail"]
+
+
+def test_upload_creates_gap_for_quoted():
+    from interface.collect.email_threads.db import ExpectedSource
+    
+    QUOTED_EMAIL = b"""From: bob@example.com
+To: alice@example.com
+Subject: Re: Contract
+
+Yes, I agree.
+
+From: Alice <alice@example.com>
+Sent: Monday, October 23, 2023 10:00 AM
+To: Bob
+Subject: Re: Contract
+
+Are we still on for the meeting?
+"""
+    response = client.post(
+        "/intake/case-123/email",
+        files={"file": ("test_quote.eml", QUOTED_EMAIL, "message/rfc822")}
+    )
+    assert response.status_code == 200
+    
+    # Check the DB directly to ensure the Gap Board was written to
+    db = TestingSessionLocal()
+    gaps = db.query(ExpectedSource).filter(ExpectedSource.case_id == "case-123").all()
+    assert len(gaps) == 1, f"Expected 1 gap, found {len(gaps)}"
+    assert gaps[0].status == "REFERENCED"
+    assert "Missing original email" in gaps[0].description
+    db.close()

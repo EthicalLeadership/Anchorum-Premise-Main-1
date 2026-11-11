@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timezone, timezone
 from sqlalchemy import Column, String, DateTime, Boolean, Text, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -35,3 +35,12 @@ def init_email_schema(engine):
 
 def get_session(engine):
     return sessionmaker(bind=engine)()
+
+
+class ExpectedSource(Base):
+    __tablename__ = "expected_sources"
+    id = Column(String, primary_key=True)
+    case_id = Column(String, index=True)
+    description = Column(String)
+    status = Column(String, default="REFERENCED")
+    referenced_in_message_id = Column(String, nullable=True)

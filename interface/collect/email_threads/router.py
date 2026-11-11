@@ -4,10 +4,11 @@ import uuid
 
 from .ingest import ingest
 from .db import get_session, get_engine
-from .abort import ParsingAbort
 
 router = APIRouter(prefix="/intake", tags=["email_intake"])
 
+# Simple dependency to get a DB session
+# In production, this should pull from your existing DB connection pool
 def get_db():
     engine = get_engine()
     db = get_session(engine)
@@ -37,9 +38,5 @@ async def upload_email(
             "document_id": document_id,
             "messages_ingested": len(rows)
         }
-    except ParsingAbort as e:
-        # Catch our specific parser errors and return a 422
-        raise HTTPException(status_code=422, detail=f"Parsing aborted: {e.reason}")
     except Exception as e:
-        # Log the actual error internally, don't leak stack traces to the client
-        raise HTTPException(status_code=500, detail="Internal server error during ingestion")
+        raise HTTPException(status_code=500, detail=str(e))
