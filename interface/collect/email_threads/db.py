@@ -1,6 +1,6 @@
 import os
-from datetime import datetime, timezone, timezone, timezone
-from sqlalchemy import Column, String, DateTime, Boolean, Text, create_engine
+from datetime import datetime, timezone
+from sqlalchemy import Column, String, DateTime, Text, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 Base = declarative_base()
@@ -26,6 +26,15 @@ class EmailMessage(Base):
     trust_headers = Column(Text)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+class ExpectedSource(Base):
+    __tablename__ = "expected_sources"
+    id = Column(String, primary_key=True)
+    case_id = Column(String, nullable=False, index=True)
+    description = Column(String)
+    status = Column(String, default="REFERENCED")
+    referenced_in_message_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
 def get_engine(db_path="output/anchorum-local.db"):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     return create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
@@ -35,12 +44,3 @@ def init_email_schema(engine):
 
 def get_session(engine):
     return sessionmaker(bind=engine)()
-
-
-class ExpectedSource(Base):
-    __tablename__ = "expected_sources"
-    id = Column(String, primary_key=True)
-    case_id = Column(String, index=True)
-    description = Column(String)
-    status = Column(String, default="REFERENCED")
-    referenced_in_message_id = Column(String, nullable=True)

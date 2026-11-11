@@ -3,17 +3,17 @@ import uuid
 from datetime import datetime
 from .extractor import parse_email
 from .threading import build_threads
-from .db import EmailMessage
+from .db import EmailMessage, ExpectedSource
 
 def ingest(case_id: str, document_id: str, raw: bytes, session) -> list[EmailMessage]:
     parsed = parse_email(raw)
-    
+
     msg_dicts = [
         {"message_id": m.message_id, "in_reply_to": m.in_reply_to, "references": m.references}
         for m in parsed if m.message_id
     ]
     thread_map = build_threads(msg_dicts) if msg_dicts else {}
-    
+
     rows = []
     for pm in parsed:
         thread_id = thread_map.get(pm.message_id) if pm.message_id else None
@@ -38,19 +38,19 @@ def ingest(case_id: str, document_id: str, raw: bytes, session) -> list[EmailMes
         )
         session.add(row)
         rows.append(row)
-    
-    
-        # GAP BOARD LOGIC: If it's a quoted row, we don't have the original.
-        # Create an expected source entry so it appears on the War Room board.
-        if derivation == "QUOTED":
+
+        # GAP BOARD LOGIC: if this row is a quoted block, the original message
+        # is proven to exist but was not collected. Record the gap.
+        if pm.derivation == "QUOTED":
+            sender = pm.from_raw[0][1] if pm.from_raw else "unknown sender"
             gap = ExpectedSource(
                 id=str(uuid.uuid4()),
                 case_id=case_id,
-                description=f"Missing original email: {subject or 'No Subject'}",
+                description=f"Missing original email quoted in thread: '{pm.subject or 'No Subject'}' from {sender}",
                 status="REFERENCED",
-                referenced_in_message_id=msg_row.id
+                referenced_in_message_id=row.id,
             )
             session.add(gap)
 
-        session.commit()
+    session.commit()
     return rows
