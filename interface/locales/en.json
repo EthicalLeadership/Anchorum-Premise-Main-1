@@ -496,7 +496,6 @@
   "evidence.text.loading": "Loading extracted text…",
   "evidence.text.error": "The extracted text could not be loaded.",
   "evidence.viewer.tab_unavailable": "Nothing recorded for this item.",
-
   "export.gate.not_checked": "Not checked",
   "export.gate.warn": "Review",
   "export.gate.advisory": "(advisory)",
@@ -510,7 +509,6 @@
   "export.gate.projection_rules.note": "Nothing has been analysed yet, so there is no rules hash to compare.",
   "export.gate.control_chain": "Control chain",
   "export.gate.control_chain.note": "No control chain exists on this host.",
-
   "proof.title": "Cryptographic proofs",
   "proof.intro": "Recomputes every hash this case claims, from the stored rows and bytes. Nothing is read from a stored verdict.",
   "proof.action.verify": "Verify cryptographic proofs",
@@ -549,6 +547,15 @@
   "proof.code.control_mismatch": "the control chain does not verify",
   "proof.error.feature_unavailable": "Proof verification needs the local API.",
   "proof.error.backend_unreachable": "The local API is not reachable.",
-
-  "audit.event.proofs_verified": "cryptographic proofs verified"
+  "audit.event.proofs_verified": "cryptographic proofs verified",
+  "warroom.title": "War Room",
+  "warroom.truncated": "Warning: chronology is truncated to the first 2,000 entries.",
+  "warroom.chronology.title": "Chronology",
+  "warroom.undated.title": "Undated tray",
+  "warroom.gaps.title": "Gaps & Missing Evidence",
+  "warroom.gaps.empty": "No missing evidence detected.",
+  "warroom.actors.title": "Communications",
+  "warroom.actors.from": "From",
+  "warroom.actors.to": "To",
+  "warroom.actors.count": "Count"
 }

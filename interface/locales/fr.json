@@ -496,7 +496,6 @@
   "evidence.text.loading": "Chargement du texte extrait…",
   "evidence.text.error": "Le texte extrait n'a pas pu être chargé.",
   "evidence.viewer.tab_unavailable": "Aucun contenu enregistré pour cet élément.",
-
   "audit.event.proofs_verified": "preuves cryptographiques vérifiées",
   "export.gate.not_checked": "Non vérifié",
   "export.gate.warn": "À revoir",
@@ -511,7 +510,6 @@
   "export.gate.projection_rules.note": "Rien n'a encore été analysé : il n'y a pas d'empreinte de règles à comparer.",
   "export.gate.control_chain": "Chaîne de contrôle",
   "export.gate.control_chain.note": "Aucune chaîne de contrôle n'existe sur cet hôte.",
-
   "proof.title": "Preuves cryptographiques",
   "proof.intro": "Recalcule chaque empreinte revendiquée par ce dossier, à partir des lignes et des octets stockés. Aucun verdict enregistré n'est relu.",
   "proof.action.verify": "Vérifier les preuves cryptographiques",
@@ -549,5 +547,15 @@
   "proof.code.empty_control_chain": "la chaîne de contrôle est vide",
   "proof.code.control_mismatch": "la chaîne de contrôle ne se vérifie pas",
   "proof.error.feature_unavailable": "La vérification des preuves nécessite l'API locale.",
-  "proof.error.backend_unreachable": "L'API locale n'est pas joignable."
+  "proof.error.backend_unreachable": "L'API locale n'est pas joignable.",
+  "warroom.title": "Salle de guerre",
+  "warroom.truncated": "Attention : la chronologie est tronquee aux 2 000 premieres entrees.",
+  "warroom.chronology.title": "Chronologie",
+  "warroom.undated.title": "Courrier non date",
+  "warroom.gaps.title": "Lacunes et preuves manquantes",
+  "warroom.gaps.empty": "Aucune preuve manquante detectee.",
+  "warroom.actors.title": "Communications",
+  "warroom.actors.from": "De",
+  "warroom.actors.to": "A",
+  "warroom.actors.count": "Nombre"
 }
