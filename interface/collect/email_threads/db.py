@@ -44,3 +44,12 @@ def init_email_schema(engine):
 
 def get_session(engine):
     return sessionmaker(bind=engine)()
+
+
+def get_db():
+    engine = get_engine()
+    db = get_session(engine)
+    try:
+        yield db
+    finally:
+        db.close()
