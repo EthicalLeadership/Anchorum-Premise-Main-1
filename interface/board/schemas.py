@@ -26,3 +26,20 @@ class ActorsResponse(BaseModel):
     total_messages: int
     unique_actors: int
     edges: list[CommEdge]
+
+class ChronologyEntry(BaseModel):
+    message_id: str
+    date: Optional[datetime] = None
+    date_raw: Optional[str] = None
+    from_address: Optional[str] = None
+    to_address: Optional[str] = None
+    subject: Optional[str] = None
+    thread_id: Optional[str] = None
+
+class ChronologyResponse(BaseModel):
+    case_id: str
+    total_dated: int
+    total_undated: int
+    truncated: bool = False
+    dated_entries: list[ChronologyEntry]
+    undated_tray: list[ChronologyEntry]

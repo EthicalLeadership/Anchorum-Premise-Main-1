@@ -4,7 +4,16 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from interface.collect.email_threads.db import get_db, ExpectedSource, EmailMessage
-from .schemas import GapResponse, GapItem, ActorsResponse, CommEdge
+from .schemas import GapResponse, GapItem, ActorsResponse, CommEdge, ChronologyResponse, ChronologyEntry
+
+
+def _safe_extract_addrs(raw: str) -> list[str]:
+    try:
+        rows = json.loads(raw or "[]")
+        return [addr for row in rows for addr in row if addr]
+    except (json.JSONDecodeError, TypeError):
+        return []
+
 
 board_router = APIRouter(prefix="/board", tags=["board"])
 
@@ -85,4 +94,53 @@ def get_actors(case_id: str, db: Session = Depends(get_db)):
             )
             for (fa, ta), data in sorted_edges
         ],
+    )
+
+@board_router.get("/{case_id}/chronology", response_model=ChronologyResponse)
+def get_chronology(case_id: str, db: Session = Depends(get_db)):
+    # Query 2001 to detect truncation. Explicit NULL handling in SQL.
+    rows = (
+        db.query(EmailMessage)
+        .filter(
+            EmailMessage.case_id == case_id,
+            EmailMessage.derivation.in_(["HEADER", "ATTACHMENT"]),
+        )
+        .order_by(EmailMessage.sent_at.is_(None), EmailMessage.sent_at.asc())
+        .limit(2001)
+        .all()
+    )
+    
+    truncated = len(rows) > 2000
+    if truncated:
+        rows = rows[:2000]
+
+    dated_entries = []
+    undated_tray = []
+
+    for row in rows:
+        from_addrs = _safe_extract_addrs(row.from_raw)
+        to_addrs = _safe_extract_addrs(row.to_raw)
+        
+        entry = ChronologyEntry(
+            message_id=row.id,
+            date=row.sent_at,
+            date_raw=row.sent_at_raw,
+            from_address=from_addrs[0] if from_addrs else None,
+            to_address=to_addrs[0] if to_addrs else None,
+            subject=row.subject,
+            thread_id=row.thread_id
+        )
+        
+        if row.sent_at:
+            dated_entries.append(entry)
+        else:
+            undated_tray.append(entry)
+
+    return ChronologyResponse(
+        case_id=case_id,
+        total_dated=len(dated_entries),
+        total_undated=len(undated_tray),
+        truncated=truncated,
+        dated_entries=dated_entries,
+        undated_tray=undated_tray
     )

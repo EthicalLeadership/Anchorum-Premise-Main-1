@@ -128,3 +128,33 @@ def test_actors_case_scoped(client):
     data = r.json()
     assert data["total_messages"] == 0
     assert data["edges"] == []
+
+def test_chronology_sorting_and_undated(client):
+    test_client, Session = client
+    db = Session()
+    db.add(_make_msg("c-chron", "a@x.com", "b@x.com", datetime(2023, 1, 1, 10, 0)))
+    db.add(_make_msg("c-chron", "b@x.com", "a@x.com", datetime(2023, 1, 5, 10, 0)))
+    undated_msg = _make_msg("c-chron", "c@x.com", "d@x.com", None)
+    undated_msg.sent_at_raw = "Unknown Date"
+    db.add(undated_msg)
+    db.commit(); db.close()
+
+    r = test_client.get("/board/c-chron/chronology")
+    data = r.json()
+    assert data["total_dated"] == 2
+    assert data["total_undated"] == 1
+    assert data["truncated"] is False
+    assert data["dated_entries"][0]["from_address"] == "a@x.com"
+    assert data["undated_tray"][0]["from_address"] == "c@x.com"
+
+def test_chronology_truncation_flag(client):
+    test_client, Session = client
+    db = Session()
+    for i in range(2001):
+        db.add(_make_msg("c-bulk", "a@x.com", "b@x.com", datetime(2023, 1, 1)))
+    db.commit(); db.close()
+
+    r = test_client.get("/board/c-bulk/chronology")
+    data = r.json()
+    assert data["truncated"] is True
+    assert data["total_dated"] == 2000
