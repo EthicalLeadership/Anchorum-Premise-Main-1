@@ -214,7 +214,9 @@ class AuditLockAcrossProcessesTests(unittest.TestCase):
 
 
 class ArtifactIdentityInCommittedRecordTests(unittest.TestCase):
-    """W1: the record must name the artifact that was actually submitted.
+    """W1: The artifact hash must be explicitly exported, not blocked by the denylist.
+
+    W1: the record must name the artifact that was actually submitted.
 
     Before this, ``raw_sha256`` was the only identity on the record, and for a
     document submission the bytes it hashed were a wrapper this system
@@ -222,6 +224,15 @@ class ArtifactIdentityInCommittedRecordTests(unittest.TestCase):
     submitter handed over and could not be tied back to the file. These tests
     pin both halves: the identity travels, and the invented fields are named.
     """
+
+    def test_source_sha256_is_exportable(self):
+        from dossier_pipeline.trust_boundary import DEFAULT_CONTRACT
+
+        self.assertIn(
+            "source_sha256",
+            DEFAULT_CONTRACT.exportable_fields,
+            "source_sha256 must be in exportable_fields so it travels with the record",
+        )
 
     SOURCE_FIELDS = (
         "message_id",
