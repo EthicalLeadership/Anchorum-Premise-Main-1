@@ -380,7 +380,19 @@ class DocumentResubmissionIdentityTests(unittest.TestCase):
             },
         )
         self.config.start()
+    def test_document_bridge_populates_synthesised_fields(self) -> None:
+        """W2: The document bridge itself must inject the synthetic field list."""
+        from interface import document
 
+        first = document.process(file_path=str(self.brief), filename=self.brief.name)
+        self.assertEqual(first["status"], "processed")
+        
+        expected_fields = ("message_id", "subject", "sender", "recipient", "date")
+        self.assertEqual(
+            tuple(first["data"]["synthesised_fields"]),
+            expected_fields,
+            "The document bridge must populate synthesised_fields so the record is honest."
+        )
     def tearDown(self) -> None:
         self.config.stop()
         self.tempdir.cleanup()
