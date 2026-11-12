@@ -8,8 +8,15 @@ string-based leakage heuristics.
 
 from __future__ import annotations
 
+import os as _os
 from dataclasses import dataclass
 from typing import Final, Iterable
+
+try:
+    from .config import load_config
+except ImportError:  # pragma: no cover - fallback for direct execution / tests
+    def load_config():
+        return {}
 
 BOUNDARY_CONTRACT_VERSION: Final[str] = "1.0.0"
 
@@ -55,6 +62,21 @@ DEFAULT_CONTRACT = TrustBoundaryContract(
         "previous_hash",
         "control_hash",
         "trace",
+        # W3 §7.6: analysis and extracted text never enter a pipeline payload
+        # today, but `validate_export_fields` is a denylist — anything not named
+        # here passes through `_public_payload` and into `export_json` /
+        # `export_markdown_summary`. Naming them here guarantees that if they
+        # are ever added for convenience, they export redacted rather than in
+        # the clear. The two hashes are digests, not inert: F-18 found a hash
+        # being published as if it were metadata, and a digest lets a reader
+        # confirm a guessed document against the record.
+        "extract_text",
+        "extract_error",
+        "analysis_json",
+        "extract_text_path",
+        "extract_sha256",
+        "analysis_rules_hash",
+        "analysis_config_hash",
     ),
     exportable_fields=(
         "dossier_id",
@@ -132,3 +154,19 @@ def validate_export_fields(field_names: Iterable[str]) -> tuple[str, ...]:
         if contract.is_internal_only(normalized):
             rejected.append(normalized)
     return tuple(rejected)
+
+
+def _config() -> dict:
+    cfg = load_config()
+    cfg.setdefault("dossier_id", "INTERFACE")
+    # §7.7 / F-11 residual: a CWD-relative default means two processes started
+    # from two directories write pipeline state to two places. `ANCHORUM_OUTPUT_DIR`
+    # lets a deployment pin one absolute root regardless of CWD. Unset in local
+    # dev and in tests, so nothing changes there — `_pipeline_config` still
+    # resolves whatever value ends up here.
+    cfg.setdefault(
+        "output_dir",
+        _os.environ.get("ANCHORUM_OUTPUT_DIR") or "./output",
+    )
+    cfg.setdefault("email", "interface@localhost")
+    return cfg

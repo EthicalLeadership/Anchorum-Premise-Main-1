@@ -37,7 +37,10 @@ def _json_safe(v: Any) -> Any:
 def _config() -> dict:
     cfg = load_config()
     cfg.setdefault("dossier_id", "INTERFACE")
-    cfg.setdefault("output_dir", "./output")
+    cfg.setdefault(
+        "output_dir",
+        _os.environ.get("ANCHORUM_OUTPUT_DIR") or "./output",
+    )
     cfg.setdefault("email", "interface@localhost")
     return cfg
 
