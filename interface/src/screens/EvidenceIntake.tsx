@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { translate } from "../i18n";
+import { translate, type MessageKey } from "../i18n";
 import type { createAdapter, EvidenceAnalysis, ExtractStatus } from "../adapter";
 import type { Locale } from "../types";
 import { FileDropZone } from "../components/FileDropZone";
@@ -163,7 +163,7 @@ export function EvidenceIntake({ locale, adapter, caseId }: Props) {
           <option value="">{translate(locale, "evidence.intake.unset")}</option>
           {CATEGORIES.map((value) => (
             <option key={value} value={value}>
-              {translate(locale, `evidence.category.${value}` as never)}
+              {translate(locale, `evidence.category.${value}` as MessageKey)}
             </option>
           ))}
         </select>
@@ -174,7 +174,7 @@ export function EvidenceIntake({ locale, adapter, caseId }: Props) {
           <option value="">{translate(locale, "evidence.intake.unset")}</option>
           {SOURCES.map((value) => (
             <option key={value} value={value}>
-              {translate(locale, `evidence.source.${value}` as never)}
+              {translate(locale, `evidence.source.${value}` as MessageKey)}
             </option>
           ))}
         </select>
@@ -185,7 +185,7 @@ export function EvidenceIntake({ locale, adapter, caseId }: Props) {
           <thead>
             <tr>
               {(["file", "size", "type", "duplicate", "progress", "result"] as const).map((c) => (
-                <th key={c}>{translate(locale, `evidence.intake.column.${c}` as never)}</th>
+                <th key={c}>{translate(locale, `evidence.intake.column.${c}` as MessageKey)}</th>
               ))}
             </tr>
           </thead>
@@ -203,7 +203,7 @@ export function EvidenceIntake({ locale, adapter, caseId }: Props) {
                     failedStage={r.state === "failed" ? r.failedStage : undefined}
                   />
                   {r.notReadKey ? (
-                    <p role="alert">{translate(locale, r.notReadKey as never)}</p>
+                    <p role="alert">{translate(locale, r.notReadKey as MessageKey)}</p>
                   ) : null}
                   {r.analysis?.warning ? (
                     <p>
