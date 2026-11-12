@@ -8,16 +8,16 @@ users, audit logs, and jurisdiction stamps.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import TYPE_CHECKING, Optional, TypeAlias
 
-from sqlalchemy import (Column, DateTime, ForeignKey, Integer, String, Text,
-                        UniqueConstraint, create_engine, inspect, Boolean)
-from sqlalchemy.orm import Session, relationship, sessionmaker
+from sqlalchemy import (Boolean, CheckConstraint, Column, DateTime, Float,
+                        ForeignKey, Integer, String, Text, UniqueConstraint,
+                        create_engine, inspect)
+from sqlalchemy.orm import Mapped, Session, relationship, sessionmaker
 
 try:
     # SQLAlchemy >= 2.0
-    from sqlalchemy.orm import (DeclarativeBase, Mapped,  # type: ignore
-                                mapped_column)
+    from sqlalchemy.orm import DeclarativeBase, mapped_column  # type: ignore
 
     class Base(DeclarativeBase):
         pass
@@ -28,10 +28,17 @@ except ImportError:
 
     from sqlalchemy.ext.declarative import declarative_base
 
-    Mapped = Any  # type: ignore
+    # Keep the fallback compatible with SQLAlchemy's typing API for static
+    # analyzers, while avoiding a runtime variable redefinition that pyright
+    # treats as an invalid type expression when used in `Mapped[...]` fields.
+    if TYPE_CHECKING:
+        Mapped: TypeAlias = Any  # type: ignore[assignment]
+    else:
+        Mapped = Any
 
-    def mapped_column(*args, **kwargs):
-        return Column(*args, **kwargs)
+    # SQLAlchemy < 2.0 does not provide mapped_column(), but Column is a
+    # compatible drop-in for the model definitions used here.
+    mapped_column: Any = Column  # type: ignore[assignment]
 
     Base = declarative_base()
 
@@ -218,3 +225,57 @@ def init_schema(engine) -> None:
 
 def get_session(session_factory) -> Session:
     return session_factory()
+class Message(Base):
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True)
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=False, index=True)
+    message_key = Column(String(256), nullable=False, unique=True)
+    timestamp_occurred = Column(DateTime(timezone=True), nullable=True)
+    timestamp_captured = Column(DateTime(timezone=True), nullable=False)
+    source_hash = Column(String(64), nullable=False, index=True)
+    source_filename = Column(String(256), nullable=False)
+    source_locator_json = Column(Text, nullable=False, default="{}")
+    body_text = Column(Text, nullable=True)
+    subject = Column(String(512), nullable=True)
+    sender = Column(String(256), nullable=True)
+    recipient = Column(String(256), nullable=True)
+    message_type = Column(String(64), nullable=False)
+    previous_hash = Column(String(64), nullable=False, default="")
+    current_hash = Column(String(64), nullable=False, default="")
+
+    __table_args__ = (
+        CheckConstraint("length(source_hash) = 64", name="ck_source_hash_length"),
+    )
+
+class Finding(Base):
+    __tablename__ = "findings"
+
+    id = Column(Integer, primary_key=True)
+    message_id = Column(Integer, ForeignKey("messages.id"), nullable=False, index=True)
+    finding_key = Column(String(256), nullable=False, unique=True)
+    category = Column(String(128), nullable=False)
+    severity = Column(String(64), nullable=True)
+    confidence = Column(Float, nullable=True)
+    description = Column(Text, nullable=False)
+    evidence_refs = Column(Text, nullable=True)
+    analyzed_at = Column(DateTime(timezone=True), nullable=False)
+    analyzer = Column(String(256), nullable=True)
+    analysis_version = Column(String(32), nullable=False)
+    status = Column(String(32), nullable=False, default="candidate")
+
+class Decision(Base):
+    __tablename__ = "decisions"
+
+    id = Column(Integer, primary_key=True)
+    finding_id = Column(Integer, ForeignKey("findings.id"), nullable=False, index=True)
+    decision_key = Column(String(256), nullable=False, unique=True)
+    decided_by = Column(String(256), nullable=False)
+    decided_at = Column(DateTime(timezone=True), nullable=False)
+    decision_version = Column(String(32), nullable=False)
+    reasoning = Column(Text, nullable=False)
+    outcome = Column(String(128), nullable=False)
+    policy_refs = Column(Text, nullable=True)
+    status = Column(String(32), nullable=False)
+    revoked_by = Column(String(256), nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
