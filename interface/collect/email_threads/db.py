@@ -35,6 +35,14 @@ class ExpectedSource(Base):
     referenced_in_message_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+class FindingReview(Base):
+    __tablename__ = "finding_reviews"
+    id = Column(String, primary_key=True)
+    case_id = Column(String, nullable=False, index=True)
+    status = Column(String, nullable=False, default="candidate")
+    reviewed_by = Column(String, nullable=False, default="system")
+    reviewed_at = Column(DateTime, default=datetime.utcnow)
+
 def get_engine(db_path="output/anchorum-local.db"):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     return create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
