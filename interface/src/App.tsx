@@ -11,6 +11,7 @@ import { EvidenceViewer } from "./screens/EvidenceViewer";
 import { CreateCase } from "./screens/CreateCase";
 import { Timeline } from "./screens/Timeline";
 import { Administration } from "./screens/Administration";
+import { WarRoom } from "./screens/WarRoom";
 import { AuditExports } from "./screens/AuditExports";
 import { translate } from "./i18n";
 import { StateBlock } from "./components/StateBlock";
@@ -139,7 +140,9 @@ export function App() {
       : null;
 
 
-  const activeSection = path.endsWith("/timeline")
+  const activeSection = path.endsWith("/warroom")
+    ? "warroom"
+    : path.endsWith("/timeline")
     ? "timeline"
     : path.endsWith("/audit")
       ? "audit"
@@ -193,6 +196,11 @@ export function App() {
           locale={locale}
           adapter={adapter}
           caseId={decodeURIComponent(hash.split("/")[2])}
+        />
+      ) : /^#\/cases\/[^/]+\/warroom$/.test(path) ? (
+        <WarRoom
+          locale={locale}
+          caseId={decodeURIComponent(path.split("/")[2])}
         />
       ) : /^#\/cases\/[^/]+\/(evidence|register)$/.test(path) ? (
         <Register

@@ -6,7 +6,8 @@ export type CaseSection =
   | "intake"
   | "timeline"
   | "audit"
-  | "settings";
+  | "settings"
+  | "warroom";
 
 export type WorkspaceSection =
   | "workspace"

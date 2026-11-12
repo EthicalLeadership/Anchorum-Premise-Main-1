@@ -39,6 +39,7 @@ const sections: CaseSection[] = [
   "intake",
   "timeline",
   "audit",
+  "warroom",
   "settings",
 ];
 
@@ -48,6 +49,7 @@ const sectionLabels: Record<CaseSection, MessageKey> = {
   intake: "nav.email_intake",
   timeline: "nav.timeline",
   audit: "nav.audit",
+  warroom: "nav.war_room",
   settings: "nav.settings",
 };
 
@@ -122,8 +124,8 @@ const caseStatusLabels: Record<
 };
 
 const RAIL_BY_ROLE: Record<SessionRole, readonly CaseSection[]> = {
-  case_admin: ["overview", "evidence", "intake", "timeline", "audit", "settings"],
-  reviewer: ["overview", "evidence", "intake", "timeline", "audit"],
+  case_admin: ["overview", "evidence", "intake", "timeline", "audit", "warroom", "settings"],
+  reviewer: ["overview", "evidence", "intake", "timeline", "audit", "warroom"],
   // An auditor reads; submitting new messages into a case is not a read. The
   // intake rail entry is absent for that role on purpose.
   auditor: ["overview", "evidence", "audit"],

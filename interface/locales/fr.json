@@ -557,5 +557,6 @@
   "warroom.actors.title": "Acteurs",
   "warroom.actors.from": "De",
   "warroom.actors.to": "À",
-  "warroom.actors.count": "Nombre"
+  "warroom.actors.count": "Nombre",
+  "nav.war_room": "Salle de guerre"
 }
