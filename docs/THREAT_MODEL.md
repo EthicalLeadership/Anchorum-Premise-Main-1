@@ -4,9 +4,11 @@
 **Deployment model (G0-1, amended 2026-11-12):** multi-user, **one OS account per
 user required**. A shared OS account is **unsupported** — the product refuses
 multi-user operation when it detects one (Security Owner, Option A).
-**Security owner (G0-6):** **NOT NAMED.** Every entry received so far contained a
-literal placeholder. CR-0 cannot be signed by a role, or by an agent on a person's
-behalf.
+**Security owner (G0-6):** **DECIDED 2026-11-12 — Samuel Tessier.** He is also the
+sole author, owner, and developer of this software; there is no independent security
+review for v1. Implementer = reviewer is recorded as a residual (see §8). Each sold
+deployment is individualized per client (own keys, audit chain, data boundary) as a
+v1 acceptance criterion (see §2).
 **Scope:** CR-0 through CR-12 as defined in Revision 2. Nothing here authorizes code
 or migration work.
 
@@ -64,6 +66,17 @@ would defend *within* a shared account, at the cost of unrecoverable data loss o
 forgotten passphrase and an unlocked session for every query, background task and
 export. It is the analysed fallback if Option A proves unenforceable in practice,
 and it would then need an escrow decision from G0-3 and Counsel.
+
+**Per-client individualization (v1 acceptance criterion, decided 2026-11-12).** Each
+sold deployment is a separate security domain: its own signing and anchoring keypair,
+its own audit chain with independent continuity, its own data boundary (database,
+sidecar text, exports, anchor directory), and no shared trust relationship with any
+other client deployment. A compromise of one client's keys does not weaken another's;
+an upgrade at one deployment does not touch another's data or keys. This is a
+shipping gate for v1, tracked against CR-10 (authentication, key handling) and CR-12
+(key storage, retention), not a future upgrade. Whether the deployment contacts a
+vendor licensing service, and how that service affects the client's threat model, is
+a separate decision to be recorded before the first client deployment.
 
 ## 3. Assets
 
@@ -165,8 +178,13 @@ Recorded:
 
 Still open and blocking:
 
-- **G0-6 — named Security Owner.** No usable name supplied; every entry contained the
-  placeholder `[person and title]`. CR-0 cannot be signed by a role.
+- **G0-6 — DECIDED 2026-11-12.** Security Owner: **Samuel Tessier**. He is also the
+  sole author, owner, and developer; there is no independent security review for v1.
+  Implementer = reviewer is recorded as a residual, not a control.
+- **Per-client individualization — DECIDED 2026-11-12 as a v1 acceptance criterion.**
+  Each sold deployment is a separate security domain (own keys, audit chain, data
+  boundary, anchor directory). Has no workstream yet; must be assigned before the
+  first client is deployed. Tracked against CR-10 and CR-12.
 - **G0-3 — privilege, PII, retention.** Now the next control that matters: with OS
   separation restored, retention and redaction bound exposure when authentication is
   defeated.
