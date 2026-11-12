@@ -1,20 +1,28 @@
 """IRAC scope segmentation.
 
-The brief this product was asked to analyse extracts to a single line with no
-headings and no blank-line blocks, so heading detection and blank-line blocking
-cannot segment it. Segmentation is therefore cue-driven: a documented, ordered
-table of phrases that mark where each IRAC part begins in a case document, with
-every cut rewound to the start of the sentence the cue was found in, so a part
-never begins mid-sentence.
+Three stages, in the order the remediation plan §7.2 requires, each tried only
+when the one before it recovered fewer than two parts:
 
-The citation is a structural prefix rather than a cue: everything up to the end
-of the reporter citation is CITATION, and the facts follow it.
+1. **Headings.** A document that states where its parts begin is segmented by
+   those statements (``## ISSUE``, ``FACTS:``, ``HOLDING``). The author's own
+   structure outranks anything inferred here.
+2. **Cues.** A document with no headings — the brief this product was asked to
+   analyse extracts to a single line with neither headings nor blank-line
+   blocks — is segmented by a documented, ordered table of phrases that mark
+   where each IRAC part begins, with every cut rewound to the start of the
+   sentence the cue was found in, so a part never begins mid-sentence. The
+   citation is a structural prefix rather than a cue: everything up to the end
+   of the reporter citation is CITATION, and the facts follow it.
+3. **Blank-line blocks**, and failing that a single DOCUMENT scope.
 
-A scope is emitted only when its cue appears after the previous cut, so the parts
-always come out in document order. When fewer than two parts are recovered the
-function falls back to blank-line blocks, and failing that to a single DOCUMENT
-scope. It never invents a part that is not present in the text, and it raises on
-empty input rather than returning an empty list.
+In stages 1 and 2 a scope is emitted only after the previous cut, so the parts
+always come out in document order. The function never invents a part the text
+does not contain, and it raises on empty input rather than returning an empty
+list.
+
+The vocabulary the stages match on lives in :mod:`interface.scope_vocabulary`
+and the heading-line scanner in :mod:`interface.scope_headings`; this module
+holds the order the stages run in and the ``Scope`` value they produce.
 
 Flagged in the remediation plan as decision D-3: the cue table is a product
 choice about what these scopes mean, and this is the implementation the plan
@@ -27,16 +35,42 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-DOCUMENT = "DOCUMENT"
+from interface import scope_headings
+from interface.scope_vocabulary import (
+    CITATION,
+    CITATION_PATTERN,
+    CUE_TABLE,
+    DISTILLED_RULES,
+    FACTS,
+    HEADING_ALIASES,
+    HOLDING,
+    ISSUE,
+    PROCEDURAL_POSTURE,
+    REASONING,
+    RULE,
+    SETTINGS,
+)
 
-CITATION = "CITATION"
-FACTS = "FACTS"
-PROCEDURAL_POSTURE = "PROCEDURAL_POSTURE"
-ISSUE = "ISSUE"
-RULE = "RULE"
-REASONING = "REASONING"
-HOLDING = "HOLDING"
-DISTILLED_RULES = "DISTILLED_RULES"
+__all__ = [
+    "CITATION",
+    "CITATION_PATTERN",
+    "CUE_TABLE",
+    "DISTILLED_RULES",
+    "DOCUMENT",
+    "FACTS",
+    "HEADING_ALIASES",
+    "HOLDING",
+    "ISSUE",
+    "PROCEDURAL_POSTURE",
+    "REASONING",
+    "RULE",
+    "SCOPE_NAMES",
+    "Scope",
+    "SETTINGS",
+    "split_scopes",
+]
+
+DOCUMENT = "DOCUMENT"
 
 SCOPE_NAMES = (
     CITATION,
@@ -48,30 +82,6 @@ SCOPE_NAMES = (
     HOLDING,
     DISTILLED_RULES,
 )
-
-# A reporter citation at the head of the document: "322 A.2d 630 1974 CONTRACTS".
-CITATION_PATTERN = r"^\s*\d+\s+[A-Za-z][\w.]*\s+\d+[\s\x00-\x1f\(\)\[\]]*\d{4}[\s\x00-\x1f\(\)\[\]]*[A-Z]{2,}\b"
-
-# Ordered cue table for the parts that follow the citation: (scope, pattern).
-CUE_TABLE: tuple[tuple[str, str], ...] = (
-    (
-        PROCEDURAL_POSTURE,
-        r"(?:Superior Court[^.]{0,60}?(?:heard|ruled)|appealed the decision)",
-    ),
-    (ISSUE, r"Whether\b"),
-    (RULE, r"(?:A contract modification|only requires consideration)"),
-    (
-        REASONING,
-        r"(?:gave careful attention|Court emphasized|They reasoned|applied\s*:)",
-    ),
-    (HOLDING, r"(?:reversed the lower court|held that Maher|held that)"),
-    (
-        DISTILLED_RULES,
-        r"(?:Contract modifications are enforceable|Pre-Existing Duty rule)",
-    ),
-)
-
-SETTINGS = re.IGNORECASE | re.DOTALL
 
 
 @dataclass(frozen=True)
@@ -132,8 +142,39 @@ def _blank_line_blocks(text: str) -> list[Scope]:
     return scopes
 
 
+def _from_starts(
+    text: str, starts: list[tuple[str, int]], *, keep_preamble: bool
+) -> list[Scope]:
+    """Cut `text` at each start, in the order the starts appear.
+
+    `keep_preamble` decides what becomes of text before the first cut. Headings
+    are an explicit structure, so text under no heading at all - a case caption,
+    a docket line - is kept as a DOCUMENT part rather than dropped. A cue is an
+    inference, and a cue found mid-document already means the text before it
+    belongs to no part this module recognises.
+    """
+    scopes: list[Scope] = []
+    first_start = starts[0][1]
+
+    if keep_preamble and first_start > 0 and text[:first_start].strip():
+        scopes.append(
+            Scope(name=DOCUMENT, text=text[:first_start], start=0, end=first_start)
+        )
+
+    for index, (name, start) in enumerate(starts):
+        end = starts[index + 1][1] if index + 1 < len(starts) else len(text)
+        scopes.append(Scope(name=name, text=text[start:end], start=start, end=end))
+
+    return scopes
+
+
 def split_scopes(text: str) -> list[Scope]:
     """Segment a document into IRAC scopes, or the best honest fallback.
+
+    Stages run in the order the plan §7.2 requires and each is taken only if it
+    recovered at least two parts, so the strongest available structure wins:
+    the document's own headings, then the cue table, then blank-line blocks,
+    then the whole document as one part.
 
     Raises ValueError for empty input rather than returning an empty list, so an
     empty segmentation can never be mistaken for a document with no content.
@@ -141,13 +182,13 @@ def split_scopes(text: str) -> list[Scope]:
     if not text or not text.strip():
         raise ValueError("cannot segment empty text")
 
-    hits = _cue_starts(text)
-    if len(hits) >= 2:
-        scopes: list[Scope] = []
-        for index, (name, start) in enumerate(hits):
-            end = hits[index + 1][1] if index + 1 < len(hits) else len(text)
-            scopes.append(Scope(name=name, text=text[start:end], start=start, end=end))
-        return scopes
+    headings = scope_headings.heading_starts(text, HEADING_ALIASES)
+    if len(headings) >= 2:
+        return _from_starts(text, headings, keep_preamble=True)
+
+    cues = _cue_starts(text)
+    if len(cues) >= 2:
+        return _from_starts(text, cues, keep_preamble=False)
 
     blocks = _blank_line_blocks(text)
     if len(blocks) >= 2:
