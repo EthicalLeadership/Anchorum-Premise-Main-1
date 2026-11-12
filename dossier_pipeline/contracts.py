@@ -91,6 +91,7 @@ class EmailEnvelope:
     source_bytes: int = 0
     source_filename: str = ""
     source_media_type: str = ""
+    # Transport method: "email", "document", "sms", or "call_transcript".
     transport: str = "email"
     #: Envelope fields that were invented rather than observed. Named explicitly
     #: so a reader of the signed record can tell them from observed values.

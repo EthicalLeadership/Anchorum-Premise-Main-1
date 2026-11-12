@@ -72,6 +72,12 @@ TRANSPORT_DOCUMENT = "document"
 #: them from values that were observed.
 SYNTHESISED_DOCUMENT_FIELDS = ("message_id", "subject", "sender", "recipient", "date")
 
+#: Transport for call transcripts (VTT, TXT).
+TRANSPORT_CALL_TRANSCRIPT = "call_transcript"
+
+#: Transport for SMS-like artifacts (JSON, CSV).
+TRANSPORT_SMS = "sms"
+
 #: Fixed timestamp for synthetic wrappers. A wall clock here makes the recorded
 #: identity a function of when ingestion ran rather than of what was ingested,
 #: which is exactly what made the same PDF hash differently on every run.
@@ -113,6 +119,7 @@ def _document_source(
     byte_size: int,
     filename: str,
     media_type: str,
+    transport: str = TRANSPORT_DOCUMENT,
 ) -> dict:
     """The artifact identity a document submission carries into the pipeline."""
     return {
@@ -120,7 +127,7 @@ def _document_source(
         "source_bytes": byte_size,
         "source_filename": filename,
         "source_media_type": media_type,
-        "transport": TRANSPORT_DOCUMENT,
+        "transport": transport,
         "synthesised_fields": SYNTHESISED_DOCUMENT_FIELDS,
     }
 
@@ -183,11 +190,20 @@ def process(
             name = filename or ""
             if name and not submission.is_eml(raw_bytes, name):
                 body = submission.extract_text(raw_bytes, name)
+                # Detect transport from file extension when available.
+                transport: str = TRANSPORT_DOCUMENT
+                if name:
+                    ext = Path(name).suffix.lower()
+                    if ext == ".vtt":
+                        transport = TRANSPORT_CALL_TRANSCRIPT
+                    elif ext in (".json", ".csv"):
+                        transport = TRANSPORT_SMS
                 source = _document_source(
                     hashlib.sha256(raw_bytes).hexdigest(),
                     len(raw_bytes),
                     name,
                     "application/octet-stream",
+                    transport=transport,
                 )
                 result = _submit_text(pipeline, body, cfg, subject, sender, source)
             else:
@@ -202,11 +218,19 @@ def process(
                 # Read once, so the hash and the text describe the same bytes.
                 document_bytes = p.read_bytes()
                 body = submission.extract_text(document_bytes, p.name)
+                # Detect transport from file extension.
+                transport: str = TRANSPORT_DOCUMENT
+                ext = (p.suffix or "").lower()
+                if ext == ".vtt":
+                    transport = TRANSPORT_CALL_TRANSCRIPT
+                elif ext in (".json", ".csv"):
+                    transport = TRANSPORT_SMS
                 source = _document_source(
                     hashlib.sha256(document_bytes).hexdigest(),
                     len(document_bytes),
                     p.name,
                     "application/octet-stream",
+                    transport=transport,
                 )
                 result = _submit_text(pipeline, body, cfg, subject, sender, source)
         else:

@@ -386,7 +386,7 @@ class EmailIntake:
             # entirely and make the message look as though it had none.
             return str(raw).strip()
 
-    def parse_email_bytes(self, raw_bytes: bytes) -> EmailEnvelope:
+    def parse_email_bytes(self, raw_bytes: bytes, transport: str = "email") -> EmailEnvelope:
         msg = email.message_from_bytes(raw_bytes)
 
         message_id = self._header_text(msg, "Message-ID")
@@ -511,7 +511,7 @@ class EmailIntake:
             source_sha256=raw_sha256,
             source_bytes=len(raw_bytes),
             source_media_type="message/rfc822",
-            transport="email",
+            transport=transport,
             synthesised_fields=(),
         )
 
