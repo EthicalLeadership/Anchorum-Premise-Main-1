@@ -558,5 +558,7 @@
   "warroom.actors.from": "De",
   "warroom.actors.to": "À",
   "warroom.actors.count": "Nombre",
-  "nav.war_room": "Salle de guerre"
+  "nav.war_room": "Salle de guerre",
+  "evidence.viewer.tab.analysis": "Analyse",
+  "error.unknown": "Une erreur inattendue s'est produite."
 }

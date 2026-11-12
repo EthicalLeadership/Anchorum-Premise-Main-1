@@ -1,4 +1,5 @@
 import { fixture } from "./fixtures/dupont-v-acme";
+import type { AnalysisRecord } from "./types";
 
 import type {
   CaseSummary,
@@ -876,6 +877,25 @@ export function createAdapter(config: AdapterConfig) {
         if (idx !== -1) sessionEvidence.splice(idx, 1);
         return success({ id, removed: true as const });
       },
+      /** The full analysis record for one stored item. */
+      analysis(id: string) {
+        if (config.backend) {
+          return requestJson<AnalysisRecord>(`/evidence/${encodeURIComponent(id)}/analysis`);
+        }
+        return Promise.resolve(failure("FEATURE_UNAVAILABLE"));
+      },
+
+      /** Re-run analysis in place. Idempotent; returns the fresh record. */
+      analyse(id: string) {
+        if (config.backend) {
+          return requestJson<AnalysisRecord>(
+            `/evidence/${encodeURIComponent(id)}/analyse`,
+            { method: "POST" },
+          );
+        }
+        return Promise.resolve(failure("FEATURE_UNAVAILABLE"));
+      },
+
       originalUrl(id: string): string | null {
         return config.backend
           ? `${config.backend.baseUrl.replace(/\/$/, "")}/evidence/${encodeURIComponent(id)}/download`

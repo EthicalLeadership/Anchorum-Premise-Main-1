@@ -11,6 +11,7 @@ import { DataTable, type Column } from "../components/DataTable";
 import { ChainTimeline } from "../components/ChainTimeline";
 import { VerificationTile, type VerificationView } from "../components/VerificationTile";
 import { PdfViewer } from "../components/PdfViewer";
+import { AnalysisPanel } from "../components/AnalysisPanel";
 import { ExtractedText } from "../components/ExtractedText";
 import { SaulSummaryDrawer } from "../components/SaulSummaryDrawer";
 import { formatDateTime, translate } from "../i18n";
@@ -97,7 +98,7 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
     arrivalTerm.length > 0 && Number.isFinite(arrivalAt) && arrivalAt >= 0
       ? { at: arrivalAt, term: arrivalTerm }
       : null;
-  const [tab, setTab] = useState<"original" | "extracted">(
+  const [tab, setTab] = useState<"original" | "extracted" | "analysis">(
     arrival ? "extracted" : "original",
   );
   const [textLoad, setTextLoad] = useState<TextLoad>({ kind: "idle" });
@@ -360,6 +361,16 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
         >
           {t("evidence.viewer.tab.extracted")}
         </button>
+        <button
+          role="tab"
+          id="tab-analysis"
+          aria-selected={tab === "analysis"}
+          aria-controls="panel-analysis"
+          className="evidence-tabs__tab"
+          onClick={() => setTab("analysis")}
+        >
+          {t("evidence.viewer.tab.analysis")}
+        </button>
       </div>
 
       {tab === "original" ? (
@@ -375,6 +386,10 @@ export function EvidenceViewer({ locale, adapter, caseId, evidenceId }: Props) {
           ) : (
             <p role="status">{t("evidence.viewer.tab_unavailable")}</p>
           )}
+        </div>
+      ) : tab === "analysis" ? (
+        <div role="tabpanel" id="panel-analysis" aria-labelledby="tab-analysis">
+          <AnalysisPanel evidenceId={evidenceId} adapter={adapter} />
         </div>
       ) : textLoad.kind === "ready" ? (
         <div role="tabpanel" id="panel-extracted" aria-labelledby="tab-extracted">

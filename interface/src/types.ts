@@ -116,3 +116,41 @@ export interface Finding {
   rationale: string;
   status: "candidate" | "confirmed" | "dismissed";
 }
+
+/**
+ * The full analysis record served by GET /evidence/{id}/analysis.
+ * Distinct from EvidenceAnalysis (the compact counts-only view on each item).
+ */
+export type AnalysisScopeRecord = {
+  scope: string;
+  chars: number;
+  conceptId: string | null;
+  classification: string;
+  admissible: boolean;
+  matchedConcepts: string[];
+  fallbackReason: string | null;
+};
+
+export type AnalysisCoverage = {
+  scopesTotal: number;
+  scopesMatched: number;
+  scopesFallback: number;
+  scopesInsufficient: number;
+  ratio: number;
+  warning: string | null;
+};
+
+export type AnalysisExtract = { status: string; chars: number; sha256: string; error: string };
+export type AnalysisProjection = { engineVersion: string; lexiconHash: string; configHash: string };
+export type AnalysisSource = { sha256: string; bytes: number; mediaType: string; filename: string };
+
+export type AnalysisRecord = {
+  id: string;
+  status: string;
+  reason: string;
+  source: AnalysisSource;
+  extract: AnalysisExtract;
+  projection: AnalysisProjection;
+  coverage: AnalysisCoverage;
+  scopes: AnalysisScopeRecord[];
+};

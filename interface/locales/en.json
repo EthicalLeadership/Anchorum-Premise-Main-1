@@ -558,5 +558,7 @@
   "warroom.actors.from": "From",
   "warroom.actors.to": "To",
   "warroom.actors.count": "Count",
-  "nav.war_room": "War Room"
+  "nav.war_room": "War Room",
+  "evidence.viewer.tab.analysis": "Analysis",
+  "error.unknown": "An unexpected error occurred."
 }
