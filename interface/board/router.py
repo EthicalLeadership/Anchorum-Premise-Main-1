@@ -1,9 +1,11 @@
 import json
 from collections import defaultdict
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from interface.collect.email_threads.db import get_db, ExpectedSource, EmailMessage
+from interface.collect.email_threads.db import get_db, ExpectedSource, EmailMessage, FindingReview
+from interface.findings import evaluate_findings
 from .schemas import GapResponse, GapItem, ActorsResponse, CommEdge, ChronologyResponse, ChronologyEntry
 
 
@@ -144,3 +146,60 @@ def get_chronology(case_id: str, db: Session = Depends(get_db)):
         dated_entries=dated_entries,
         undated_tray=undated_tray
     )
+
+
+class ReviewUpdate(BaseModel):
+    status: str
+
+@board_router.get("/{case_id}/findings")
+def get_findings(case_id: str, db: Session = Depends(get_db)):
+    rows = db.query(EmailMessage).filter(EmailMessage.case_id == case_id).all()
+    messages = []
+    for r in rows:
+        messages.append({
+            "id": r.id,
+            "timestamp": r.sent_at.isoformat() + "Z" if r.sent_at else "1970-01-01T00:00:00Z",
+            "from_actor": r.from_raw,
+            "to_actor": r.to_raw,
+            "channel": "email" if r.derivation in ("HEADER", "ATTACHMENT") else "document",
+            "thread_id": r.thread_id or "none",
+            "parent_id": None,
+            "body": r.body_text or "",
+            "needs_reply": False,
+        })
+    raw_findings = evaluate_findings(messages)
+    reviews = db.query(FindingReview).filter(FindingReview.case_id == case_id).all()
+    review_map = {r.id: r.status for r in reviews}
+    for f in raw_findings:
+        if f["id"] in review_map:
+            f["status"] = review_map[f["id"]]
+    return raw_findings
+
+@board_router.post("/{case_id}/findings/{finding_id}")
+def update_finding_status(
+    case_id: str,
+    finding_id: str,
+    payload: ReviewUpdate,
+    db: Session = Depends(get_db),
+):
+    if payload.status not in ("candidate", "confirmed", "dismissed"):
+        raise HTTPException(status_code=400, detail="Invalid status")
+
+    review = db.query(FindingReview).filter(
+        FindingReview.id == finding_id,
+        FindingReview.case_id == case_id,
+    ).first()
+
+    if review:
+        review.status = payload.status
+    else:
+        review = FindingReview(
+            id=finding_id,
+            case_id=case_id,
+            status=payload.status,
+            reviewed_by="system",
+        )
+        db.add(review)
+
+    db.commit()
+    return {"id": finding_id, "status": payload.status}
