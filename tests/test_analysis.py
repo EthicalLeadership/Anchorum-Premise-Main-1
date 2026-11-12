@@ -184,3 +184,54 @@ def test_extract_raises_the_dispatchers_refusal():
         assert "docx" in str(exc).lower()
     else:
         raise AssertionError("extract must raise on an artifact it cannot read")
+
+
+# --- the heading stage, through the record ---------------------------------
+#
+# `split_scopes` is pinned in `tests/test_scopes.py`. These pin the same
+# property one layer up: a document that states its own headings reaches the
+# record as one entry per declared part, in document order, each projected from
+# its own text. Without them the heading stage could be wired to nothing and
+# every unit pin would still pass.
+
+HEADED_TEXT = """Memorandum
+
+## Facts
+The respondent collected refuse under an annual contract.
+
+## Issue
+Whether a promise to pay more binds without new consideration.
+
+## Holding
+The court reversed the lower court and held the modification unenforceable.
+"""
+
+
+def test_a_headed_document_records_one_entry_per_declared_part():
+    record = analysis.analyse(HEADED_TEXT.encode(), "memo.txt", "text/plain")
+
+    assert record["status"] == analysis.STATUS_PROCESSED
+    assert [scope["scope"] for scope in record["scopes"]] == [
+        "DOCUMENT",
+        "FACTS",
+        "ISSUE",
+        "HOLDING",
+    ]
+
+
+def test_each_heading_scope_is_projected_from_its_own_text():
+    record = analysis.analyse(HEADED_TEXT.encode(), "memo.txt", "text/plain")
+    by_name = {scope["scope"]: scope for scope in record["scopes"]}
+
+    for name in ("FACTS", "ISSUE", "HOLDING"):
+        assert by_name[name]["chars"] > 0, f"{name} was recorded empty"
+        assert "conceptId" in by_name[name]
+
+    # The parts are cut from the document, so their lengths sum to no more than
+    # it. A stage that projected the whole text once per heading would exceed it.
+    assert sum(scope["chars"] for scope in record["scopes"]) <= len(HEADED_TEXT)
+
+
+def test_coverage_counts_the_parts_the_headings_declared():
+    record = analysis.analyse(HEADED_TEXT.encode(), "memo.txt", "text/plain")
+    assert record["coverage"]["scopesTotal"] == len(record["scopes"]) == 4
