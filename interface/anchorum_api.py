@@ -517,6 +517,8 @@ def _record_pipeline_custody(document: Document, *, case_id: int) -> None:
         evidence_store.close()
 
 
+from interface.ledger.anchor_router import router as ledger_anchor_router
+
 def create_app(
     database_url: str | None = None,
     *,
@@ -565,10 +567,12 @@ def create_app(
     )
     app.include_router(email_router)
     app.include_router(board_router)
+    app.include_router(ledger_anchor_router)
     app.state.local_api_mode = enabled
     app.state.database_engine = engine
     app.state.db_sessions = db_sessions
     app.state.evidence_directory = storage_root
+    app.state.anchor_dir = Path(storage_root) / "anchors"
 
     if enabled:
         origins = [
