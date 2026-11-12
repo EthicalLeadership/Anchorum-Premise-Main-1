@@ -102,6 +102,29 @@ match", which is a legitimate outcome, and without the coverage summary seven
 empty scopes read as "this document contains no legal concepts". A document whose
 language the lexicon does not cover says so instead.
 
+**How the scopes are cut.** Three stages, in order, each used only if it
+recovered at least two parts: the document's own headings (`## ISSUE`, `FACTS:`,
+`HOLDING`), then a cue table of phrases that mark where a part begins, then
+blank-line blocks, and finally the whole document as one part. The parts are
+contiguous and their offsets index the extracted text, so a reviewer can find the
+source of any scope.
+
+The heading and cue vocabularies live in `interface/scope_vocabulary.py`, and a
+heading the table does not name is ignored rather than guessed at, so an
+`INTRODUCTION` heading cannot invent an IRAC part. Which words belong in those
+tables is a product decision the remediation plan calls D-3: the code decides
+*which text* is projected, never how it is projected, and no projection behaviour
+depends on the segmentation.
+
+**One value, three names.** A projection reports its lexicon hash as
+`rules_hash`; the analysis record surfaces it as `lexiconHash`, because to a
+reader of this API that is what it identifies; and the column is
+`analysis_rules_hash`, because that is what it stores. The renaming is deliberate
+and one-directional rather than an inconsistency to be tidied away.
+`engine.fingerprint()` re-derives the same pair from the lexicon on disk, which is
+what lets a stored analysis be tied to the lexicon that produced it, and what
+makes re-analysis after a lexicon change mean something.
+
 What this is **not**: it describes the document's language. It is not a statement
 that the evidence is authentic, admissible or unaltered, and it is not malware
 scanning. It reports what the lexicon matched; a reviewer decides what that means.
