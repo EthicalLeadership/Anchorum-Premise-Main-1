@@ -118,8 +118,10 @@ describe("WarRoom", () => {
 
     render(<WarRoom caseId="c1" locale="en" />);
 
-    await waitFor(() => {
-      expect(screen.queryByTestId("war-room")).not.toBeInTheDocument();
-    });
+    // The container is always present so the route test can mount-find it.
+    // The error state lives inside the container as an alert.
+    const container = await screen.findByTestId("war-room");
+    expect(container).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
   });
 });

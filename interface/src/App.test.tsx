@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
 describe("App session seam", () => {
@@ -107,3 +107,29 @@ describe("AuditExports format select UI", () => {
     }, { timeout: 10000 });
   });
 });
+
+  it("mounts the WarRoom screen when navigating to a warroom route", async () => {
+    window.location.hash = "#/cases/CASE-2024-018/warroom";
+
+    // WarRoom renders a container with data-testid="war-room" in every state
+    // (loading, error, ready). This test asserts the ROUTE fires; the data
+    // fetching behavior is covered in WarRoom.test.tsx. A minimal fetch mock
+    // is enough to keep the component from hanging.
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: false,
+        status: 500,
+        statusText: "mocked",
+        json: () => Promise.resolve({}),
+      } as Response)
+    );
+
+    render(<App />);
+
+    const warRoom = await screen.findByTestId("war-room");
+    expect(warRoom).toBeInTheDocument();
+
+    globalThis.fetch = originalFetch;
+    window.location.hash = "";
+  });

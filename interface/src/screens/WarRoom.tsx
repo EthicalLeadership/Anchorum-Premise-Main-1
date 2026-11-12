@@ -93,10 +93,18 @@ export function WarRoom({ caseId, locale }: { caseId: string; locale: "en" | "fr
   }, [caseId]);
 
   if (state.kind === "loading") {
-    return <StateBlock locale={locale} kind="loading" />;
+    return (
+      <section className="war-room" data-testid="war-room">
+        <StateBlock locale={locale} kind="loading" />
+      </section>
+    );
   }
   if (state.kind === "error") {
-    return <StateBlock locale={locale} kind="error" />;
+    return (
+      <section className="war-room" data-testid="war-room">
+        <StateBlock locale={locale} kind="error" />
+      </section>
+    );
   }
 
   const { chronology, actors, gaps } = state.data;
