@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { createAdapter } from "../adapter";
+import type { Finding } from "../types";
 import { WarRoom } from "./WarRoom";
 
 const chronology = {
@@ -51,6 +52,8 @@ const gaps = {
   gaps: [],
 };
 
+const findings = [] as Finding[];
+
 function mockAdapter(failed = false) {
   const result = <T,>(value: T) =>
     failed ? { ok: false as const, error: "HTTP_500" } : { ok: true as const, value };
@@ -60,6 +63,10 @@ function mockAdapter(failed = false) {
       chronology: vi.fn(async () => result(chronology)),
       actors: vi.fn(async () => result(actors)),
       gaps: vi.fn(async () => result(gaps)),
+      findings: vi.fn(async () => result(findings)),
+      updateFinding: vi.fn(async (_cid, fid, status) => {
+        return result({ id: fid, status });
+      }),
     },
   } as unknown as Pick<ReturnType<typeof createAdapter>, "board">;
 }

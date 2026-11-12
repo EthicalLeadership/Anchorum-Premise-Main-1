@@ -106,3 +106,13 @@ export interface GapItem {
   status: string;
   description: string;
 }
+
+export interface Finding {
+  id: string;
+  rule: string;
+  title: string;
+  triggering_message_id: string;
+  evidence_message_ids: string[];
+  rationale: string;
+  status: "candidate" | "confirmed" | "dismissed";
+}

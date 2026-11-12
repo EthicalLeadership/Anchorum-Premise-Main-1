@@ -1,24 +1,21 @@
 import { useEffect, useState } from "react";
-import type {
-  ActorsResponse,
-  ChronologyResponse,
-  GapResponse,
-  createAdapter,
-} from "../adapter";
+import type { createAdapter } from "../adapter";
 import { StateBlock } from "../components/StateBlock";
+import { FindingsPanel } from "../components/FindingsPanel";
 import { translate } from "../i18n";
 import type { Locale, ChronologyEntry, CommEdge, GapItem } from "../types";
 
 type Props = {
   locale: Locale;
+  // FIX: Only require the board methods, not the entire adapter
   adapter: Pick<ReturnType<typeof createAdapter>, "board">;
   caseId: string;
 };
 
 type BoardData = {
-  chronology: ChronologyResponse;
-  actors: ActorsResponse;
-  gaps: GapResponse;
+  chronology: any;
+  actors: any;
+  gaps: any;
 };
 
 export function WarRoom({ caseId, locale, adapter }: Props) {
@@ -31,7 +28,7 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
   useEffect(() => {
     let active = true;
     setState({ kind: "loading" });
-    
+
     (async () => {
       try {
         const chronoRes = await adapter.board.chronology(caseId);
@@ -68,7 +65,7 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
       </section>
     );
   }
-  
+
   if (state.kind === "error") {
     return (
       <section style={{ padding: '2rem' }} data-testid="war-room">
@@ -140,6 +137,8 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
         </article>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          <FindingsPanel adapter={adapter} caseId={caseId} />
+          
           <article style={{ background: '#fff', padding: '1.5rem', border: '1px solid #e5e7eb', borderRadius: '8px' }} data-testid="war-room-gaps">
             <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', borderBottom: '1px solid #e5e7eb', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
               {translate(locale, "warroom.gaps.title")}

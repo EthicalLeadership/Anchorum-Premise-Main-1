@@ -5,6 +5,7 @@ import type {
   ChronologyEntry,
   CommEdge,
   GapItem,
+  Finding,
   SessionUser,
 } from "./types";
 
@@ -1093,6 +1094,17 @@ export function createAdapter(config: AdapterConfig) {
         requestJson<ActorsResponse>(`/board/${encodeURIComponent(caseId)}/actors`),
       gaps: (caseId: string) => 
         requestJson<GapResponse>(`/board/${encodeURIComponent(caseId)}/gaps`),
+      findings: (caseId: string) => 
+        requestJson<Finding[]>(`/board/${encodeURIComponent(caseId)}/findings`),
+      updateFinding: (caseId: string, findingId: string, status: string) =>
+        requestJson<{ id: string; status: string }>(
+          `/board/${encodeURIComponent(caseId)}/findings/${encodeURIComponent(findingId)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status }),
+          }
+        ),
     },
   };
 }
