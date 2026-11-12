@@ -1,50 +1,18 @@
 import { useEffect, useState } from "react";
+import type {
+  ActorsResponse,
+  ChronologyResponse,
+  GapResponse,
+  createAdapter,
+} from "../adapter";
 import { StateBlock } from "../components/StateBlock";
 import { translate } from "../i18n";
+import type { Locale, ChronologyEntry, CommEdge, GapItem } from "../types";
 
-type ChronologyEntry = {
-  message_id: string;
-  date: string | null;
-  date_raw: string | null;
-  from_address: string | null;
-  to_address: string | null;
-  subject: string | null;
-  thread_id: string | null;
-};
-
-type ChronologyResponse = {
-  case_id: string;
-  total_dated: number;
-  total_undated: number;
-  truncated: boolean;
-  dated_entries: ChronologyEntry[];
-  undated_tray: ChronologyEntry[];
-};
-
-type CommEdge = {
-  from_address: string;
-  to_address: string;
-  count: number;
-};
-
-type ActorsResponse = {
-  case_id: string;
-  total_messages: number;
-  unique_actors: number;
-  edges: CommEdge[];
-};
-
-type GapItem = {
-  id: string;
-  description: string;
-  status: string;
-  referenced_in_message_id: string | null;
-};
-
-type GapResponse = {
-  case_id: string;
-  total: number;
-  gaps: GapItem[];
+type Props = {
+  locale: Locale;
+  adapter: Pick<ReturnType<typeof createAdapter>, "board">;
+  caseId: string;
 };
 
 type BoardData = {
@@ -53,18 +21,7 @@ type BoardData = {
   gaps: GapResponse;
 };
 
-function apiBase(): string {
-  const env = import.meta.env as { VITE_API_BASE_URL?: string };
-  return env.VITE_API_BASE_URL?.trim() ?? "";
-}
-
-async function fetchJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${apiBase()}${path}`);
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  return (await res.json()) as T;
-}
-
-export function WarRoom({ caseId, locale }: { caseId: string; locale: "en" | "fr" }) {
+export function WarRoom({ caseId, locale, adapter }: Props) {
   const [state, setState] = useState<
     | { kind: "loading" }
     | { kind: "ready"; data: BoardData }
@@ -72,36 +29,49 @@ export function WarRoom({ caseId, locale }: { caseId: string; locale: "en" | "fr
   >({ kind: "loading" });
 
   useEffect(() => {
-    let live = true;
+    let active = true;
     setState({ kind: "loading" });
-    Promise.all([
-      fetchJson<ChronologyResponse>(`/board/${caseId}/chronology`),
-      fetchJson<ActorsResponse>(`/board/${caseId}/actors`),
-      fetchJson<GapResponse>(`/board/${caseId}/gaps`),
-    ])
-      .then(([chronology, actors, gaps]) => {
-        if (!live) return;
-        setState({ kind: "ready", data: { chronology, actors, gaps } });
-      })
-      .catch(() => {
-        if (!live) return;
-        setState({ kind: "error" });
-      });
-    return () => {
-      live = false;
-    };
-  }, [caseId]);
+    
+    (async () => {
+      try {
+        const chronoRes = await adapter.board.chronology(caseId);
+        const actorsRes = await adapter.board.actors(caseId);
+        const gapsRes = await adapter.board.gaps(caseId);
+
+        if (!active) return;
+
+        if (!chronoRes.ok || !actorsRes.ok || !gapsRes.ok) {
+          setState({ kind: "error" });
+          return;
+        }
+
+        setState({
+          kind: "ready",
+          data: {
+            chronology: chronoRes.value,
+            actors: actorsRes.value,
+            gaps: gapsRes.value,
+          },
+        });
+      } catch (err) {
+        if (active) setState({ kind: "error" });
+      }
+    })();
+
+    return () => { active = false; };
+  }, [caseId, adapter]);
 
   if (state.kind === "loading") {
     return (
-      <section className="war-room" data-testid="war-room">
+      <section style={{ padding: '2rem' }} data-testid="war-room">
         <StateBlock locale={locale} kind="loading" />
       </section>
     );
   }
+  
   if (state.kind === "error") {
     return (
-      <section className="war-room" data-testid="war-room">
+      <section style={{ padding: '2rem' }} data-testid="war-room">
         <StateBlock locale={locale} kind="error" />
       </section>
     );
@@ -110,48 +80,58 @@ export function WarRoom({ caseId, locale }: { caseId: string; locale: "en" | "fr
   const { chronology, actors, gaps } = state.data;
 
   return (
-    <section className="war-room" data-testid="war-room">
-      <header className="war-room__header">
-        <h1>{translate(locale, "warroom.title")}</h1>
+    <section style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }} data-testid="war-room">
+      <header style={{ marginBottom: '2rem' }}>
+        <h1 style={{ fontSize: '2rem', fontWeight: 'bold' }}>{translate(locale, "warroom.title")}</h1>
         {chronology.truncated && (
-          <p className="war-room__warning" role="alert">
+          <p style={{ color: '#b45309', background: '#fef3c7', padding: '0.5rem', borderRadius: '4px', marginTop: '1rem' }} role="alert">
             {translate(locale, "warroom.truncated")}
           </p>
         )}
       </header>
 
-      <div className="war-room__grid">
-        <article
-          className="war-room__chronology"
-          data-testid="war-room-chronology"
-        >
-          <h2>{translate(locale, "warroom.chronology.title")}</h2>
-          <ol>
-            {chronology.dated_entries.map((entry) => (
-              <li key={entry.message_id}>
-                <time>{entry.date ?? ""}</time>
-                <span>
-                  {entry.from_address ?? "\u2014"} &rarr;{" "}
-                  {entry.to_address ?? "\u2014"}
-                </span>
-                <span>{entry.subject ?? ""}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+        <div style={{ padding: '1.5rem', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#fff' }}>
+          <h3 style={{ fontSize: '0.875rem', color: '#6b7280', textTransform: 'uppercase' }}>Total Messages</h3>
+          <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>{actors.total_messages}</p>
+        </div>
+        <div style={{ padding: '1.5rem', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#fff' }}>
+          <h3 style={{ fontSize: '0.875rem', color: '#6b7280', textTransform: 'uppercase' }}>Unique Actors</h3>
+          <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>{actors.unique_actors}</p>
+        </div>
+        <div style={{ padding: '1.5rem', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#fff' }}>
+          <h3 style={{ fontSize: '0.875rem', color: '#6b7280', textTransform: 'uppercase' }}>Open Gaps</h3>
+          <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>{gaps.total}</p>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+        <article style={{ background: '#fff', padding: '1.5rem', border: '1px solid #e5e7eb', borderRadius: '8px' }} data-testid="war-room-chronology">
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', borderBottom: '1px solid #e5e7eb', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+            {translate(locale, "warroom.chronology.title")}
+          </h2>
+          <ol style={{ paddingLeft: '1.5rem', margin: 0 }}>
+            {chronology.dated_entries.map((entry: ChronologyEntry) => (
+              <li key={entry.message_id} style={{ marginBottom: '1rem' }}>
+                <time style={{ color: '#6b7280', fontSize: '0.875rem', display: 'block' }}>{entry.date ?? ""}</time>
+                <span style={{ fontWeight: '500' }}>{entry.from_address ?? "\u2014"} &rarr; {entry.to_address ?? "\u2014"}</span>
+                <span style={{ display: 'block', color: '#374151' }}>{entry.subject ?? ""}</span>
               </li>
             ))}
           </ol>
           {chronology.undated_tray.length > 0 && (
-            <section
-              className="war-room__undated"
-              data-testid="war-room-undated"
-            >
-              <h3>{translate(locale, "warroom.undated.title")}</h3>
-              <ul>
-                {chronology.undated_tray.map((entry) => (
-                  <li key={entry.message_id}>
-                    <span>{entry.date_raw ?? "\u2014"}</span>
-                    <span>
-                      {entry.from_address ?? "\u2014"} &rarr;{" "}
-                      {entry.to_address ?? "\u2014"}
+            <section data-testid="war-room-undated" style={{ marginTop: '2rem' }}>
+              <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>
+                {translate(locale, "warroom.undated.title")}
+              </h3>
+              <ul style={{ paddingLeft: '1.5rem', margin: 0 }}>
+                {chronology.undated_tray.map((entry: ChronologyEntry) => (
+                  <li key={entry.message_id} style={{ marginBottom: '0.5rem' }}>
+                    <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                      {entry.date_raw ?? "\u2014"}
                     </span>
+                    {" — "}
+                    <span>{entry.from_address ?? "\u2014"} &rarr; {entry.to_address ?? "\u2014"}</span>
                   </li>
                 ))}
               </ul>
@@ -159,42 +139,49 @@ export function WarRoom({ caseId, locale }: { caseId: string; locale: "en" | "fr
           )}
         </article>
 
-        <article className="war-room__gaps" data-testid="war-room-gaps">
-          <h2>{translate(locale, "warroom.gaps.title")}</h2>
-          {gaps.gaps.length === 0 ? (
-            <p>{translate(locale, "warroom.gaps.empty")}</p>
-          ) : (
-            <ul>
-              {gaps.gaps.map((gap) => (
-                <li key={gap.id}>
-                  <strong>{gap.status}</strong> &mdash; {gap.description}
-                </li>
-              ))}
-            </ul>
-          )}
-        </article>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          <article style={{ background: '#fff', padding: '1.5rem', border: '1px solid #e5e7eb', borderRadius: '8px' }} data-testid="war-room-gaps">
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', borderBottom: '1px solid #e5e7eb', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+              {translate(locale, "warroom.gaps.title")}
+            </h2>
+            {gaps.gaps.length === 0 ? (
+              <p style={{ color: '#6b7280', fontStyle: 'italic' }}>{translate(locale, "warroom.gaps.empty")}</p>
+            ) : (
+              <ul style={{ paddingLeft: '1.5rem', margin: 0 }}>
+                {gaps.gaps.map((gap: GapItem) => (
+                  <li key={gap.id} style={{ marginBottom: '0.75rem' }}>
+                    <strong style={{ color: '#b45309', fontSize: '0.75rem', textTransform: 'uppercase' }}>{gap.status}</strong>
+                    <span style={{ display: 'block' }}>{gap.description}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
 
-        <article className="war-room__actors" data-testid="war-room-actors">
-          <h2>{translate(locale, "warroom.actors.title")}</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>{translate(locale, "warroom.actors.from")}</th>
-                <th>{translate(locale, "warroom.actors.to")}</th>
-                <th>{translate(locale, "warroom.actors.count")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {actors.edges.map((edge, i) => (
-                <tr key={`${edge.from_address}-${edge.to_address}-${i}`}>
-                  <td>{edge.from_address}</td>
-                  <td>{edge.to_address}</td>
-                  <td>{edge.count}</td>
+          <article style={{ background: '#fff', padding: '1.5rem', border: '1px solid #e5e7eb', borderRadius: '8px' }} data-testid="war-room-actors">
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', borderBottom: '1px solid #e5e7eb', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+              {translate(locale, "warroom.actors.title")}
+            </h2>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>
+                  <th style={{ paddingBottom: '0.5rem' }}>{translate(locale, "warroom.actors.from")}</th>
+                  <th style={{ paddingBottom: '0.5rem' }}>{translate(locale, "warroom.actors.to")}</th>
+                  <th style={{ paddingBottom: '0.5rem' }}>{translate(locale, "warroom.actors.count")}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </article>
+              </thead>
+              <tbody>
+                {actors.edges.map((edge: CommEdge, i: number) => (
+                  <tr key={`${edge.from_address}-${edge.to_address}-${i}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                    <td style={{ padding: '0.5rem 0' }}>{edge.from_address}</td>
+                    <td style={{ padding: '0.5rem 0' }}>{edge.to_address}</td>
+                    <td style={{ padding: '0.5rem 0' }}>{edge.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </article>
+        </div>
       </div>
     </section>
   );

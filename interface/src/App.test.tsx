@@ -20,13 +20,12 @@ describe("App session seam", () => {
     );
   });
 
-  it("renders the overview on its case navigation route", async () => {
+  it("renders the War Room on its case navigation route", async () => {
     window.location.hash = "#/cases/CASE-2024-018/overview";
     render(<App />);
 
-    expect(
-      await screen.findByRole("heading", { name: "Verification" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId("war-room")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(document.querySelector(".case-header")).toBeTruthy();
     expect(document.querySelector(".rail")).toBeTruthy();
   });

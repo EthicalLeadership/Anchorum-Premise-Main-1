@@ -85,3 +85,24 @@ export interface ShellBootstrap {
   permissions: ShellPermissions;
   routes: ShellRoutes;
 }
+
+export interface ChronologyEntry {
+  message_id: string;
+  date?: string | null;
+  date_raw?: string | null;
+  from_address?: string | null;
+  to_address?: string | null;
+  subject?: string | null;
+}
+
+export interface CommEdge {
+  from_address: string;
+  to_address: string;
+  count: number;
+}
+
+export interface GapItem {
+  id: string;
+  status: string;
+  description: string;
+}

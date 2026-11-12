@@ -1,6 +1,29 @@
 import { fixture } from "./fixtures/dupont-v-acme";
 
-import type { CaseSummary, SessionUser } from "./types";
+import type {
+  CaseSummary,
+  ChronologyEntry,
+  CommEdge,
+  GapItem,
+  SessionUser,
+} from "./types";
+
+export type ChronologyResponse = {
+  truncated: boolean;
+  dated_entries: readonly ChronologyEntry[];
+  undated_tray: readonly ChronologyEntry[];
+};
+
+export type ActorsResponse = {
+  total_messages: number;
+  unique_actors: number;
+  edges: readonly CommEdge[];
+};
+
+export type GapResponse = {
+  total: number;
+  gaps: readonly GapItem[];
+};
 
 export interface AdapterConfig {
   backend: { baseUrl: string } | null;
@@ -38,6 +61,7 @@ export type CustodyEntry = {
    *  unsigned, and the metadata block must say so rather than show a blank. */
   hmac?: string;
 };
+
 /**
  * What analysis did to an artifact's bytes, as the API reports it. This is the
  * real vocabulary, not a two-value approximation of it: `unsupported` means the
@@ -124,6 +148,7 @@ export type Evidence = {
    *  Optional because older fixtures and some statuses don't carry it. */
   sha256?: string;
 };
+
 /** The second-opinion document type the AI consultant returned, if any. */
 export type Consultation = {
   documentType: string;
@@ -773,9 +798,6 @@ export function createAdapter(config: AdapterConfig) {
               value: {
                 id: body.id,
                 hash: body.hash,
-                // The artifact hash the server bound to the record. Reported
-                // separately from `hash` so a reader can see they are the same
-                // value the pipeline stores as `source_sha256`.
                 sourceSha256: body.sourceSha256 ?? body.hash,
                 duplicate: Boolean(body.duplicate),
                 processingStatus: body.processingStatus,
@@ -795,8 +817,6 @@ export function createAdapter(config: AdapterConfig) {
         sessionEvidence.push({
           id,
           name: input.name,
-          // Offline mode stores the bytes and reads nothing, so "stored" is the
-          // truthful status. "indexed" claimed a step that never ran here.
           status: "stored",
           badges: ["received", "stored"],
           quarantinedReason: null,
@@ -913,14 +933,6 @@ export function createAdapter(config: AdapterConfig) {
         return Promise.resolve(failure("FEATURE_UNAVAILABLE"));
       },
 
-      /**
-       * The summary already stored for this item.
-       *
-       * Separate from `summarize` on purpose: opening the drawer again must not
-       * cost another model call, and a reader revisiting a summary is entitled
-       * to the one that is on record rather than a fresh, slightly different
-       * one.
-       */
       summary(id: string) {
         if (config.backend) {
           return requestJson<SummaryResult>(
@@ -989,13 +1001,6 @@ export function createAdapter(config: AdapterConfig) {
       },
     },
     anchoring: {
-      /**
-       * The case's published anchor, or the reason there is none.
-       *
-       * Answered offline too, because "this build has no zone configured" is a
-       * truthful state the reader can act on — unlike a proof, which cannot be
-       * computed here without inventing a claim about their case.
-       */
       get(caseId: string) {
         if (config.backend) {
           return requestJson<AnchorState>(
@@ -1033,13 +1038,6 @@ export function createAdapter(config: AdapterConfig) {
             : success<readonly AuditEntry[]>([]),
         );
       },
-      /**
-       * Re-derive every cryptographic claim the case makes.
-       *
-       * POST, and never answered offline: a proof computed from the sample
-       * fixture would be a proof about the sample, presented as if it were
-       * about the reader's case. There is no honest offline answer.
-       */
       verifyProofs(caseId: string) {
         if (config.backend) {
           return requestJson<ProofsReport>(
@@ -1086,6 +1084,15 @@ export function createAdapter(config: AdapterConfig) {
           ),
         );
       },
+    },
+    // ADDED/FIXED: Use requestJson so it targets the backend and respects auth/errors
+    board: {
+      chronology: (caseId: string) => 
+        requestJson<ChronologyResponse>(`/board/${encodeURIComponent(caseId)}/chronology`),
+      actors: (caseId: string) => 
+        requestJson<ActorsResponse>(`/board/${encodeURIComponent(caseId)}/actors`),
+      gaps: (caseId: string) => 
+        requestJson<GapResponse>(`/board/${encodeURIComponent(caseId)}/gaps`),
     },
   };
 }

@@ -2,7 +2,6 @@ import { AppShell } from "./components/AppShell";
 import { useEffect, useMemo, useState } from "react";
 import { createAdapter } from "./adapter";
 import { CaseList } from "./screens/CaseList";
-import { Overview } from "./screens/Overview";
 import { EvidenceIntake } from "./screens/EvidenceIntake";
 import { EmailIntake } from "./screens/EmailIntake";
 import { Search } from "./screens/Search";
@@ -180,9 +179,9 @@ export function App() {
       ) : path === "#/cases/new" ? (
         <CreateCase locale={locale} adapter={adapter} />
       ) : /^#\/cases\/[^/]+(?:\/overview)?$/.test(path) ? (
-        <Overview
-          locale={locale}
+        <WarRoom
           adapter={adapter}
+          locale={locale}
           caseId={decodeURIComponent(path.split("/")[2])}
         />
       ) : /^#\/cases\/[^/]+\/intake\/email$/.test(path) ? (
@@ -199,6 +198,7 @@ export function App() {
         />
       ) : /^#\/cases\/[^/]+\/warroom$/.test(path) ? (
         <WarRoom
+          adapter={adapter}
           locale={locale}
           caseId={decodeURIComponent(path.split("/")[2])}
         />
