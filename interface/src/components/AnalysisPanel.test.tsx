@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { AnalysisPanel } from "./AnalysisPanel";
 import type { AnalysisRecord } from "../types";
 
@@ -22,6 +22,8 @@ function makeAdapter(record: AnalysisRecord = baseRecord) {
 }
 
 describe("AnalysisPanel", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("fetches once on mount and renders scope rows", async () => {
     const adapter = makeAdapter();
     render(<AnalysisPanel evidenceId="E-1" adapter={adapter} />);
@@ -94,13 +96,14 @@ describe("AnalysisPanel", () => {
     expect(screen.getByText("weird_status")).toBeInTheDocument();
   });
 
-  it("re-analyse updates from POST response", async () => {
+  it("re-run updates from POST response", async () => {
     const adapter = makeAdapter();
     const updated: AnalysisRecord = { ...baseRecord, coverage: { ...baseRecord.coverage, scopesMatched: 2 } };
     adapter.evidence.analyse.mockResolvedValueOnce({ ok: true, value: updated });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<AnalysisPanel evidenceId="E-1" adapter={adapter} />);
     await waitFor(() => expect(screen.getByText(/FACTS/)).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: /re-analyse/i }));
+    fireEvent.click(screen.getByRole("button", { name: /re-run analysis/i }));
     await waitFor(() => expect(adapter.evidence.analyse).toHaveBeenCalledWith("E-1"));
     await waitFor(() => expect(screen.getByText(/2 of 8 scopes matched/)).toBeInTheDocument());
   });
@@ -116,5 +119,33 @@ describe("AnalysisPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /retry/i }));
     await waitFor(() => expect(screen.getByText(/FACTS/)).toBeInTheDocument());
     expect(adapter.evidence.analysis).toHaveBeenCalledTimes(2);
+  });
+
+  it("re-run requires confirmation - cancel blocks the destructive action", async () => {
+    const adapter = makeAdapter();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<AnalysisPanel evidenceId="E-1" adapter={adapter} />);
+    await waitFor(() => expect(screen.getByText(/FACTS/)).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /re-run analysis/i }));
+    await waitFor(() => expect(confirmSpy).toHaveBeenCalledTimes(1));
+    expect(confirmSpy.mock.calls[0][0]).toMatch(/replaces the current analysis record/i);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(adapter.evidence.analyse).not.toHaveBeenCalled();
+  });
+
+  it("renders the legal disclaimer", async () => {
+    const { container } = render(<AnalysisPanel evidenceId="E-1" adapter={makeAdapter()} />);
+    await waitFor(() => expect(screen.getByText(/FACTS/)).toBeInTheDocument());
+    expect(container.textContent).toMatch(/not a legal opinion/i);
+    expect(container.textContent).toMatch(/not a court/i);
+  });
+
+  it("surfaces extract.error", async () => {
+    const rec: AnalysisRecord = {
+      ...baseRecord,
+      extract: { ...baseRecord.extract, error: "PdfTextError: no text layer" },
+    };
+    const { container } = render(<AnalysisPanel evidenceId="E-1" adapter={makeAdapter(rec)} />);
+    await waitFor(() => expect(container.textContent).toMatch(/no text layer/i));
   });
 });
