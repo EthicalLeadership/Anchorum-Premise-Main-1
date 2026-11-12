@@ -22,6 +22,7 @@ type Load =
 export function AnalysisPanel({ evidenceId, adapter }: Props) {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [rerunning, setRerunning] = useState(false);
+  const [replacedAt, setReplacedAt] = useState<string | null>(null);
   const alive = useRef(true);
 
   useEffect(() => {
@@ -48,6 +49,7 @@ export function AnalysisPanel({ evidenceId, adapter }: Props) {
 
   const rerun = useCallback(async () => {
     setRerunning(true);
+    setReplacedAt(new Date().toISOString());
     try {
       const res = await adapter.evidence.analyse(evidenceId);
       if (!alive.current) return;
@@ -82,13 +84,30 @@ export function AnalysisPanel({ evidenceId, adapter }: Props) {
 
   return (
     <section className="analysis-panel" aria-labelledby="analysis-heading">
+      {replacedAt && (
+        <div role="status" style={{ background: "#fff3cd", padding: "10px", marginBottom: "15px", borderLeft: "4px solid #ffc107" }}>
+          <strong>Warning:</strong> Analysis replaced at {replacedAt}. Prior analysis not retained.
+        </div>
+      )}
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1rem" }}>
         <h2 id="analysis-heading" style={{ margin: 0, fontSize: "1.25rem" }}>Analysis</h2>
-        <button type="button" onClick={() => void rerun()} disabled={rerunning}>
-          {rerunning ? "Re-analysing\u2026" : "Re-analyse"}
+        <button
+          type="button"
+          onClick={() => {
+            if (window.confirm("WARNING: Re-analysis replaces the current analysis record. The prior record will not be retained. This may destroy evidence supporting your prior filings. Continue?")) {
+              void rerun();
+            }
+          }}
+          disabled={rerunning}
+        >
+          {rerunning ? "Re-analysing\u2026" : "Re-run analysis (replaces current)"}
         </button>
       </header>
       <StatusBlock record={load.record} />
+      <footer className="legal-disclaimer" style={{ borderTop: '1px solid #ccc', marginTop: '2rem', paddingTop: '1rem', fontSize: '0.8rem', color: '#555' }}>
+        <strong>This is an automated analysis of the artifact, not a legal opinion.</strong>{" "}
+        "Not admissible" is the engine's output, not a court's determination. Verify against the source before relying on it.
+      </footer>
     </section>
   );
 }
@@ -143,6 +162,11 @@ function ProcessedView({ record }: { record: AnalysisRecord }) {
 
   return (
     <>
+      {extract.error && (
+        <div role="alert" style={{ color: "#721c24", padding: "10px", marginBottom: "15px", background: "#f8d7da", borderRadius: "4px" }}>
+          <strong>Extraction Warning:</strong> {extract.error}
+        </div>
+      )}
       {hasWarning && (
         <div role="alert">
           <p><strong>Lexicon coverage warning:</strong> {coverage.warning}</p>
@@ -171,6 +195,11 @@ function ProcessedView({ record }: { record: AnalysisRecord }) {
           <code>{projection.lexiconHash.slice(0, 16)}{"\u2026"}</code>
         </dd>
       </dl>
+      <div style={{ marginTop: "15px", padding: "10px", background: "#f8f9fa", borderRadius: "4px", fontSize: "0.8rem", color: "#555" }}>
+        <div><strong>Full source SHA-256:</strong> <code style={{ wordBreak: "break-all" }}>{source.sha256}</code></div>
+        <div><strong>Full extract SHA-256:</strong> <code style={{ wordBreak: "break-all" }}>{extract.sha256}</code></div>
+        <div><strong>Config hash:</strong> <code style={{ wordBreak: "break-all" }}>{projection.configHash}</code></div>
+      </div>
       <h3 style={{ marginTop: "1.5rem" }}>Scopes</h3>
       {scopes.length === 0 ? (
         <p>No scopes were segmented from the extracted text.</p>
@@ -179,6 +208,9 @@ function ProcessedView({ record }: { record: AnalysisRecord }) {
           {scopes.map((s, i) => (
             <li key={`${s.scope}-${i}`} style={{ marginBottom: "0.5rem" }}>
               <strong>{s.scope}</strong>{" \u00b7 "}{s.chars} chars{" \u00b7 "}{s.classification}
+              <span style={{ marginLeft: "8px", padding: "2px 8px", borderRadius: "4px", fontSize: "0.75rem", backgroundColor: s.admissible ? "#d4edda" : "#f8d7da", color: s.admissible ? "#155724" : "#721c24" }}>
+                {s.admissible ? "Admissible" : "NOT ADMISSIBLE"}
+              </span>
               {s.matchedConcepts.length > 0 && (
                 <>{" \u00b7 "}matched: {s.matchedConcepts.join(", ")}</>
               )}
