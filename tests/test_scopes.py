@@ -12,6 +12,7 @@ import pytest
 from interface.scopes import (
     CITATION,
     DISTILLED_RULES,
+    DOCUMENT,
     FACTS,
     HOLDING,
     ISSUE,
@@ -133,3 +134,67 @@ def test_benchmark_brief_segments_into_eight_irac_scopes(monkeypatch):
             f"{scope.name}: {scope.chars} != {BENCHMARK_CHARS[scope.name]}"
         )
     assert sum(scope.chars for scope in scopes) == sum(BENCHMARK_CHARS.values())
+
+
+# --- the heading stage ----------------------------------------------------
+#
+# The brief segments through the cue table because its extract is a single line
+# with no headings. A document that carries its own headings must segment by
+# them instead, and must do so ahead of the cue table: these documents also
+# contain cue phrases, so a regression that reordered the stages would show up
+# as ISSUE and REASONING scopes appearing where FACTS and HOLDING were declared.
+
+HEADED_DOCUMENT = """Memorandum
+
+## Facts
+The Court gave careful attention to the record.
+
+## Holding
+Whether it binds is now settled.
+"""
+
+
+def test_headings_segment_a_headed_document_before_the_cue_table():
+    scopes = split_scopes(HEADED_DOCUMENT)
+    assert [scope.name for scope in scopes] == [DOCUMENT, FACTS, HOLDING]
+
+
+def test_heading_scopes_cover_the_source_without_gaps_or_overlap():
+    scopes = split_scopes(HEADED_DOCUMENT)
+    assert scopes[0].start == 0
+    assert scopes[-1].end == len(HEADED_DOCUMENT)
+    for earlier, later in zip(scopes, scopes[1:]):
+        assert earlier.end == later.start
+    for scope in scopes:
+        assert HEADED_DOCUMENT[scope.start : scope.end] == scope.text
+
+
+def test_text_before_the_first_heading_is_kept_as_a_document_scope():
+    scopes = split_scopes(HEADED_DOCUMENT)
+    assert scopes[0].name == DOCUMENT
+    assert scopes[0].text.strip() == "Memorandum"
+
+
+def test_uppercase_label_headings_are_honoured():
+    text = "FACTS:\nMurray collected rubbish.\n\nISSUE:\nWhether it binds.\n"
+    scopes = split_scopes(text)
+    assert [scope.name for scope in scopes] == [FACTS, ISSUE]
+
+
+def test_one_recognised_heading_is_not_enough_to_segment_on():
+    text = "## Facts\nA block of prose.\n\nAnother block of prose.\n"
+    scopes = split_scopes(text)
+    assert [scope.name for scope in scopes] == ["DOCUMENT_1", "DOCUMENT_2"]
+
+
+def test_headings_that_name_no_scope_invent_no_scope():
+    text = "# Introduction\nOne block.\n\n# Notes\nAnother block.\n"
+    scopes = split_scopes(text)
+    assert [scope.name for scope in scopes] == ["DOCUMENT_1", "DOCUMENT_2"]
+
+
+def test_a_repeated_heading_does_not_duplicate_the_scope():
+    text = "## Facts\nOne.\n\n## Facts\nTwo.\n\n## Holding\nThree.\n"
+    scopes = split_scopes(text)
+    assert [scope.name for scope in scopes] == [FACTS, HOLDING]
+    assert "Two." in scopes[0].text
