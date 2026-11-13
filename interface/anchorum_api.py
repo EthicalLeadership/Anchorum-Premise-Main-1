@@ -38,6 +38,7 @@ from sqlalchemy.engine import make_url
 from dossier_enforcement.gates import TransactionGate
 from dossier_pipeline.schema import AuditLog, Case, Document, JurisdictionStamp, User, init_schema
 from dossier_pipeline.barreau_gate import BarreauGate, BarreauGateError
+from interface.ledger.snapshot import build_snapshot
 from dossier_pipeline.evidence import (
     CustodyAction,
     EvidenceSigner,
@@ -3306,6 +3307,36 @@ def create_app(
             "files": results,
             "summary": counts,
         }
+
+    def _snapshot_builder_for_case(case_id: str):
+        """Build a LedgerSnapshot for a case from its email messages."""
+        from interface.collect.email_threads.db import EmailMessage
+
+        db = db_sessions()
+        try:
+            msgs = (
+                db.query(EmailMessage)
+                .filter(EmailMessage.case_id == case_id)
+                .order_by(EmailMessage.sent_at.asc())
+                .all()
+            )
+            messages = [
+                {
+                    "message_id": m.id,
+                    "content_hash": m.content_hash or "",
+                    "sent_at": m.sent_at.isoformat() if m.sent_at else None,
+                }
+                for m in msgs
+            ]
+            return build_snapshot(
+                case_id=case_id,
+                as_of_utc=datetime.now(timezone.utc),
+                messages=messages,
+            )
+        finally:
+            db.close()
+
+    app.state.snapshot_builder = _snapshot_builder_for_case
 
     return app
 

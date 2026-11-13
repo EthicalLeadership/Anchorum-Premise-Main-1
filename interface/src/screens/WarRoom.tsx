@@ -25,6 +25,9 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
     | { kind: "error" }
   >({ kind: "loading" });
 
+  const [anchorStatus, setAnchorStatus] = useState<string | null>(null);
+  const [anchorLoading, setAnchorLoading] = useState(false);
+
   useEffect(() => {
     let active = true;
     setState({ kind: "loading" });
@@ -79,7 +82,40 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
   return (
     <section style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }} data-testid="war-room">
       <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 'bold' }}>{translate(locale, "warroom.title")}</h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+          <h1 style={{ fontSize: "2rem", fontWeight: "bold", margin: 0 }}>{translate(locale, "warroom.title")}</h1>
+          <div className="card" style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "16px" }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: "11px", color: "var(--text-muted)", letterSpacing: "0.08em" }}>BITCOIN INTEGRITY PROOF</h3>
+              <p style={{ margin: "4px 0 0 0", fontSize: "13px", fontFamily: "var(--font-sans)" }}>
+                {anchorStatus ? anchorStatus : "Not yet anchored"}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={anchorLoading}
+              onClick={async () => {
+                setAnchorLoading(true);
+                try {
+                  const res = await fetch(`/ledger/snapshots/${encodeURIComponent(caseId)}/anchor`, { method: "POST" });
+                  if (res.ok) {
+                    setAnchorStatus("Pending confirmation");
+                  } else {
+                    const err = await res.json().catch(() => ({}));
+                    setAnchorStatus(err.detail || `Failed (${res.status})`);
+                  }
+                } catch {
+                  setAnchorStatus("Error: backend unreachable");
+                } finally {
+                  setAnchorLoading(false);
+                }
+              }}
+            >
+              {anchorLoading ? "Stamping..." : "Anchor to Bitcoin"}
+            </button>
+          </div>
+        </div>
         {chronology.truncated && (
           <p style={{ color: '#b45309', background: '#fef3c7', padding: '0.5rem', borderRadius: '4px', marginTop: '1rem' }} role="alert">
             {translate(locale, "warroom.truncated")}
