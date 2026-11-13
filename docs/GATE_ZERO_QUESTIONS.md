@@ -69,7 +69,9 @@ relevant items. Do not let an implementation agent invent answers.
 - [ ] **H-9 — Production migration execution.** Owner: Operations Owner.
 - [ ] **H-10 — Named Security Owner and threat-model sign-off.** Owner: Product + Security Owners. **Same blocker as G0-6.**
 - [ ] **H-11 — Export/decision enablement after pen test and policy.** Owner: Product + Security + Legal.
+
 - [ ] **H-12 — Incident-response and rollback authority.** Owner: Operations + Security.
+
 ## C. Views by owner
 
 An item under more than one owner is not decided until **every** listed owner has
