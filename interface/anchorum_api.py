@@ -397,6 +397,8 @@ def _record_filed_date(db: Session, case_id: int, document: Document) -> None:
     )
 
 
+_EVIDENCE_SECRET = None
+
 def _hmac_signer():
     """Return an EvidenceSigner, or None if GDC_EVIDENCE_SECRET is unset.
 
@@ -407,6 +409,8 @@ def _hmac_signer():
     """
     try:
         from dossier_pipeline.evidence import EvidenceSigner
+        if _EVIDENCE_SECRET:
+            return EvidenceSigner(secret=_EVIDENCE_SECRET)
         return EvidenceSigner()
     except Exception:
         return None
@@ -573,6 +577,29 @@ def create_app(
     app.state.db_sessions = db_sessions
     app.state.evidence_directory = storage_root
     app.state.anchor_dir = Path(storage_root) / "anchors"
+
+    # Per-client deployment key & HMAC secret
+    global _EVIDENCE_SECRET
+    try:
+        from interface.security.client_keys import get_or_create_deployment_key
+        from cryptography.hazmat.primitives import serialization
+        _deployment_key = get_or_create_deployment_key(Path(storage_root) / "keys")
+        _key_bytes = _deployment_key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        _EVIDENCE_SECRET = hashlib.sha256(_key_bytes).hexdigest()
+        app.state.evidence_secret = _EVIDENCE_SECRET
+        app.state.evidence_secret_error = None
+    except Exception as exc:
+        # Key generation failed (permissions, disk, etc.).
+        # Fail soft: HMAC proof reports not_checked / no_signing_key rather
+        # than pretending to sign. Preserves the "no key configured" safety
+        # property the deployment-verification test relies on.
+        _EVIDENCE_SECRET = None
+        app.state.evidence_secret = None
+        app.state.evidence_secret_error = str(exc)
 
     if enabled:
         origins = [

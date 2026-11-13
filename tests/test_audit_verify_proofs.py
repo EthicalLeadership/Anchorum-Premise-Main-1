@@ -53,7 +53,18 @@ def test_verify_proofs_reports_each_proof(tmp_path, monkeypatch):
     # This deployment holds no signing secret, which is the state that must be
     # reported rather than glossed: "we signed it" and "we had no key" are not
     # the same sentence.
+    #
+    # With per-client key generation in place, the only way to reach the
+    # "no secret" state is for key generation itself to fail. Force that.
     monkeypatch.delenv("GDC_EVIDENCE_SECRET", raising=False)
+
+    def _fail_keygen(*a, **kw):
+        raise OSError("simulated: cannot write key directory")
+
+    monkeypatch.setattr(
+        "interface.security.client_keys.get_or_create_deployment_key",
+        _fail_keygen,
+    )
     with TestClient(_app(tmp_path)) as client:
         _new_case(client)
         client.post(

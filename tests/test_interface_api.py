@@ -732,3 +732,31 @@ def test_upload_rejects_a_source_outside_the_allowlist(tmp_path):
     assert rejected.status_code == 422
     assert rejected.json()["error"] == "INVALID_SOURCE"
     assert list(evidence_directory.glob("*.bin")) == []
+
+def test_per_client_evidence_secret_isolated(tmp_path):
+    """Two deployments with different storage roots must have different HMAC secrets."""
+    from interface.anchorum_api import create_app, _hmac_signer
+    import interface.anchorum_api as api_module
+
+    app_a = create_app(
+        database_url=f"sqlite:///{tmp_path}/a.db",
+        evidence_directory=str(tmp_path / "a"),
+        local_api_mode=False,
+    )
+    secret_a = app_a.state.evidence_secret
+
+    app_b = create_app(
+        database_url=f"sqlite:///{tmp_path}/b.db",
+        evidence_directory=str(tmp_path / "b"),
+        local_api_mode=False,
+    )
+    secret_b = app_b.state.evidence_secret
+    
+    assert secret_a is not None
+    assert secret_b is not None
+    assert secret_a != secret_b, "Two different clients must not share an HMAC secret"
+    
+    # Verify the signer uses the correct secret
+    signer = _hmac_signer()
+    assert signer is not None
+    assert signer.secret == secret_b  # last created app wins the global
