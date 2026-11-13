@@ -68,8 +68,8 @@ Host: a request whose `Host` header is not in the allowed set is rejected with 4
 Origin: a state-changing request (POST, PUT, PATCH, DELETE) whose `Origin` is outside the allowed set is rejected with 403. A state-changing request carrying no `Origin` must present `x-anchorum-key` equal to the deployment key, else 401.
 Routes: any request under `/board/`, `/ledger/` or `/cases/` must present that key, else 401.
 **Tests:** `tests/test_auth.py`
-**Evidence:** `git show 73df171:<file>`
-**Status:** PARTIAL. All three checks exist and pass. But `AuthMiddleware` skips the Host and Origin checks whenever `PYTEST_CURRENT_TEST` is present in the environment, so a deployment that can set the server's environment disables them without a code change — which is the opposite of "unconditional". COVERED when that seam is removed and a test asserts enforcement *with* the variable set.
+**Evidence:** `git show 73df171:<file>` (introduced), `git show d1acd58:<file>` (bypass removed)
+**Status:** COVERED. All three checks exist and pass. The earlier `PYTEST_CURRENT_TEST` bypass was removed in commit `d1acd58`: enforcement is now controlled by a `require_auth` parameter on `create_app` (default `True`), stored on `app.state.require_auth`. No environment variable can disable it. `tests/test_auth.py::test_require_auth_true_ignores_pytest_env` asserts enforcement *with* the old bypass variable set — that is the regression test for the defect described in the original caveat, which is preserved as errata in `TRACEABILITY_MATRIX.md`.
 
 ## CR-11 — Verification and rollout
 

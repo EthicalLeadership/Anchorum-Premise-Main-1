@@ -147,6 +147,8 @@ One caveat, recorded in §8: the shipped middleware skips the Host and Origin ch
 when `PYTEST_CURRENT_TEST` is set, so the baseline is unconditional in intent and
 conditional in implementation until that seam is removed.
 
+**Errata (2026-11-13, commit d1acd58):** the `PYTEST_CURRENT_TEST` bypass described above has been removed. Enforcement is a `require_auth` parameter on `create_app` (default `True`), with no environment variable that can disable it. Regression test: `tests/test_auth.py::test_require_auth_true_ignores_pytest_env`.
+
 **What CR-12 cannot do.** It cannot decide whether a document is privileged. That is
 a human judgement recorded as a flag; the control enforces default-deny on documents
 carrying it. Where classification is wrong, the system faithfully protects the wrong
@@ -210,5 +212,7 @@ Also decided, and still carrying obligations that are open:
   moves to COVERED when the environment seam is removed.
 - **The detection requirement in §2 has no owner or workstream.** Until it does,
   Option A is a statement of intent rather than a control.
+
+**Errata (2026-11-13, commit d1acd58):** the `PYTEST_CURRENT_TEST` bypass described above has been removed. Enforcement is a `require_auth` parameter on `create_app` (default `True`), with no environment variable that can disable it. Regression test: `tests/test_auth.py::test_require_auth_true_ignores_pytest_env`.
 
 No workstream may proceed until CR-0 is signed.
