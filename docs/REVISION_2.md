@@ -62,6 +62,15 @@ the bottom as BLOCKED. This is honest backlog, not an oversight.
 **Evidence:** `git show 46bb8ad:<file>`
 **Status:** COVERED.
 
+### CR-10.6 — Authentication baseline (unconditional)
+**Requirement:** Every request is authenticated, and no deployment mode disables this. Loopback is not a credential.
+Host: a request whose `Host` header is not in the allowed set is rejected with 400.
+Origin: a state-changing request (POST, PUT, PATCH, DELETE) whose `Origin` is outside the allowed set is rejected with 403. A state-changing request carrying no `Origin` must present `x-anchorum-key` equal to the deployment key, else 401.
+Routes: any request under `/board/`, `/ledger/` or `/cases/` must present that key, else 401.
+**Tests:** `tests/test_auth.py`
+**Evidence:** `git show 73df171:<file>`
+**Status:** PARTIAL. All three checks exist and pass. But `AuthMiddleware` skips the Host and Origin checks whenever `PYTEST_CURRENT_TEST` is present in the environment, so a deployment that can set the server's environment disables them without a code change — which is the opposite of "unconditional". COVERED when that seam is removed and a test asserts enforcement *with* the variable set.
+
 ## CR-11 — Verification and rollout
 
 ### CR-11.1 — OpenTimestamps stamping
@@ -110,13 +119,13 @@ the bottom as BLOCKED. This is honest backlog, not an oversight.
 **Evidence:** `git show 7737b30:<file>`
 **Status:** COVERED.
 
-## Not yet defined — BLOCKED (88 of 102 items)
+## Not yet defined - BLOCKED (87 of 102 items)
 
 The following CR items have no requirement definition. They will be marked `BLOCKED — requirement not yet defined` in the matrix.
 
 - **CR-0** (4 items): CR-0.1, CR-0.2, CR-0.3, CR-0.4
 - **CR-1** (4 items): CR-1.7, CR-1.8, CR-1.9, CR-1.10
-- **CR-10** (9 items): CR-10.1, CR-10.2, CR-10.4, CR-10.5, CR-10.6, CR-10.7, CR-10.8, CR-10.9, CR-10.10
+- **CR-10** (8 items): CR-10.1, CR-10.2, CR-10.4, CR-10.5, CR-10.7, CR-10.8, CR-10.9, CR-10.10
 - **CR-11** (4 items): CR-11.4, CR-11.5, CR-11.6, CR-11.7
 - **CR-12** (6 items): CR-12.1, CR-12.2, CR-12.3, CR-12.4, CR-12.5, CR-12.6
 - **CR-2** (8 items): CR-2.1, CR-2.2, CR-2.3, CR-2.4, CR-2.5, CR-2.6, CR-2.7, CR-2.8

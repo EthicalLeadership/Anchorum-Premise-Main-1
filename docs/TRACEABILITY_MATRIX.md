@@ -14,10 +14,11 @@ there is no independent review.
   requirement is. Nothing can be covered by a requirement nobody has written.
 - **BLOCKED — reason** — the requirement is defined or implied but no test covers it.
 
-`REVISION_2.md` currently defines fourteen requirements (CR-1.1–1.6, CR-3.1, CR-3.2,
-CR-6.1, CR-6.2, CR-10.3, CR-11.1–11.3). The other eighty-eight IDs in this matrix are
-**reserved placeholders**, not requirements: the numbering came from the workstream
-structure, and a row is only marked covered once its requirement text exists.
+`REVISION_2.md` currently defines fifteen requirements (CR-1.1–1.6, CR-3.1, CR-3.2,
+CR-6.1, CR-6.2, CR-10.3, CR-10.6, CR-11.1–11.3). The other eighty-seven IDs in this
+matrix are **reserved placeholders**, not requirements: the numbering came from the
+workstream structure, and a row is only marked covered once its requirement text
+exists.
 
 | Requirement ID | Workstream | File | Test Name | Evidence Location | Enforcement Point | Status |
 |---|---|---|---|---|---|---|
@@ -105,7 +106,7 @@ structure, and a row is only marked covered once its requirement text exists.
 | CR-10.3 | CR-10 Security and integrity | tests/test_ledger_signing.py | test_sign_verify_roundtrip, test_verify_wrong_key, test_verify_malformed_signature | commit 46bb8ad | Ed25519 signer | Covered |
 | CR-10.4 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
 | CR-10.5 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
-| CR-10.6 | CR-10 Security and integrity | tests/test_auth.py | test_rejects_invalid_host, test_rejects_invalid_origin_on_post, test_requires_api_key_on_api_routes, test_accepts_valid_api_key, test_allows_browser_origin_on_post | commit 73df171 | `interface/security/auth.py::AuthMiddleware`, installed in `create_app` | Covered — with the bypass caveat at the end of this document |
+| CR-10.6 | CR-10 Security and integrity | tests/test_auth.py | test_rejects_invalid_host, test_rejects_invalid_origin_on_post, test_requires_api_key_on_api_routes, test_accepts_valid_api_key, test_allows_browser_origin_on_post | commit 73df171 | `interface/security/auth.py::AuthMiddleware`, installed in `create_app` | PARTIAL — requirement defined (REVISION_2.md CR-10.6); the checks pass, but enforcement is disabled whenever `PYTEST_CURRENT_TEST` is set (caveat at the end of this document) |
 | CR-10.7 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
 | CR-10.8 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
 | CR-10.9 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
