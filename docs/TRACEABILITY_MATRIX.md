@@ -105,7 +105,7 @@ structure, and a row is only marked covered once its requirement text exists.
 | CR-10.3 | CR-10 Security and integrity | tests/test_ledger_signing.py | test_sign_verify_roundtrip, test_verify_wrong_key, test_verify_malformed_signature | commit 46bb8ad | Ed25519 signer | Covered |
 | CR-10.4 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
 | CR-10.5 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
-| CR-10.6 | CR-10 Security and integrity | tests/test_auth.py | test_auth.py::test_requires_api_key_on_api_routes | commit HEAD | AuthMiddleware | Covered |
+| CR-10.6 | CR-10 Security and integrity | tests/test_auth.py | test_rejects_invalid_host, test_rejects_invalid_origin_on_post, test_requires_api_key_on_api_routes, test_accepts_valid_api_key, test_allows_browser_origin_on_post | commit 73df171 | `interface/security/auth.py::AuthMiddleware`, installed in `create_app` | Covered — with the bypass caveat at the end of this document |
 | CR-10.7 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
 | CR-10.8 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
 | CR-10.9 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
@@ -136,5 +136,23 @@ nobody has written.
 
 The tests named above exist, are collected, and pass: 156 passed across the eleven
 files cited (`tests/test_ledger_*.py`, `tests/test_client_keys.py`,
-`tests/test_war_room_*.py`). Any row that cannot be checked that way is marked
+`tests/test_war_room_*.py`), and 16 across `tests/test_auth.py` and
+`tests/test_auth_secret_policy.py`. Any row that cannot be checked that way is marked
 BLOCKED rather than Covered.
+
+## Caveat: the CR-10.6 baseline is conditional on an environment variable
+
+`AuthMiddleware` begins `is_test = "PYTEST_CURRENT_TEST" in os.environ` and skips the
+Host and Origin checks when that is true. The tests handle this correctly — each one
+calls `monkeypatch.delenv("PYTEST_CURRENT_TEST")` so the real path executes, which is
+why they are evidence at all.
+
+The weakness is in the shipped code, not the tests: the control that the threat model
+calls **unconditional** is switched off by an environment variable. Anyone who can
+set the environment of the server process — a wrapper script, a `.env` file, a
+launchd or systemd unit, a CI runner — disables Host and Origin enforcement without
+touching the code and without leaving a code diff. It is a legitimate test seam that
+was left reachable in production, which is the ordinary way a control becomes
+optional. A build-time constant, an explicit injectable setting defaulted off, or
+detecting the test runner in the test fixture rather than in the middleware would
+close it. Not fixed here: this document is evidence, and Gate Zero authorises no code.

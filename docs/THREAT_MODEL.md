@@ -143,6 +143,10 @@ see; the baseline controls are for what it cannot. Host and Origin are checked, 
 is never wildcard, CSRF tokens protect state-changing routes, and the application
 authenticates its own users rather than trusting the OS session.
 
+One caveat, recorded in §8: the shipped middleware skips the Host and Origin checks
+when `PYTEST_CURRENT_TEST` is set, so the baseline is unconditional in intent and
+conditional in implementation until that seam is removed.
+
 **What CR-12 cannot do.** It cannot decide whether a document is privileged. That is
 a human judgement recorded as a flag; the control enforces default-deny on documents
 carrying it. Where classification is wrong, the system faithfully protects the wrong
@@ -176,7 +180,8 @@ Recorded:
   per user required, shared account unsupported and refused at runtime.
 - **Option B** — rejected 2026-11-12, retained in §2 as the analysed fallback.
 
-Still open and blocking:
+
+Also decided, and still carrying obligations that are open:
 
 - **G0-6 — DECIDED 2026-11-12.** Security Owner: **Samuel Tessier**. He is also the
   sole author, owner, and developer; there is no independent security review for v1.
@@ -188,8 +193,20 @@ Still open and blocking:
 - **G0-3 — privilege, PII, retention.** Now the next control that matters: with OS
   separation restored, retention and redaction bound exposure when authentication is
   defeated.
-- **Control matrix review.** The traceability matrix must be signed with this model
-  and is still entirely `Uncovered`.
+- **Control matrix review.** The matrix is signed alongside this model. Of its 102
+  reserved IDs, 15 are covered by named passing tests and 86 have no requirement
+  text yet.
+- **CR-10.6 is implemented, and its enforcement is conditional on an environment
+  variable.** `interface/security/auth.py` checks Host and Origin and requires an
+  API key for non-browser clients (commit `73df171`), and the behaviour is covered by
+  named tests in `tests/test_auth.py`. But the middleware skips the Host and Origin
+  checks whenever `PYTEST_CURRENT_TEST` is set, so a deployment that can set the
+  server's environment can disable the baseline without changing code. §6 calls this
+  control unconditional; it is unconditional in intent and conditional in
+  implementation. Closing it — a build-time constant, or moving the test seam into
+  the fixture — is a code change, and Gate Zero authorises none.
+- **CR-10.6 has no requirement text in `REVISION_2.md`.** The control exists in code
+  and in this model, but not in the plan the matrix is signed against.
 - **The detection requirement in §2 has no owner or workstream.** Until it does,
   Option A is a statement of intent rather than a control.
 
