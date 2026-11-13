@@ -88,7 +88,7 @@
 | CR-10.3 | CR-10 Security and integrity | tests/test_ledger_signing.py | (see REVISION_2.md) | commit 46bb8ad | | Covered |
 | CR-10.4 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
 | CR-10.5 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
-| CR-10.6 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
+| CR-10.6 | CR-10 Security and integrity | tests/test_client_keys.py | tests/test_client_keys.py::test_generates_key_if_missing | commit HEAD | | Covered |
 | CR-10.7 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
 | CR-10.8 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
 | CR-10.9 | CR-10 Security and integrity | | | | | BLOCKED — requirement not yet defined |
