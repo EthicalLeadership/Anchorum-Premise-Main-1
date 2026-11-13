@@ -1,0 +1,312 @@
+/* === EDITORIAL THEME (LAST IN CASCADE) === */
+/* =========================================
+   ANCHORUM EDITORIAL THEME (Dark SaaS)
+   ========================================= */
+:root {
+  --bg: #0a0a0a;
+  --bg-panel: #141414;
+  --text: #ffffff;
+  --text-muted: #a0a0a0;
+  --accent: #ff6b6b; /* Coral Orange */
+  --accent-hover: #ff5252;
+  --border: #2a2a2a;
+  --spacing: 32px;
+  --font-sans: 'Inter', -apple-system, sans-serif;
+  --font-serif: 'Playfair Display', 'Georgia', serif;
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
+  font-family: var(--font-sans);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+/* Buttons */
+.btn, button {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn:hover {
+  border-color: var(--text);
+}
+.btn--primary {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  font-weight: 600;
+}
+.btn--primary:hover {
+  background: var(--accent-hover);
+}
+
+/* 12-Column Grid */
+.grid-12 {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--spacing);
+  padding: var(--spacing);
+}
+.col-span-4 { grid-column: span 4; }
+.col-span-6 { grid-column: span 6; }
+.col-span-12 { grid-column: span 12; }
+
+@media (max-width: 1024px) {
+  .col-span-4 { grid-column: span 6; }
+}
+@media (max-width: 768px) {
+  .col-span-4, .col-span-6 { grid-column: span 12; }
+}
+
+/* Sidebar / Rail */
+.shell__body {
+  display: flex;
+}
+.rail {
+  width: 240px;
+  border-right: 1px solid var(--border);
+  min-height: calc(100vh - 60px);
+  transition: width 0.3s ease;
+  background: var(--bg-panel);
+}
+.rail--collapsed {
+  width: 0;
+  overflow: hidden;
+  border-right: none;
+}
+.shell__main {
+  flex: 1;
+  padding: var(--spacing);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Topbar */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px var(--spacing);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.topbar a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* Cards */
+.card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+}
+.card h3 {
+  margin-top: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-family: var(--font-sans);
+}
+.card p {
+  font-size: 32px;
+  margin: 8px 0 0 0;
+  font-family: var(--font-serif);
+}
+
+/* Command Palette */
+.cmd-palette-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 20vh;
+  z-index: 9999;
+}
+.cmd-palette {
+  width: 600px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+.cmd-palette input {
+  width: 100%;
+  padding: 16px 24px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 18px;
+  outline: none;
+}
+.cmd-palette ul {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.cmd-palette li {
+  padding: 12px 24px;
+  cursor: pointer;
+}
+.cmd-palette li:hover, .cmd-palette li.active {
+  background: var(--accent);
+  color: #000;
+}
+
+
+/* =========================================
+   SAFER SCOPED OVERRIDES (Fixing Sign-In)
+   ========================================= */
+
+/* Only apply the dark canvas to the main app shell, not forms */
+
+
+.shell, .shell__body, .shell__main {
+    background-color: var(--bg) !important;
+    color: var(--text) !important;
+}
+
+/* Tables specifically */
+table {
+    background: transparent !important;
+    color: var(--text) !important;
+}
+th, td {
+    border-bottom: 1px solid var(--border) !important;
+    color: var(--text) !important;
+}
+
+/* Specific inputs (only in the main shell) */
+.shell__main input, .shell__main select, .shell__main textarea {
+    background-color: var(--bg-panel) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+}
+
+/* Specific buttons (only in the main shell, excluding primary) */
+.shell__main button:not(.btn--primary) {
+    background-color: transparent !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+}
+
+/* Primary Buttons */
+.btn--primary {
+    background-color: var(--accent) !important;
+    color: #000 !important;
+    border: none !important;
+    font-weight: 600 !important;
+}
+
+/* Fix the Continue banner */
+.case-list__continue, .continue-banner, [class*="continue"] {
+    background-color: var(--bg-panel) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+}
+
+/* Dropdown menus */
+.menu, .menu-root > div, [role="menu"] {
+    background-color: var(--bg-panel) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+}
+.menu a, [role="menu"] a {
+    color: var(--text) !important;
+}
+
+
+/* =========================================
+   SAFER SCOPED OVERRIDES (Fixing Sign-In)
+   ========================================= */
+
+/* Only apply the dark canvas to the main app shell, not forms */
+
+
+.shell, .shell__body, .shell__main {
+    background-color: var(--bg) !important;
+    color: var(--text) !important;
+}
+
+/* Tables specifically */
+table {
+    background: transparent !important;
+    color: var(--text) !important;
+}
+th, td {
+    border-bottom: 1px solid var(--border) !important;
+    color: var(--text) !important;
+}
+
+/* Specific inputs (only in the main shell) */
+.shell__main input, .shell__main select, .shell__main textarea {
+    background-color: var(--bg-panel) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+}
+
+/* Specific buttons (only in the main shell, excluding primary) */
+.shell__main button:not(.btn--primary) {
+    background-color: transparent !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+}
+
+/* Primary Buttons */
+.btn--primary {
+    background-color: var(--accent) !important;
+    color: #000 !important;
+    border: none !important;
+    font-weight: 600 !important;
+}
+
+/* Fix the Continue banner */
+.case-list__continue, .continue-banner, [class*="continue"] {
+    background-color: var(--bg-panel) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+}
+
+/* Dropdown menus */
+.menu, .menu-root > div, [role="menu"] {
+    background-color: var(--bg-panel) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+}
+.menu a, [role="menu"] a {
+    color: var(--text) !important;
+}
+
+
+/* Ensure sign-in page is readable */
+.login-container, .auth-form, .register-form, form {
+    background-color: #ffffff !important;
+    color: #0a0a0a !important;
+}
+.login-container input, .auth-form input, .register-form input {
+    background-color: #f5f5f5 !important;
+    color: #0a0a0a !important;
+    border: 1px solid #ccc !important;
+}

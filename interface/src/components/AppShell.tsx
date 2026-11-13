@@ -12,6 +12,7 @@ import {
   type MessageKey,
   type MessageParameters,
 } from "../i18n";
+import { CommandPalette } from "./CommandPalette";
 import type {
   CaseSection,
   CustodyEntry,
@@ -143,6 +144,7 @@ export function AppShell({
   onVerify,
 }: AppShellProps) {
   const [openMenu, setOpenMenu] = useState<"case" | "user" | null>(null);
+  const [railOpen, setRailOpen] = useState(true);
   const [selectedItem, setSelectedItem] = useState<DrawerObject | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(
@@ -245,12 +247,14 @@ export function AppShell({
 
   return (
     <div className="shell">
+      <CommandPalette />
       <a className="skip-link" href="#main">
         {t("a11y.skip_to_main")}
       </a>
 
       <header className="topbar">
         <div className="topbar__identity">
+          <button onClick={() => setRailOpen(!railOpen)} className="btn" style={{ marginRight: "16px", padding: "4px 8px" }}>☰</button>
           <a className="topbar__wordmark" href={routes.globalSection("workspace")}>
             Anchorum
           </a>
@@ -396,7 +400,7 @@ export function AppShell({
 
       <div className="shell__body">
         {activeCase && (
-          <nav className="rail" aria-label={t("nav.case_nav")}>
+          <nav className={`rail ${railOpen ? "" : "rail--collapsed"}`} aria-label={t("nav.case_nav")}>
             <ul className="rail__list">
               {sections.map((section) =>
                 RAIL_BY_ROLE[session.role].includes(section) &&

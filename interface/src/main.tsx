@@ -17,6 +17,7 @@ import "./styles/audit-exports.css";
 import "./styles/markdown.css";
 import "./styles/saul-summary.css";
 import "./styles/email-intake.css";
+import "./styles/theme-editorial.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
