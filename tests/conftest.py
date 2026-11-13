@@ -73,3 +73,28 @@ def _wipe_test_output():
     wipe()
     yield
     wipe()
+
+"""Test harness: wrap create_app to disable auth by default.
+
+AuthMiddleware reads app.state.require_auth, set by create_app. Most tests do
+not want to know about API keys and Host/Origin checks, so this conftest wraps
+create_app before any test module imports it and injects require_auth=False.
+
+Tests that DO test auth pass require_auth=True explicitly, which overrides the
+wrapper's setdefault (because the kwarg is already present).
+
+This file only loads under pytest. A production deploy that does not run pytest
+cannot reach this wrapper, which is the point: enforcement is a code decision,
+not an environment variable.
+"""
+import interface.anchorum_api as _api
+
+_original_create_app = _api.create_app
+
+
+def _test_create_app(*args, **kwargs):
+    kwargs.setdefault("require_auth", False)
+    return _original_create_app(*args, **kwargs)
+
+
+_api.create_app = _test_create_app

@@ -9,6 +9,7 @@ def app(tmp_path):
         database_url=f"sqlite:///{tmp_path}/test.db",
         evidence_directory=str(tmp_path / "evidence"),
         local_api_mode=True,
+        require_auth=True,  # auth tests need the real enforcement path
     )
 
 def test_rejects_invalid_host(app, monkeypatch):
@@ -87,3 +88,39 @@ def test_merge_env_adds_without_replacing(monkeypatch):
     monkeypatch.setenv("TEST_MERGE_VAR", "a, b , c")
     result = _merge_env("TEST_MERGE_VAR", frozenset({"x"}))
     assert result == frozenset({"x", "a", "b", "c"})
+
+
+def test_require_auth_true_ignores_pytest_env(tmp_path, monkeypatch):
+    """require_auth=True enforces Host/Origin regardless of any env var.
+
+    This is the test that would have failed before the fix: the old code
+    read PYTEST_CURRENT_TEST from the environment and skipped all checks when
+    it was set. Now require_auth is a parameter, not an env var, so no
+    environment setting can disable enforcement.
+    """
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "true")
+    app = create_app(
+        database_url=f"sqlite:///{tmp_path}/test.db",
+        evidence_directory=str(tmp_path / "evidence"),
+        local_api_mode=True,
+        require_auth=True,  # explicit — overrides the conftest wrapper
+    )
+    client = TestClient(app)
+    r = client.get("/board/1/actors", headers={"Host": "evil.example.com"})
+    assert r.status_code == 400
+    assert r.json()["error"] == "INVALID_HOST"
+
+
+def test_require_auth_true_rejects_missing_api_key(tmp_path, monkeypatch):
+    """require_auth=True enforces the API key on API routes regardless of env."""
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "true")
+    app = create_app(
+        database_url=f"sqlite:///{tmp_path}/test.db",
+        evidence_directory=str(tmp_path / "evidence"),
+        local_api_mode=True,
+        require_auth=True,
+    )
+    client = TestClient(app)
+    r = client.get("/board/1/actors")
+    assert r.status_code == 401
+    assert r.json()["error"] == "UNAUTHORIZED"

@@ -531,6 +531,7 @@ def create_app(
     *,
     local_api_mode: bool | None = None,
     evidence_directory: str | Path | None = None,
+    require_auth: bool = True,
 ) -> FastAPI:
     """Build the local/test app; API operations are disabled unless opted in."""
     enabled = _local_mode_enabled() if local_api_mode is None else local_api_mode
@@ -582,6 +583,7 @@ def create_app(
     app.state.api_key = get_or_create_api_key(Path(storage_root) / "keys")
     app.state.evidence_directory = storage_root
     app.state.anchor_dir = Path(storage_root) / "anchors"
+    app.state.require_auth = require_auth
 
     # Per-client deployment key & HMAC secret
     global _EVIDENCE_SECRET
