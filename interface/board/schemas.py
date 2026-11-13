@@ -6,6 +6,7 @@ class GapItem(BaseModel):
     id: str
     description: str
     status: str
+    severity: str = "medium"
     referenced_in_message_id: Optional[str] = None
     created_at: Optional[datetime] = None
 

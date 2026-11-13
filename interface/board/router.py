@@ -19,27 +19,41 @@ def _safe_extract_addrs(raw: str) -> list[str]:
 
 board_router = APIRouter(prefix="/board", tags=["board"])
 
+from dossier_pipeline.war_room.uncertainty import KnowledgeGap, GapSeverity
+
 @board_router.get("/{case_id}/gaps", response_model=GapResponse)
 def get_gaps(case_id: str, db: Session = Depends(get_db)):
-    gaps = (
+    rows = (
         db.query(ExpectedSource)
         .filter(ExpectedSource.case_id == case_id)
         .order_by(ExpectedSource.created_at.desc())
         .all()
     )
+    
+    gaps = []
+    for r in rows:
+        # Bridge to the new engine's model
+        kg = KnowledgeGap(
+            id=r.id,
+            case_id=r.case_id,
+            description=r.description,
+            severity=GapSeverity.MEDIUM # Default if not stored in DB
+        )
+        gaps.append(
+            GapItem(
+                id=kg.id,
+                description=kg.description,
+                status=r.status,
+                severity=kg.severity.value,
+                referenced_in_message_id=r.referenced_in_message_id,
+                created_at=r.created_at,
+            )
+        )
+        
     return GapResponse(
         case_id=case_id,
         total=len(gaps),
-        gaps=[
-            GapItem(
-                id=g.id,
-                description=g.description,
-                status=g.status,
-                referenced_in_message_id=g.referenced_in_message_id,
-                created_at=g.created_at,
-            )
-            for g in gaps
-        ],
+        gaps=gaps,
     )
 
 @board_router.get("/{case_id}/actors", response_model=ActorsResponse)

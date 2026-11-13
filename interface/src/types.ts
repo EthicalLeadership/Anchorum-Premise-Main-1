@@ -105,6 +105,7 @@ export interface GapItem {
   id: string;
   status: string;
   description: string;
+  severity: string;
 }
 
 export interface Finding {

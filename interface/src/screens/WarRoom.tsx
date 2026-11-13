@@ -150,7 +150,7 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
                 {gaps.gaps.map((gap: GapItem) => (
                   <li key={gap.id} style={{ marginBottom: '0.75rem' }}>
                     <strong style={{ color: '#b45309', fontSize: '0.75rem', textTransform: 'uppercase' }}>{gap.status}</strong>
-                    <span style={{ display: 'block' }}>{gap.description}</span>
+                    <span style={{ display: 'block' }}><><strong>[{gap.severity}]</strong> {gap.description}</></span>
                   </li>
                 ))}
               </ul>
