@@ -46,3 +46,44 @@ def test_allows_browser_origin_on_post(app, monkeypatch):
     # Allowed origin bypasses API key for CSRF-safety
     r = client.post("/cases", headers={"Origin": "http://localhost:5173"})
     assert r.status_code not in (401, 403)
+
+
+def test_health_is_exempt_from_auth(app, monkeypatch):
+    """A load balancer or probe must reach /health with no credential."""
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    client = TestClient(app)
+    r = client.get("/health")
+    assert r.status_code == 200
+
+
+def test_health_is_exempt_even_from_unlisted_host(app, monkeypatch):
+    """Probes often connect by IP or container name; /health must still answer."""
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    client = TestClient(app)
+    r = client.get("/health", headers={"Host": "lb.internal:8080"})
+    assert r.status_code == 200
+
+
+def test_unlisted_host_still_rejected(app, monkeypatch):
+    """Extending the allowlist must not weaken the default denial."""
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    client = TestClient(app)
+    r = client.get("/board/1/actors", headers={"Host": "evil.example.com"})
+    assert r.status_code == 400
+    assert r.json()["error"] == "INVALID_HOST"
+
+
+def test_merge_env_empty(monkeypatch):
+    """With no env var, merge returns the defaults unchanged."""
+    from interface.security.auth import _merge_env
+    monkeypatch.delenv("TEST_MERGE_VAR", raising=False)
+    result = _merge_env("TEST_MERGE_VAR", frozenset({"x", "y"}))
+    assert result == frozenset({"x", "y"})
+
+
+def test_merge_env_adds_without_replacing(monkeypatch):
+    """Env var entries are appended, not substituted for defaults."""
+    from interface.security.auth import _merge_env
+    monkeypatch.setenv("TEST_MERGE_VAR", "a, b , c")
+    result = _merge_env("TEST_MERGE_VAR", frozenset({"x"}))
+    assert result == frozenset({"x", "a", "b", "c"})
