@@ -25,8 +25,14 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
     | { kind: "error" }
   >({ kind: "loading" });
 
-  const [anchorStatus, setAnchorStatus] = useState<string | null>(null);
-  const [anchorLoading, setAnchorLoading] = useState(false);
+  const [anchorState, setAnchorState] = useState<
+    | { kind: "unknown" }
+    | { kind: "not_anchored" }
+    | { kind: "stamping" }
+    | { kind: "pending" }
+    | { kind: "confirmed"; block: number; attestedAt: string | null }
+    | { kind: "failed"; reason: string }
+  >({ kind: "unknown" });
 
   useEffect(() => {
     let active = true;
@@ -61,6 +67,70 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
     return () => { active = false; };
   }, [caseId, adapter]);
 
+  // Load current anchor status on mount.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/ledger/snapshots/${encodeURIComponent(caseId)}/anchor/verify`,
+        );
+        if (!active) return;
+        if (res.status === 404) {
+          setAnchorState({ kind: "not_anchored" });
+          return;
+        }
+        if (!res.ok) {
+          setAnchorState({ kind: "failed", reason: `HTTP ${res.status}` });
+          return;
+        }
+        const body = await res.json();
+        if (body.status === "confirmed" && typeof body.bitcoin_block === "number") {
+          setAnchorState({
+            kind: "confirmed",
+            block: body.bitcoin_block,
+            attestedAt: body.attested_at ?? null,
+          });
+        } else if (body.status === "pending") {
+          setAnchorState({ kind: "pending" });
+        } else {
+          setAnchorState({ kind: "failed", reason: body.status || "unknown" });
+        }
+      } catch {
+        if (active) setAnchorState({ kind: "not_anchored" });
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [caseId]);
+
+  // Poll verification while a proof is pending.
+  useEffect(() => {
+    if (anchorState.kind !== "pending") return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `/ledger/snapshots/${encodeURIComponent(caseId)}/anchor/verify`,
+        );
+        if (!res.ok) return;
+        const body = await res.json();
+        if (body.status === "confirmed" && typeof body.bitcoin_block === "number") {
+          setAnchorState({
+            kind: "confirmed",
+            block: body.bitcoin_block,
+            attestedAt: body.attested_at ?? null,
+          });
+        } else if (body.status === "failed") {
+          setAnchorState({ kind: "failed", reason: "verify_failed" });
+        }
+      } catch {
+        // network blip: keep polling
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [anchorState.kind, caseId]);
+
   if (state.kind === "loading") {
     return (
       <section style={{ padding: '2rem' }} data-testid="war-room">
@@ -88,32 +158,44 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
             <div>
               <h3 style={{ margin: 0, fontSize: "11px", color: "var(--text-muted)", letterSpacing: "0.08em" }}>BITCOIN INTEGRITY PROOF</h3>
               <p style={{ margin: "4px 0 0 0", fontSize: "13px", fontFamily: "var(--font-sans)" }}>
-                {anchorStatus ? anchorStatus : "Not yet anchored"}
+                {anchorState.kind === "unknown" && "Checking…"}
+                {anchorState.kind === "not_anchored" && "Not yet anchored"}
+                {anchorState.kind === "stamping" && "Stamping…"}
+                {anchorState.kind === "pending" && "Pending confirmation (Bitcoin block every ~10 min)"}
+                {anchorState.kind === "confirmed" && (
+                  <>Confirmed: Bitcoin block {anchorState.block}{anchorState.attestedAt ? ` · ${anchorState.attestedAt}` : ""}</>
+                )}
+                {anchorState.kind === "failed" && <>Failed: {anchorState.reason}</>}
               </p>
             </div>
-            <button
-              type="button"
-              className="btn btn--primary"
-              disabled={anchorLoading}
-              onClick={async () => {
-                setAnchorLoading(true);
-                try {
-                  const res = await fetch(`/ledger/snapshots/${encodeURIComponent(caseId)}/anchor`, { method: "POST" });
-                  if (res.ok) {
-                    setAnchorStatus("Pending confirmation");
-                  } else {
-                    const err = await res.json().catch(() => ({}));
-                    setAnchorStatus(err.detail || `Failed (${res.status})`);
+            {(anchorState.kind === "not_anchored" || anchorState.kind === "failed") && (
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={async () => {
+                  setAnchorState({ kind: "stamping" });
+                  try {
+                    const res = await fetch(
+                      `/ledger/snapshots/${encodeURIComponent(caseId)}/anchor`,
+                      { method: "POST" },
+                    );
+                    if (res.ok) {
+                      setAnchorState({ kind: "pending" });
+                    } else {
+                      const err = await res.json().catch(() => ({}));
+                      setAnchorState({
+                        kind: "failed",
+                        reason: err.detail || `HTTP ${res.status}`,
+                      });
+                    }
+                  } catch {
+                    setAnchorState({ kind: "failed", reason: "Backend unreachable" });
                   }
-                } catch {
-                  setAnchorStatus("Error: backend unreachable");
-                } finally {
-                  setAnchorLoading(false);
-                }
-              }}
-            >
-              {anchorLoading ? "Stamping..." : "Anchor to Bitcoin"}
-            </button>
+                }}
+              >
+                Anchor to Bitcoin
+              </button>
+            )}
           </div>
         </div>
         {chronology.truncated && (

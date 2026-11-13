@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { createAdapter } from "../adapter";
 import type { Finding } from "../types";
 import { WarRoom } from "./WarRoom";
@@ -73,6 +73,30 @@ function mockAdapter(failed = false) {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+beforeEach(() => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes("/anchor/verify")) {
+        return Promise.resolve({
+          ok: false,
+          status: 404,
+          json: () => Promise.resolve({ detail: "not found" }),
+        } as unknown as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      } as unknown as Response);
+    }),
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("WarRoom", () => {
