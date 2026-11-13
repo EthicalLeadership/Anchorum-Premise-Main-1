@@ -53,7 +53,7 @@
   "case.create.title": "Créer un dossier",
   "case.create.field.title": "Titre",
   "case.create.field.key": "Clé du dossier",
-  "case.create.field.key_help": "Unique; validée sur le serveur.",
+  "case.create.field.key_help": "Le numéro de dossier ou de référence interne de votre cabinet. Tout format utilisé par votre pratique. Doit être unique dans cet espace de travail ; apparaît dans tous les exports et dossiers d'audit.",
   "case.create.field.jurisdiction": "Juridiction",
   "case.create.field.matter_type": "Type de dossier",
   "case.create.field.timezone": "Fuseau horaire",

@@ -53,7 +53,7 @@
   "case.create.title": "Create case",
   "case.create.field.title": "Title",
   "case.create.field.key": "Case key",
-  "case.create.field.key_help": "Unique; validated on the server.",
+  "case.create.field.key_help": "Your firm's internal matter number or file reference. Any format your practice uses. Must be unique within this workspace; appears in all exports and audit records.",
   "case.create.field.jurisdiction": "Jurisdiction",
   "case.create.field.matter_type": "Matter type",
   "case.create.field.timezone": "Timezone",
