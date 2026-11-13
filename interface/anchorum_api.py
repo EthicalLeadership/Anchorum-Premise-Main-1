@@ -48,6 +48,8 @@ from interface import analysis as analysis_service
 from interface import anchoring
 from interface import malware_scan
 from interface import preflight, proofs
+from interface.security.client_keys import get_or_create_deployment_key, get_or_create_api_key
+from interface.security.auth import AuthMiddleware
 from interface.collect.email_threads import email_router
 from interface.board import board_router
 from interface.analysis import analyse
@@ -569,19 +571,21 @@ def create_app(
         ),
         lifespan=lifespan,
     )
+    app.add_middleware(AuthMiddleware)
     app.include_router(email_router)
     app.include_router(board_router)
     app.include_router(ledger_anchor_router)
     app.state.local_api_mode = enabled
     app.state.database_engine = engine
     app.state.db_sessions = db_sessions
+    app.state.api_key = get_or_create_api_key(Path(storage_root) / "keys")
     app.state.evidence_directory = storage_root
     app.state.anchor_dir = Path(storage_root) / "anchors"
 
     # Per-client deployment key & HMAC secret
     global _EVIDENCE_SECRET
     try:
-        from interface.security.client_keys import get_or_create_deployment_key
+
         from cryptography.hazmat.primitives import serialization
         _deployment_key = get_or_create_deployment_key(Path(storage_root) / "keys")
         _key_bytes = _deployment_key.private_bytes(
@@ -592,14 +596,13 @@ def create_app(
         _EVIDENCE_SECRET = hashlib.sha256(_key_bytes).hexdigest()
         app.state.evidence_secret = _EVIDENCE_SECRET
         app.state.evidence_secret_error = None
+        app.state.api_key = get_or_create_api_key(Path(storage_root) / "keys")
     except Exception as exc:
         # Key generation failed (permissions, disk, etc.).
-        # Fail soft: HMAC proof reports not_checked / no_signing_key rather
-        # than pretending to sign. Preserves the "no key configured" safety
-        # property the deployment-verification test relies on.
         _EVIDENCE_SECRET = None
         app.state.evidence_secret = None
         app.state.evidence_secret_error = str(exc)
+        app.state.api_key = None
 
     if enabled:
         origins = [
@@ -3312,6 +3315,7 @@ app = create_app()
 # --- EMAIL INGESTION ROUTER ---
 try:
     from interface.collect.email_threads.router import router as email_router
+    app.add_middleware(AuthMiddleware)
     app.include_router(email_router)
     app.include_router(board_router)
 except ImportError:

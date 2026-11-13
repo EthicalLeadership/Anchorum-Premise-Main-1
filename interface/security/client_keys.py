@@ -51,3 +51,17 @@ def get_or_create_deployment_key(key_dir: Path) -> Ed25519PrivateKey:
     os.chmod(pub_path, stat.S_IRUSR | stat.S_IWUSR)
     
     return private_key
+
+
+def get_or_create_api_key(key_dir: Path) -> str:
+    """Generate or load a per-client API key for request authentication."""
+    key_path = key_dir / "api_key.txt"
+    if key_path.exists():
+        return key_path.read_text().strip()
+    
+    import secrets
+    api_key = secrets.token_urlsafe(32)
+    _ensure_dir(key_dir)
+    key_path.write_text(api_key)
+    os.chmod(key_path, stat.S_IRUSR | stat.S_IWUSR)  # 0600
+    return api_key

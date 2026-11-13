@@ -62,7 +62,7 @@ def test_verify_proofs_reports_each_proof(tmp_path, monkeypatch):
         raise OSError("simulated: cannot write key directory")
 
     monkeypatch.setattr(
-        "interface.security.client_keys.get_or_create_deployment_key",
+        "interface.anchorum_api.get_or_create_deployment_key",
         _fail_keygen,
     )
     with TestClient(_app(tmp_path)) as client:
