@@ -15,8 +15,9 @@ there is no independent review.
 - **BLOCKED — reason** — the requirement is defined or implied but no test covers it.
 
 `REVISION_2.md` currently defines fifteen requirements (CR-1.1–1.6, CR-3.1, CR-3.2,
-CR-6.1, CR-6.2, CR-10.3, CR-10.6, CR-11.1–11.3). The other eighty-seven IDs in this
-matrix are **reserved placeholders**, not requirements: the numbering came from the
+CR-6.1, CR-6.2, CR-10.3, CR-10.6, CR-11.1–11.3). The remaining eighty-seven IDs
+have no requirement text in `REVISION_2.md`: eighty-six are reserved placeholders
+and CR-0.1 is covered by the threat model itself. The numbering came from the
 workstream structure, and a row is only marked covered once its requirement text
 exists.
 

@@ -119,11 +119,11 @@ Routes: any request under `/board/`, `/ledger/` or `/cases/` must present that k
 **Evidence:** `git show 7737b30:<file>`
 **Status:** COVERED.
 
-## Not yet defined - BLOCKED (87 of 102 items)
+## Not yet defined - BLOCKED (86 of 102 items)
 
 The following CR items have no requirement definition. They will be marked `BLOCKED — requirement not yet defined` in the matrix.
 
-- **CR-0** (4 items): CR-0.1, CR-0.2, CR-0.3, CR-0.4
+- **CR-0** (3 items): CR-0.2, CR-0.3, CR-0.4
 - **CR-1** (4 items): CR-1.7, CR-1.8, CR-1.9, CR-1.10
 - **CR-10** (8 items): CR-10.1, CR-10.2, CR-10.4, CR-10.5, CR-10.7, CR-10.8, CR-10.9, CR-10.10
 - **CR-11** (4 items): CR-11.4, CR-11.5, CR-11.6, CR-11.7

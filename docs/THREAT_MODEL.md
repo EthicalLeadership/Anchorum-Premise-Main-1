@@ -196,7 +196,7 @@ Also decided, and still carrying obligations that are open:
   separation restored, retention and redaction bound exposure when authentication is
   defeated.
 - **Control matrix review.** The matrix is signed alongside this model. Of its 102
-  reserved IDs, 14 are covered by named passing tests, 1 is PARTIAL (CR-10.6), and 87 have no requirement
+  reserved IDs, 15 are covered by named passing tests (plus CR-0.1, covered by this document), and 86 have no requirement
   text yet.
 - **CR-10.6 is implemented, and its enforcement is conditional on an environment
   variable.** `interface/security/auth.py` checks Host and Origin and requires an
@@ -207,9 +207,10 @@ Also decided, and still carrying obligations that are open:
   control unconditional; it is unconditional in intent and conditional in
   implementation. Closing it — a build-time constant, or moving the test seam into
   the fixture — is a code change, and Gate Zero authorises none.
-- **CR-10.6's requirement now exists** (`REVISION_2.md` CR-10.6, status PARTIAL), so
-  the bypass is a recorded gap in the signed plan rather than an implicit one. It
-  moves to COVERED when the environment seam is removed.
+- **CR-10.6's requirement exists and is scored COVERED** (`REVISION_2.md` CR-10.6).
+  The environment seam was removed in `d1acd58`, and a regression test asserts
+  enforcement with the old variable set. The gap is closed in code and recorded in
+  the signed plan.
 - **The detection requirement in §2 has no owner or workstream.** Until it does,
   Option A is a statement of intent rather than a control.
 
