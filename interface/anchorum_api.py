@@ -525,6 +525,7 @@ def _record_pipeline_custody(document: Document, *, case_id: int) -> None:
 
 
 from interface.ledger.anchor_router import router as ledger_anchor_router
+from interface.ledger.timestamp_router import router as ledger_timestamp_router
 
 def create_app(
     database_url: str | None = None,
@@ -577,12 +578,17 @@ def create_app(
     app.include_router(email_router)
     app.include_router(board_router)
     app.include_router(ledger_anchor_router)
+    app.include_router(ledger_timestamp_router)
     app.state.local_api_mode = enabled
     app.state.database_engine = engine
     app.state.db_sessions = db_sessions
     app.state.api_key = get_or_create_api_key(Path(storage_root) / "keys")
     app.state.evidence_directory = storage_root
     app.state.anchor_dir = Path(storage_root) / "anchors"
+    # Local RFC 3161 Trust Engine (air-gapped). Certificates live in tsa/,
+    # responses in timestamps/<case id>/.
+    app.state.tsa_dir = Path(storage_root) / "tsa"
+    app.state.timestamp_dir = Path(storage_root) / "timestamps"
     app.state.require_auth = require_auth
 
     # Per-client deployment key & HMAC secret
@@ -2586,6 +2592,25 @@ def create_app(
                     # Use the original filename inside the zip, prefixed with the document key to avoid collisions
                     arcname = f"evidence/{doc.document_key}_{doc.filename}"
                     zf.write(path, arcname)
+
+            # Trust material. A .tsr does not embed its signer certificate, so
+            # an archive without these two files hands the recipient a
+            # timestamp they cannot verify — which defeats the export. Only
+            # written when a TSA is actually provisioned, so an installation
+            # without one ships nothing rather than broken instructions.
+            from interface.ledger.tsa_export import (
+                README_ARCNAME,
+                collect_tsa_artifacts,
+                verification_readme,
+            )
+
+            trust_artifacts = collect_tsa_artifacts(
+                storage_root, (case.case_key, str(case.id))
+            )
+            if trust_artifacts:
+                for trust_arcname, trust_source in trust_artifacts.items():
+                    zf.write(trust_source, trust_arcname)
+                zf.writestr(README_ARCNAME, verification_readme())
 
         buffer.seek(0)
         
