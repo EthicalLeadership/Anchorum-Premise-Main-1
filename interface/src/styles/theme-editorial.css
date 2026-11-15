@@ -3,13 +3,13 @@
    ANCHORUM EDITORIAL THEME (Dark SaaS)
    ========================================= */
 :root {
-  --bg: #0a0a0a;
-  --bg-panel: #141414;
-  --text: #ffffff;
-  --text-muted: #a0a0a0;
-  --accent: #ff6b6b; /* Coral Orange */
+  --bg: #F8F9FA;
+  --bg-panel: #FFFFFF;
+  --text: #1A1A1A;
+  --text-muted: #6B7280;
+  --accent: #1E3A8A; /* Coral Orange */
   --accent-hover: #ff5252;
-  --border: #2a2a2a;
+  --border: #E5E7EB;
   --spacing: 32px;
   --font-sans: 'Inter', -apple-system, sans-serif;
   --font-serif: 'Playfair Display', 'Georgia', serif;
