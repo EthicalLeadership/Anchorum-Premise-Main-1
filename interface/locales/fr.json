@@ -57,7 +57,7 @@
   "case.create.field.jurisdiction": "Juridiction",
   "case.create.field.matter_type": "Type de dossier",
   "case.create.field.timezone": "Fuseau horaire",
-  "case.create.field.description": "Description",
+  "case.create.field.description": "Brief Summary",
   "case.create.field.members": "Membres",
   "case.create.action.create": "Créer le dossier",
   "case.create.action.cancel": "Annuler",
