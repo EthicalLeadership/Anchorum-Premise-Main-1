@@ -588,6 +588,15 @@ def create_app(
     # Local RFC 3161 Trust Engine (air-gapped). Certificates live in tsa/,
     # responses in timestamps/<case id>/.
     app.state.tsa_dir = Path(storage_root) / "tsa"
+    # §F: TSA signing pair must be unique per deployment. Fail at boot
+    # rather than on the first stamp attempt if it has been copied.
+    try:
+        from interface.ledger.timestamp import claim_tsa_owner
+        claim_tsa_owner(app.state.tsa_dir, Path(storage_root))
+    except Exception as exc:
+        import sys
+        print(f"FATAL: TSA ownership check failed: {exc}", file=sys.stderr)
+        raise
     app.state.timestamp_dir = Path(storage_root) / "timestamps"
     app.state.require_auth = require_auth
 
