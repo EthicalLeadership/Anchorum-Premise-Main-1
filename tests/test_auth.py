@@ -19,6 +19,44 @@ def test_rejects_invalid_host(app, monkeypatch):
     assert r.status_code == 400
     assert r.json()["error"] == "INVALID_HOST"
 
+def test_accepts_loopback_on_any_port(app, monkeypatch):
+    """A dev server on an unlisted port is not an attack.
+
+    Vite falls back to 5174 when 5173 is taken, and uvicorn is often started on
+    a port nobody wrote down. Pinning ports turned that into a 400 that read
+    like a broken route. The Host check exists to block a rebound DNS *name*,
+    and a rebound name is never `localhost`.
+    """
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    client = TestClient(app)
+    for host in ("localhost:5174", "127.0.0.1:8099", "[::1]:9000", "localhost"):
+        r = client.get("/session", headers={"Host": host})
+        assert r.status_code == 200, (host, r.status_code, r.text)
+
+
+def test_rejects_non_loopback_name_even_on_an_allowed_port(app, monkeypatch):
+    """The control must still bite: a name we do not control is refused."""
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    client = TestClient(app)
+    r = client.get("/session", headers={"Host": "attacker.example:8000"})
+    assert r.status_code == 400
+    assert r.json()["error"] == "INVALID_HOST"
+
+
+def test_rejects_loopback_lookalikes_and_malformed_ports(app, monkeypatch):
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    client = TestClient(app)
+    for host in (
+        "localhost.evil.com:8000",
+        "notlocalhost:5173",
+        "localhost:notaport",
+        "127.0.0.1.evil.com:5173",
+    ):
+        r = client.get("/session", headers={"Host": host})
+        assert r.status_code == 400, host
+        assert r.json()["error"] == "INVALID_HOST"
+
+
 def test_rejects_invalid_origin_on_post(app, monkeypatch):
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     client = TestClient(app)

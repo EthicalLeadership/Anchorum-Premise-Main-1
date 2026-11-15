@@ -14,8 +14,9 @@ when pytest runs — a production deploy that does not run pytest cannot reach
 it.
 
 Deployment-time configuration:
-    ANCHORUM_ALLOWED_HOSTS    comma-separated host[:port] additions
-                              (default set: localhost/127.0.0.1 on 8000 & 5173, testserver)
+    ANCHORUM_ALLOWED_HOSTS    comma-separated host[:port] additions.
+                              Always allowed without configuration: any port on
+                              localhost, 127.0.0.1 and [::1], plus `testserver`.
     ANCHORUM_ALLOWED_ORIGINS  comma-separated scheme://host[:port] additions
                               (default set: localhost/127.0.0.1 on 5173 & 8000)
 
@@ -45,6 +46,41 @@ _DEFAULT_HOSTS = frozenset({
 })
 ALLOWED_HOSTS = _merge_env("ANCHORUM_ALLOWED_HOSTS", _DEFAULT_HOSTS)
 
+#: Names that mean "this machine". A Host of any of these is accepted on any
+#: port, because the port is not what the check protects against: a DNS
+#: rebinding attack reaches loopback under an attacker-controlled *name*, never
+#: under `localhost`. Pinning ports only rejected ordinary development — a Vite
+#: server that fell back to 5174, or uvicorn started on 8080 — with a 400 that
+#: looked like a broken route.
+_LOOPBACK_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1", "[::1]"})
+
+
+def _split_host(host: str) -> tuple[str, str]:
+    """Split `host[:port]`, keeping a bracketed IPv6 literal intact."""
+    if host.startswith("["):
+        hostname, _, rest = host.partition("]")
+        return f"{hostname}]", rest.lstrip(":")
+    hostname, _, port = host.partition(":")
+    return hostname, port
+
+
+def is_allowed_host(host: str) -> bool:
+    """Whether a Host header may reach the application.
+
+    Two ways in: the configured allowlist, or a loopback name on a valid port.
+    """
+    if not host:
+        return False
+    if host in ALLOWED_HOSTS:
+        return True
+    hostname, port = _split_host(host)
+    if hostname not in _LOOPBACK_HOSTNAMES:
+        return False
+    if not port:
+        # No port: the default port for the scheme, which is still loopback.
+        return True
+    return port.isdigit() and 0 < int(port) < 65536
+
 _DEFAULT_ORIGINS = frozenset({
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -67,7 +103,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         # 1. Host check
         host = request.headers.get("host", "").lower()
-        if host not in ALLOWED_HOSTS:
+        if not is_allowed_host(host):
             return JSONResponse({"error": "INVALID_HOST"}, status_code=400)
 
         # 2. Origin / CSRF check on state-changing methods
