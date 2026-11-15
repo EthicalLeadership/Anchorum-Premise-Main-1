@@ -35,6 +35,18 @@ def _make_client(anchor_dir: Path, builder=None):
     return TestClient(app)
 
 
+def test_anchor_is_disabled_by_default_and_points_at_the_local_tsa(tmp_path):
+    """Air-gapped is the default, so OTS must say so rather than fail cryptically."""
+    client = _make_client(tmp_path, builder=lambda case_id: _FakeSnapshot(b"bytes"))
+
+    r = client.post("/ledger/snapshots/c-1/anchor")
+
+    assert r.status_code == 503
+    detail = r.json()["detail"]
+    assert "disabled" in detail
+    assert "/timestamp" in detail
+
+
 def test_anchor_requires_builder(tmp_path):
     client = _make_client(tmp_path, builder=None)
     r = client.post("/ledger/snapshots/c-1/anchor")
@@ -44,6 +56,8 @@ def test_anchor_requires_builder(tmp_path):
 
 def test_anchor_stamps_snapshot(tmp_path, monkeypatch):
     from interface.ledger import anchor_router as mod
+
+    monkeypatch.setenv("ANCHORUM_OTS_ENABLED", "1")
 
     def fake_stamp(data, out_dir, filename):
         out_dir = Path(out_dir)
@@ -79,6 +93,8 @@ def test_anchor_stamps_snapshot(tmp_path, monkeypatch):
 def test_anchor_returns_503_when_ots_missing(tmp_path, monkeypatch):
     from interface.ledger import anchor_router as mod
 
+    monkeypatch.setenv("ANCHORUM_OTS_ENABLED", "1")
+
     def fake_stamp(*args, **kwargs):
         raise AnchorUnavailable("ots CLI not installed")
 
@@ -93,6 +109,8 @@ def test_anchor_returns_503_when_ots_missing(tmp_path, monkeypatch):
 
 def test_anchor_returns_502_on_anchor_error(tmp_path, monkeypatch):
     from interface.ledger import anchor_router as mod
+
+    monkeypatch.setenv("ANCHORUM_OTS_ENABLED", "1")
 
     def fake_stamp(*args, **kwargs):
         raise AnchorError("calendar unreachable")

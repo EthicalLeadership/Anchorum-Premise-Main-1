@@ -79,7 +79,7 @@ beforeEach(() => {
   vi.stubGlobal(
     "fetch",
     vi.fn().mockImplementation((url: string) => {
-      if (String(url).includes("/anchor/verify")) {
+      if (String(url).includes("/timestamp/verify")) {
         return Promise.resolve({
           ok: false,
           status: 404,
@@ -141,5 +141,34 @@ describe("WarRoom", () => {
     const container = await screen.findByTestId("war-room");
     expect(container).toBeInTheDocument();
     expect(screen.getByRole("alert")).toBeInTheDocument();
+  });
+
+  it("shows a failed check when the snapshot no longer matches the timestamp", async () => {
+    // `verified: false` is the case that matters: the timestamp exists, but the
+    // bytes changed afterwards. Reporting that as anything other than a failure
+    // would present a broken proof as a working one.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (String(url).includes("/timestamp/verify")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ verified: false }),
+          } as unknown as Response);
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({}),
+        } as unknown as Response);
+      }),
+    );
+
+    render(<WarRoom caseId="c1" locale="en" adapter={mockAdapter()} />);
+
+    expect(
+      await screen.findByText(/snapshot changed since it was timestamped/),
+    ).toBeInTheDocument();
   });
 });

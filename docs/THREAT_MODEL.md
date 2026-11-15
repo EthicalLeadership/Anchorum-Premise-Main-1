@@ -196,7 +196,7 @@ Also decided, and still carrying obligations that are open:
   separation restored, retention and redaction bound exposure when authentication is
   defeated.
 - **Control matrix review.** The matrix is signed alongside this model. Of its 102
-  reserved IDs, 15 are covered by named passing tests (plus CR-0.1, covered by this document), and 86 have no requirement
+  reserved IDs, 17 are covered by named passing tests (plus CR-0.1, covered by this document), and 84 have no requirement
   text yet.
 - **CR-10.6 is implemented, and its enforcement is conditional on an environment
   variable.** `interface/security/auth.py` checks Host and Origin and requires an

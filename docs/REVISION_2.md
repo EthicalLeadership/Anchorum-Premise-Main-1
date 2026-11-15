@@ -73,7 +73,14 @@ Routes: any request under `/board/`, `/ledger/` or `/cases/` must present that k
 
 ## CR-11 — Verification and rollout
 
-### CR-11.1 — OpenTimestamps stamping
+> **Scope of CR-11.** The primary, air-gapped proof path is the local RFC 3161
+> timestamp defined in CR-11.4 and implemented in `interface/ledger/timestamp.py`.
+> CR-11.1–11.3 define the optional OpenTimestamps alternative, which needs an
+> external calendar server and is therefore **disabled by default**: its route
+> returns 503 unless `ANCHORUM_OTS_ENABLED=1`. Nothing in CR-11.1–11.3 describes
+> what a default installation ships.
+
+### CR-11.1 — OpenTimestamps stamping (optional, disabled by default)
 **Requirement:** A snapshot's canonical bytes are written to disk as `snapshot.alp` and stamped via the OpenTimestamps CLI. The `.ots` proof file is the artifact an independent party can verify. Missing `ots` binary raises an actionable error; a timeout raises a distinct error; a non-zero exit raises an error including stderr.
 **Tests:** `tests/test_ledger_anchor.py`
 **Evidence:** `git show 2609339:<file>`
@@ -89,6 +96,18 @@ Routes: any request under `/board/`, `/ledger/` or `/cases/` must present that k
 **Requirement:** `POST /ledger/snapshots/{case_id}/anchor` builds a snapshot via `app.state.snapshot_builder`, stamps it, and returns snapshot and proof paths. `GET /ledger/snapshots/{case_id}/anchor/verify` returns the proof classification. Missing builder returns 503; missing `ots` returns 503; stamping failure returns 502.
 **Tests:** `tests/test_ledger_anchor_router.py`
 **Evidence:** `git show 2609339:<file>`
+**Status:** COVERED.
+
+### CR-11.4 — Local RFC 3161 timestamp (air-gapped primary proof)
+**Requirement:** The case snapshot is stamped by a local OpenSSL TSA and the response written as `snapshot.alp.tsr`. The signer certificate is issued under a dedicated timestamping profile — `basicConstraints CA:FALSE`, `keyUsage digitalSignature+nonRepudiation`, `extendedKeyUsage critical timeStamping` — because `openssl ts -reply` refuses a CA certificate. Verification passes the signer with `-untrusted` and the CA with `-CAfile`, because a timestamp response does not embed its signer. `POST /ledger/snapshots/{case_id}/timestamp` returns 503 when the TSA is unprovisioned and 502 when it refuses; `GET .../timestamp/verify` returns 404 when nothing was stamped. No step reaches the network.
+**Tests:** `tests/test_ledger_timestamp.py`, `tests/test_ledger_timestamp_router.py`, `tests/test_export_carries_verifiable_timestamp.py`
+**Evidence:** `git show 7fc6bff:<file>`
+**Status:** COVERED.
+
+### CR-11.5 — Export carries the proof it promises
+**Requirement:** A produced export contains everything a recipient needs to verify the timestamp with stock OpenSSL, and nothing of the installation's: `trust/tsa.crt`, `trust/ca.crt`, `trust/timestamps/snapshot.alp`, `trust/timestamps/snapshot.alp.tsr`, and `trust/VERIFY_TIMESTAMP.md`. Private keys are never bundled. An installation with no TSA ships no `trust/` directory at all rather than instructions for verifying nothing.
+**Tests:** `tests/test_tsa_export.py`, `tests/test_export_carries_verifiable_timestamp.py`
+**Evidence:** `git show 7fc6bff:<file>`
 **Status:** COVERED.
 
 ## CR-6 — Replay engine and performance
@@ -119,14 +138,14 @@ Routes: any request under `/board/`, `/ledger/` or `/cases/` must present that k
 **Evidence:** `git show 7737b30:<file>`
 **Status:** COVERED.
 
-## Not yet defined - BLOCKED (86 of 102 items)
+## Not yet defined - BLOCKED (84 of 102 items)
 
 The following CR items have no requirement definition. They will be marked `BLOCKED — requirement not yet defined` in the matrix.
 
 - **CR-0** (3 items): CR-0.2, CR-0.3, CR-0.4
 - **CR-1** (4 items): CR-1.7, CR-1.8, CR-1.9, CR-1.10
 - **CR-10** (8 items): CR-10.1, CR-10.2, CR-10.4, CR-10.5, CR-10.7, CR-10.8, CR-10.9, CR-10.10
-- **CR-11** (4 items): CR-11.4, CR-11.5, CR-11.6, CR-11.7
+- **CR-11** (2 items): CR-11.6, CR-11.7
 - **CR-12** (6 items): CR-12.1, CR-12.2, CR-12.3, CR-12.4, CR-12.5, CR-12.6
 - **CR-2** (8 items): CR-2.1, CR-2.2, CR-2.3, CR-2.4, CR-2.5, CR-2.6, CR-2.7, CR-2.8
 - **CR-3** (4 items): CR-3.3, CR-3.4, CR-3.5, CR-3.6

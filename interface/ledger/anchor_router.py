@@ -16,6 +16,7 @@ snapshot constructor the router cannot know.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
@@ -28,6 +29,16 @@ from .anchor import (
 )
 
 router = APIRouter(prefix="/ledger", tags=["ledger"])
+
+#: OTS needs an external calendar server, so it cannot run on an air-gapped
+#: installation. Default is off: the supported proof path is the local RFC 3161
+#: timestamp in `timestamp_router`. Set to 1 only where outbound network access
+#: is deliberate.
+OTS_ENABLE_ENV = "ANCHORUM_OTS_ENABLED"
+
+
+def _ots_enabled() -> bool:
+    return os.getenv(OTS_ENABLE_ENV, "").strip().lower() in {"1", "true", "yes"}
 
 
 def _anchor_dir(request: Request, case_id: str) -> Path:
@@ -42,6 +53,18 @@ def anchor_snapshot(case_id: str, request: Request):
         raise HTTPException(
             status_code=503,
             detail="snapshot_builder is not configured on app.state",
+        )
+
+    if not _ots_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "OpenTimestamps anchoring is disabled: it requires an external "
+                "calendar server and cannot run on an air-gapped deployment. "
+                f"Set {OTS_ENABLE_ENV}=1 to enable it, or use "
+                "POST /ledger/snapshots/{case_id}/timestamp for the local "
+                "RFC 3161 proof, which needs no network."
+            ),
         )
 
     snapshot = builder(case_id)

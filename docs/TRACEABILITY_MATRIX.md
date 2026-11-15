@@ -14,9 +14,9 @@ there is no independent review.
   requirement is. Nothing can be covered by a requirement nobody has written.
 - **BLOCKED — reason** — the requirement is defined or implied but no test covers it.
 
-`REVISION_2.md` currently defines fifteen requirements (CR-1.1–1.6, CR-3.1, CR-3.2,
-CR-6.1, CR-6.2, CR-10.3, CR-10.6, CR-11.1–11.3). The remaining eighty-seven IDs
-have no requirement text in `REVISION_2.md`: eighty-six are reserved placeholders
+`REVISION_2.md` currently defines seventeen requirements (CR-1.1–1.6, CR-3.1, CR-3.2,
+CR-6.1, CR-6.2, CR-10.3, CR-10.6, CR-11.1–11.5). The remaining eighty-five IDs
+have no requirement text in `REVISION_2.md`: eighty-four are reserved placeholders
 and CR-0.1 is covered by the threat model itself. The numbering came from the
 workstream structure, and a row is only marked covered once its requirement text
 exists.
@@ -115,8 +115,8 @@ exists.
 | CR-11.1 | CR-11 Verification and rollout | tests/test_ledger_anchor.py | test_stamp_bytes_writes_snapshot_and_invokes_ots, test_round_trip_stamp_then_verify | commit 2609339 | OpenTimestamps stamping | Covered |
 | CR-11.2 | CR-11 Verification and rollout | tests/test_ledger_anchor.py | test_verify_confirmed, test_verify_pending_is_not_failure, test_verify_failed_when_no_marker | commit 2609339 | verification classification | Covered |
 | CR-11.3 | CR-11 Verification and rollout | tests/test_ledger_anchor_router.py | test_anchor_stamps_snapshot, test_verify_returns_confirmed, test_anchor_returns_503_when_ots_missing | commit 2609339 | anchor HTTP route | Covered |
-| CR-11.4 | CR-11 Verification and rollout | | | | | BLOCKED — requirement not yet defined |
-| CR-11.5 | CR-11 Verification and rollout | | | | | BLOCKED — requirement not yet defined |
+| CR-11.4 | CR-11 Verification and rollout | tests/test_ledger_timestamp.py, tests/test_ledger_timestamp_router.py | test_stamp_and_verify, test_stamps_a_snapshot, test_stamp_then_verify_round_trip | commit 7fc6bff | local RFC 3161 timestamp (air-gapped primary proof) | Covered |
+| CR-11.5 | CR-11 Verification and rollout | tests/test_tsa_export.py, tests/test_export_carries_verifiable_timestamp.py | test_bundles_both_certificates, test_recipient_can_verify_with_stock_openssl, test_tampering_with_the_snapshot_breaks_verification | commit 7fc6bff | export carries the proof it promises | Covered |
 | CR-11.6 | CR-11 Verification and rollout | | | | | BLOCKED — requirement not yet defined |
 | CR-11.7 | CR-11 Verification and rollout | | | | | BLOCKED — requirement not yet defined |
 | CR-12.1 | CR-12 Privacy and data lifecycle | | | | | BLOCKED — requirement not yet defined |
@@ -160,4 +160,4 @@ touching the code and without leaving a code diff. It is a legitimate test seam 
 was left reachable in production, which is the ordinary way a control becomes
 optional. A build-time constant, an explicit injectable setting defaulted off, or
 detecting the test runner in the test fixture rather than in the middleware would
-close it. Not fixed here: this document is evidence, and Gate Zero authorises no code.
+close it. Not fixed here: this document is evidence, and Gate Zero authorizes no code.

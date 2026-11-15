@@ -29,8 +29,7 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
     | { kind: "unknown" }
     | { kind: "not_anchored" }
     | { kind: "stamping" }
-    | { kind: "pending" }
-    | { kind: "confirmed"; block: number; attestedAt: string | null }
+    | { kind: "confirmed"; attestedAt: string | null }
     | { kind: "failed"; reason: string }
   >({ kind: "unknown" });
 
@@ -73,7 +72,7 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
     (async () => {
       try {
         const res = await fetch(
-          `/ledger/snapshots/${encodeURIComponent(caseId)}/anchor/verify`,
+          `/ledger/snapshots/${encodeURIComponent(caseId)}/timestamp/verify`,
         );
         if (!active) return;
         if (res.status === 404) {
@@ -85,16 +84,17 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
           return;
         }
         const body = await res.json();
-        if (body.status === "confirmed" && typeof body.bitcoin_block === "number") {
-          setAnchorState({
-            kind: "confirmed",
-            block: body.bitcoin_block,
-            attestedAt: body.attested_at ?? null,
-          });
-        } else if (body.status === "pending") {
-          setAnchorState({ kind: "pending" });
+        // The local TSA answers immediately, so there is no pending state to
+        // wait on and no block to poll for. The answer is binary: either the
+        // snapshot still matches the timestamp, or the bytes changed after
+        // they were stamped — which is the case worth showing loudly.
+        if (body.verified === true) {
+          setAnchorState({ kind: "confirmed", attestedAt: null });
         } else {
-          setAnchorState({ kind: "failed", reason: body.status || "unknown" });
+          setAnchorState({
+            kind: "failed",
+            reason: "snapshot changed since it was timestamped",
+          });
         }
       } catch {
         if (active) setAnchorState({ kind: "not_anchored" });
@@ -104,32 +104,6 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
       active = false;
     };
   }, [caseId]);
-
-  // Poll verification while a proof is pending.
-  useEffect(() => {
-    if (anchorState.kind !== "pending") return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(
-          `/ledger/snapshots/${encodeURIComponent(caseId)}/anchor/verify`,
-        );
-        if (!res.ok) return;
-        const body = await res.json();
-        if (body.status === "confirmed" && typeof body.bitcoin_block === "number") {
-          setAnchorState({
-            kind: "confirmed",
-            block: body.bitcoin_block,
-            attestedAt: body.attested_at ?? null,
-          });
-        } else if (body.status === "failed") {
-          setAnchorState({ kind: "failed", reason: "verify_failed" });
-        }
-      } catch {
-        // network blip: keep polling
-      }
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [anchorState.kind, caseId]);
 
   if (state.kind === "loading") {
     return (
@@ -156,15 +130,12 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
           <h1 style={{ fontSize: "2rem", fontWeight: "bold", margin: 0 }}>{translate(locale, "warroom.title")}</h1>
           <div className="card" style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "16px" }}>
             <div>
-              <h3 style={{ margin: 0, fontSize: "11px", color: "var(--text-muted)", letterSpacing: "0.08em" }}>BITCOIN INTEGRITY PROOF</h3>
+              <h3 style={{ margin: 0, fontSize: "11px", color: "var(--text-muted)", letterSpacing: "0.08em" }}>LOCAL TIMESTAMP PROOF</h3>
               <p style={{ margin: "4px 0 0 0", fontSize: "13px", fontFamily: "var(--font-sans)" }}>
                 {anchorState.kind === "unknown" && "Checking…"}
-                {anchorState.kind === "not_anchored" && "Not yet anchored"}
-                {anchorState.kind === "stamping" && "Stamping…"}
-                {anchorState.kind === "pending" && "Pending confirmation (Bitcoin block every ~10 min)"}
-                {anchorState.kind === "confirmed" && (
-                  <>Confirmed: Bitcoin block {anchorState.block}{anchorState.attestedAt ? ` · ${anchorState.attestedAt}` : ""}</>
-                )}
+                {anchorState.kind === "not_anchored" && "Not yet timestamped"}
+                {anchorState.kind === "stamping" && "Timestamping…"}
+                {anchorState.kind === "confirmed" && "Timestamped · snapshot verified against the timestamp"}
                 {anchorState.kind === "failed" && <>Failed: {anchorState.reason}</>}
               </p>
             </div>
@@ -176,11 +147,21 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
                   setAnchorState({ kind: "stamping" });
                   try {
                     const res = await fetch(
-                      `/ledger/snapshots/${encodeURIComponent(caseId)}/anchor`,
+                      `/ledger/snapshots/${encodeURIComponent(caseId)}/timestamp`,
                       { method: "POST" },
                     );
                     if (res.ok) {
-                      setAnchorState({ kind: "pending" });
+                      // Stamping succeeded; confirm by re-verifying rather than
+                      // assuming, so the badge reflects a checked state.
+                      const check = await fetch(
+                        `/ledger/snapshots/${encodeURIComponent(caseId)}/timestamp/verify`,
+                      );
+                      const body = check.ok ? await check.json() : {};
+                      setAnchorState(
+                        body.verified === true
+                          ? { kind: "confirmed", attestedAt: null }
+                          : { kind: "failed", reason: "stamped but not verified" },
+                      );
                     } else {
                       const err = await res.json().catch(() => ({}));
                       setAnchorState({
@@ -193,7 +174,7 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
                   }
                 }}
               >
-                Anchor to Bitcoin
+                Timestamp now
               </button>
             )}
           </div>
