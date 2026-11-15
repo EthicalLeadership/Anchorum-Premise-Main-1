@@ -110,7 +110,7 @@ item nobody read.
 | G0-3 | | | | Raised in priority by G0-1 |
 | G0-4 | | | | |
 | G0-5 | | | | |
-| G0-6 | DECIDED — Security Owner for v1 is Samuel Tessier, also sole author, owner and developer; no independent review exists for v1. Each sold deployment must be individualized per client (own keys, own audit chain, own data boundary) as a v1 acceptance criterion, not a v2 aspiration | Samuel Tessier | 2026-11-12 | Named individual, not a role. Implementer = reviewer for v1, recorded as a residual. Per-client individualization is a shipping gate tracked against CR-10 and CR-12. External security review required before the first client deployment |
+| G0-6 | DECIDED — Security Owner for v1 is Samuel Tessier, also sole author, owner and developer; no independent review exists for v1. Each sold deployment must be individualized per client (own keys, own audit chain, own TSA signing pair, own data boundary) as a v1 acceptance criterion, not a v2 aspiration | Samuel Tessier | 2026-11-12 | Named individual, not a role. Implementer = reviewer for v1, recorded as a residual. Per-client individualization is a shipping gate tracked against CR-10 and CR-12. External security review required before the first client deployment |
 | G0-7 | | | | Partly answered by G0-6 (single reviewer for v1); where a second reviewer is required is open |
 | G0-8 | | | | |
 | G0-9 | | | | |
@@ -147,9 +147,13 @@ Accepted with G0-6 on 2026-11-12. These are conditions on shipping v1 to a clien
 all, not aspirations.
 
 - [ ] **Per-client individualization.** Every sold deployment gets its own keys, its
-  own audit chain and its own data boundary. No shared keys, no shared chain across
-  clients. Tracked against **CR-10** (authentication) and **CR-12** (keys, retention).
-  Status: not started, no owner assigned.
+  own audit chain, its own TSA signing pair and its own data boundary. No shared keys,
+  no shared chain across clients. The TSA certificate pair (`var/tsa/`) is part of what
+  must be unique per client: the exported `.tsr` proof carries the signer certificate,
+  so a shared pair would make one client's proof appear to have been issued by
+  another's infrastructure. Enforced at boot by `claim_tsa_owner()` in
+  `interface/ledger/timestamp.py`. Tracked against **CR-10** (authentication) and
+  **CR-12** (keys, retention). Status: not started, no owner assigned.
 - [ ] **External security review before the first client deployment.** Because v1 has
   no independent review (G0-6 residual), an external review of this threat model, the
   control set and the deployment procedure is a gate, not a recommendation. Related:
