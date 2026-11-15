@@ -550,7 +550,7 @@
   "audit.event.proofs_verified": "cryptographic proofs verified",
   "warroom.title": "War Room",
   "warroom.truncated": "Showing a limited view. Some records are hidden.",
-  "warroom.chronology.title": "Chronology",
+  "warroom.chronology.title": "Matter Timeline",
   "warroom.undated.title": "Undated Items",
   "warroom.gaps.title": "Evidence Gaps",
   "warroom.gaps.empty": "No gaps found.",

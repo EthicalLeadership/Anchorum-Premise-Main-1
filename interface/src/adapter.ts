@@ -511,6 +511,12 @@ export function createAdapter(config: AdapterConfig) {
   // in mock mode and never leak across adapter instances.
   const sessionRemovedIds = new Set<string>();
   const requestJson = <T>(path: string, init?: RequestInit) => {
+
+    const headers = new Headers(init?.headers || {});
+    const apiKey = import.meta.env.VITE_ANCHORUM_KEY || 'local-dev-key';
+    headers.set('x-anchorum-key', apiKey);
+    init = { ...init, headers };
+
     if (!config.backend) {
       return Promise.resolve(failure("BACKEND_UNREACHABLE"));
     }

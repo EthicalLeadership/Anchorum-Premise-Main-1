@@ -188,15 +188,15 @@ export function WarRoom({ caseId, locale, adapter }: Props) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
         <div style={{ padding: '1.5rem', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#fff' }}>
-          <h3 style={{ fontSize: '0.875rem', color: '#6b7280', textTransform: 'uppercase' }}>Total Messages</h3>
+          <h3 style={{ fontSize: '0.875rem', color: '#6b7280', textTransform: 'uppercase' }}>Evidence Items</h3>
           <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>{actors.total_messages}</p>
         </div>
         <div style={{ padding: '1.5rem', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#fff' }}>
-          <h3 style={{ fontSize: '0.875rem', color: '#6b7280', textTransform: 'uppercase' }}>Unique Actors</h3>
+          <h3 style={{ fontSize: '0.875rem', color: '#6b7280', textTransform: 'uppercase' }}>Parties Involved</h3>
           <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>{actors.unique_actors}</p>
         </div>
         <div style={{ padding: '1.5rem', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#fff' }}>
-          <h3 style={{ fontSize: '0.875rem', color: '#6b7280', textTransform: 'uppercase' }}>Open Gaps</h3>
+          <h3 style={{ fontSize: '0.875rem', color: '#6b7280', textTransform: 'uppercase' }}>Unresolved Gaps</h3>
           <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>{gaps.total}</p>
         </div>
       </div>

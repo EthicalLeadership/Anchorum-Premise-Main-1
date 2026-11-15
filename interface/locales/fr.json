@@ -550,7 +550,7 @@
   "proof.error.backend_unreachable": "L'API locale n'est pas joignable.",
   "warroom.title": "Salle de guerre",
   "warroom.truncated": "Vue limitée. Certains enregistrements sont masqués.",
-  "warroom.chronology.title": "Chronologie",
+  "warroom.chronology.title": "Chronologie du dossier",
   "warroom.undated.title": "Éléments non datés",
   "warroom.gaps.title": "Lacunes probantes",
   "warroom.gaps.empty": "Aucune lacune trouvée.",
