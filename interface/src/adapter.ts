@@ -27,6 +27,14 @@ export type GapResponse = {
   gaps: readonly GapItem[];
 };
 
+/**
+ * The DNS zone the backend publishes anchors into. This mirrors
+ * `interface/anchoring.py::DEFAULT_ANCHOR_DOMAIN`; it is duplicated rather than
+ * imported because the two runtimes share no module, and the backend test
+ * `test_anchoring.py` pins the server-side value so drift is visible there.
+ */
+const DEFAULT_ANCHOR_DOMAIN = "anchorumzero-trust.com";
+
 export interface AdapterConfig {
   backend: { baseUrl: string } | null;
   searchIndexReady?: boolean;
@@ -1032,7 +1040,12 @@ export function createAdapter(config: AdapterConfig) {
           success<AnchorState>({
             anchored: false,
             configured: false,
-            expectedName: `case-${caseId}.chain.creovate.digital`,
+            // Offline, there is no backend to ask for the record name, so this
+            // mirrors what `anchoring.record_name_for` would produce for the
+            // default zone: `<case label>.<zone>`. It previously named a
+            // different domain entirely (`…chain.creovate.digital`), so the
+            // panel showed a record the product never publishes.
+            expectedName: `${caseId}.${DEFAULT_ANCHOR_DOMAIN}`,
           }),
         );
       },
