@@ -24,7 +24,8 @@ import unittest
 from unittest.mock import patch
 
 from dossier_pipeline.evidence import (CustodyAction, EvidenceSigner,
-                                       EvidenceSignerUnbound, EvidenceStore)
+                                       EvidenceSignerUnbound, EvidenceStore,
+                                       SystemState)
 from dossier_pipeline.pipeline import DossierPipeline
 
 SECRET_ENV = "GDC_EVIDENCE_SECRET"
@@ -563,6 +564,246 @@ class VerifyDetectsCustodyTamperTests(unittest.TestCase):
 
             self.assertEqual(per_item_ok, report.custody_chain_ok)
             self.assertEqual(per_item, report.custody_chain_problems)
+
+
+class VerificationSeverityTests(unittest.TestCase):
+    """What each kind of damage does, and what it deliberately does not do.
+
+    `verify()` used to fold only the stored bytes into `integrity_pass` and
+    drop the custody chain on the floor, so a store whose custody log had been
+    altered reported PASS to every caller. These pins fix the mapping in place:
+    a pass means every check passed, and the store's severity says which check
+    failed. The four outcomes are separated on purpose because their innocent
+    causes differ, and two of them would be unrecoverable if conflated.
+    """
+
+    def _store_with_two_events(self, db_path: str):
+        store = EvidenceStore(db_path)
+        packet = store.ingest(
+            event_type="test",
+            raw_payload={"a": 1},
+            normalized_payload={"a": 1},
+            metadata={"dossier_id": "d"},
+        )
+        first = store.add_custody_event(
+            packet.evidence_id, "operator", CustodyAction.INGESTED
+        )
+        second = store.add_custody_event(
+            packet.evidence_id, "operator", CustodyAction.VERIFIED
+        )
+        return store, packet, first, second
+
+    def test_broken_chain_fails_the_integrity_pass(self):
+        """The defect this class exists for: a tampered chain must not pass."""
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ, {SECRET_ENV: "severity-test-secret"}
+        ):
+            store, packet, first, _ = self._store_with_two_events(
+                os.path.join(tmp, "evidence.db")
+            )
+            self.addCleanup(store.close)
+            store.conn.execute(
+                "DELETE FROM custody_events WHERE custody_id = ?", (first.custody_id,)
+            )
+            store.conn.commit()
+
+            report = store.verify()
+            self.assertFalse(report.custody_chain_ok)
+            self.assertFalse(
+                report.integrity_pass,
+                "a broken custody chain reported integrity_pass",
+            )
+            self.assertEqual(report.system_state, SystemState.COMPROMISED)
+
+    def test_broken_chain_does_not_lock_the_store(self):
+        """A compromised chain is loud, but still writable.
+
+        Locking here would be unrecoverable - no unlock exists - and a chain
+        can break for reasons other than tampering. The store keeps accepting
+        evidence and keeps reporting that its chain of custody is broken.
+        """
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ, {SECRET_ENV: "severity-test-secret"}
+        ):
+            store, packet, first, _ = self._store_with_two_events(
+                os.path.join(tmp, "evidence.db")
+            )
+            self.addCleanup(store.close)
+            store.conn.execute(
+                "DELETE FROM custody_events WHERE custody_id = ?", (first.custody_id,)
+            )
+            store.conn.commit()
+
+            store.verify()
+            self.assertEqual(store.state, SystemState.COMPROMISED)
+            packet_after = store.ingest(
+                event_type="test",
+                raw_payload={"b": 2},
+                normalized_payload={"b": 2},
+                metadata={"dossier_id": "d"},
+            )
+            self.assertIsNotNone(packet_after)
+
+    def test_content_tamper_locks_the_store_and_survives_a_reopen(self):
+        """Editing a stored row must stop the store accepting more evidence.
+
+        The lock was previously a per-process side effect: reopening the
+        database re-derived the state as COMPROMISED and the store silently
+        became writable again, so the gate in `ingest` never fired after a
+        restart. Reopening is the whole test.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = os.path.join(tmp, "evidence.db")
+            with patch.dict(os.environ, {SECRET_ENV: "severity-test-secret"}):
+                store, packet, _, _ = self._store_with_two_events(db_path)
+                store.conn.execute(
+                    "UPDATE evidence_packets SET hash_self = ? WHERE evidence_id = ?",
+                    ("f" * 64, packet.evidence_id),
+                )
+                store.conn.commit()
+                store.close()
+
+                reopened = EvidenceStore(db_path)
+                self.addCleanup(reopened.close)
+                self.assertEqual(reopened.state, SystemState.LOCKED)
+                with self.assertRaises(RuntimeError):
+                    reopened.ingest(
+                        event_type="test",
+                        raw_payload={"c": 3},
+                        normalized_payload={"c": 3},
+                        metadata={"dossier_id": "d"},
+                    )
+
+    def test_a_rotated_key_compromises_but_does_not_lock(self):
+        """Key rotation must not brick an evidence store.
+
+        Every older signature fails under a new key, but nothing was altered.
+        Treating that as tampering would refuse all further evidence on a
+        store whose only problem is that its operator rotated the key, and
+        there is no unlock to recover with.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = os.path.join(tmp, "evidence.db")
+            with patch.dict(os.environ, {SECRET_ENV: "key-before-rotation"}):
+                store, _, _, _ = self._store_with_two_events(db_path)
+                store.close()
+
+            with patch.dict(os.environ, {SECRET_ENV: "key-after-rotation"}):
+                reopened = EvidenceStore(db_path)
+                self.addCleanup(reopened.close)
+                self.assertEqual(reopened.state, SystemState.COMPROMISED)
+                self.assertIsNot(
+                    reopened.state,
+                    SystemState.LOCKED,
+                    "key rotation locked the store; there is no unlock",
+                )
+                packet = reopened.ingest(
+                    event_type="test",
+                    raw_payload={"d": 4},
+                    normalized_payload={"d": 4},
+                    metadata={"dossier_id": "d"},
+                )
+                self.assertIsNotNone(packet)
+
+    def test_legacy_unlinked_events_degrade_rather_than_compromise(self):
+        """Rows written before the chain columns existed are not tampering.
+
+        The migration adds `record_hash` with DEFAULT '', so older events stay
+        blank. That is unverifiable, which must be reported, but calling it
+        compromised would condemn every pre-migration store.
+        """
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ, {SECRET_ENV: "severity-test-secret"}
+        ):
+            store = EvidenceStore(os.path.join(tmp, "evidence.db"))
+            self.addCleanup(store.close)
+            packet = store.ingest(
+                event_type="test",
+                raw_payload={"a": 1},
+                normalized_payload={"a": 1},
+                metadata={"dossier_id": "d"},
+            )
+            store.conn.execute(
+                """
+                INSERT INTO custody_events (
+                    custody_id, evidence_id, actor_id, action, timestamp_utc, signature,
+                    previous_custody_hash, record_hash, content_hash, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "legacy-event-1",
+                    packet.evidence_id,
+                    "operator",
+                    CustodyAction.VIEWED.value,
+                    "2020-01-01T00:00:00+00:00",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "2020-01-01T00:00:00+00:00",
+                ),
+            )
+            store.conn.commit()
+
+            report = store.verify(verify_signatures=False)
+            self.assertTrue(report.custody_chain_problems)
+            self.assertTrue(
+                all(p.startswith("legacy_unlinked_event:") for p in report.custody_chain_problems),
+                report.custody_chain_problems,
+            )
+            self.assertEqual(report.system_state, SystemState.DEGRADED)
+            self.assertFalse(report.integrity_pass)
+
+
+class VerifyCommandTests(unittest.TestCase):
+    """`verify` must not print PASS for a store whose custody log was altered."""
+
+    def test_verify_command_fails_on_a_broken_custody_chain(self):
+        import contextlib
+        import io
+        import sys
+
+        from dossier_pipeline.main import main
+
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ, {SECRET_ENV: "cli-verify-secret"}
+        ):
+            os.environ.setdefault("GDC_CONTROL_SIGNING_KEY", "unit-control-key")
+            pipeline = DossierPipeline(dossier_id="TEST-VERIFY", output_dir=tmp)
+            try:
+                packet = pipeline.evidence.ingest(
+                    event_type="test",
+                    raw_payload={"a": 1},
+                    normalized_payload={"a": 1},
+                    metadata={"dossier_id": "d"},
+                )
+                first = pipeline.evidence.add_custody_event(
+                    packet.evidence_id, "operator", CustodyAction.INGESTED
+                )
+                pipeline.evidence.add_custody_event(
+                    packet.evidence_id, "operator", CustodyAction.VERIFIED
+                )
+                pipeline.evidence.conn.execute(
+                    "DELETE FROM custody_events WHERE custody_id = ?", (first.custody_id,)
+                )
+                pipeline.evidence.conn.commit()
+            finally:
+                pipeline.close()
+
+            printed = io.StringIO()
+            argv = sys.argv
+            sys.argv = ["main", "--dossier", "TEST-VERIFY", "--output-dir", tmp, "verify"]
+            try:
+                with contextlib.redirect_stdout(printed):
+                    with self.assertRaises(SystemExit) as raised:
+                        main()
+            finally:
+                sys.argv = argv
+
+            output = printed.getvalue()
+            self.assertEqual(raised.exception.code, 2, output)
+            self.assertIn("Evidence integrity: FAIL", output)
+            self.assertIn("Custody chain:      FAIL", output)
 
 
 if __name__ == "__main__":

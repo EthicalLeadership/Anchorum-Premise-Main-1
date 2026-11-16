@@ -346,6 +346,21 @@ def cmd_verify(args, config):
         f" ({evidence_report.total_packets} packets,"
         f" {evidence_report.total_custody_events} custody events)"
     )
+    # The chain of custody is checked separately from the stored bytes and can
+    # fail on its own. Printing only the byte check let this command report
+    # PASS, and exit 0, on a store whose custody log had been altered - the one
+    # thing a verification command must never do. `integrity_pass` now covers
+    # both, so the exit code below follows; this line says which one failed.
+    if evidence_report.custody_chain_ok:
+        print("Custody chain:      PASS")
+    else:
+        problems = evidence_report.custody_chain_problems
+        print(f"Custody chain:      FAIL ({len(problems)} problems)")
+        for problem in problems[:10]:
+            print(f"  {problem}")
+        if len(problems) > 10:
+            print(f"  ... and {len(problems) - 10} more")
+    print(f"Store state:        {evidence_report.system_state.value}")
     print(f"Projection OK:      {projection_report['ok']}")
     print(f"Projection sev:     {projection_report['severity']}")
 

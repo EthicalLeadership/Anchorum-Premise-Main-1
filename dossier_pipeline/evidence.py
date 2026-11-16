@@ -163,6 +163,84 @@ def _merkle_root(hashes: Sequence[str]) -> str:
     return level[0]
 
 
+# Severity derived from the two independent checks verify() runs. They answer
+# different questions and either can fail alone, so the store's state has to be
+# a function of both - not of the byte check with the custody chain left over.
+_LEGACY_CUSTODY_PROBLEM = "legacy_unlinked_event:"
+
+
+def _custody_problems_are_only_legacy(problems: Sequence[str]) -> bool:
+    """True when the chain is unlinked only because rows predate linking.
+
+    The column migration adds ``record_hash`` with ``DEFAULT ''``, so events
+    written before the chain existed stay blank. Those segments cannot be
+    verified, but nothing shows they were altered either. Treating them as
+    tampering would condemn every pre-migration store, which is a false
+    positive with an irreversible consequence.
+    """
+    return bool(problems) and all(
+        problem.startswith(_LEGACY_CUSTODY_PROBLEM) for problem in problems
+    )
+
+
+#: Mismatch fields that can only be produced by editing stored bytes. A packet's
+#: hash covers its own payload and the hash of the packet before it, so these
+#: two cannot disagree for any reason except a row that was changed or removed.
+#:
+#: Deliberately excluded, because each has an innocent cause that would lock a
+#: store permanently over nothing:
+#:   * signature_system / custody_signature - a rotated signing key fails every
+#:     older signature while leaving the evidence untouched.
+#:   * timestamp_order - a corrected system clock can write a self-consistent
+#:     packet that sorts before its predecessor.
+_CONTENT_MISMATCH_FIELDS = frozenset({"hash_self", "hash_prev"})
+
+
+def _has_content_mismatch(mismatches: Sequence[Dict[str, Any]]) -> bool:
+    """True when a stored row no longer hashes to what was signed over it.
+
+    Only the two hash fields count. Every packet records the fingerprint of the
+    key that signed it, so a rotated key can be told apart from edited data;
+    locking on signatures would refuse all further evidence the first time an
+    operator rotated the key, and there is no unlock.
+    """
+    return any(mismatch.get("field") in _CONTENT_MISMATCH_FIELDS for mismatch in mismatches)
+
+
+def _verification_severity(
+    mismatches: Sequence[Dict[str, Any]],
+    custody_chain_problems: Sequence[str],
+) -> SystemState:
+    """The store's severity, from everything ``verify()`` actually checked.
+
+    Four outcomes, each a different amount of damage:
+
+    - A content mismatch means the stored bytes no longer agree with the hash
+      signed over them. The store locks. Appending to altered evidence
+      entangles fresh records with tampered ones, and there is nothing sound
+      to unlock to.
+    - A signature mismatch alone may be a rotated key rather than tampering.
+      The store is compromised - its authenticity claim no longer holds - but
+      it keeps accepting evidence, because locking here would be unrecoverable
+      and could be caused by routine key management.
+    - A broken custody chain means the record of who held what, and when, was
+      altered. The contents may still be sound, so writes continue, but the
+      chain of custody is compromised and must say so.
+    - Legacy unlinked events mean the chain cannot speak for those segments at
+      all. Nothing was shown to be altered; the record is unverifiable, which
+      is degraded rather than compromised.
+    """
+    if _has_content_mismatch(mismatches):
+        return SystemState.LOCKED
+    if mismatches:
+        return SystemState.COMPROMISED
+    if not custody_chain_problems:
+        return SystemState.OK
+    if _custody_problems_are_only_legacy(custody_chain_problems):
+        return SystemState.DEGRADED
+    return SystemState.COMPROMISED
+
+
 _evidence_registry = LockRegistry(scope="evidence")
 
 class EvidenceStore:
@@ -884,12 +962,19 @@ class EvidenceStore:
             custody_chain_ok = custody_chain_ok and not problems
             custody_chain_problems.extend(problems)
 
-        state = SystemState.OK if not mismatches else SystemState.COMPROMISED
-        if mismatches:
-            self.state = SystemState.LOCKED
+        # A pass has to mean every check this store can run passed. It used to
+        # mean only "the stored bytes still hash to what was signed", with the
+        # custody chain computed and then dropped - so a store whose custody log
+        # had been altered reported PASS, and `verify` printed it and exited 0.
+        # The chain is what makes the evidence admissible, so it is the last
+        # thing that may be reported as intact when it is not.
+        severity = _verification_severity(mismatches, custody_chain_problems)
+        integrity_pass = not mismatches and custody_chain_ok
+        if severity is not SystemState.OK:
+            self.state = severity
         return VerificationReport(
-            system_state=state,
-            integrity_pass=not mismatches,
+            system_state=severity,
+            integrity_pass=integrity_pass,
             total_packets=len(packets),
             total_custody_events=len(custody_events),
             mismatches=mismatches,
