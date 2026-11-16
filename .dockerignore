@@ -1,0 +1,121 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+
+# Virtualenvs
+.venv/
+.venv_*/
+
+# Case data must never enter this repo
+config/actors.json
+config/case_*.json
+cases/
+emails/
+output/
+output_proton/
+*.eml
+*.zarc
+*.db
+*.log
+
+# Secrets
+.env
+.env.local
+secrets/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+# --- added by ancorum staging ---
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+config/mail_config.json
+data/
+*.jsonl
+*.sqlite
+*.db
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.bak
+*.bak-*
+*.tmp
+logger.mjs
+tmp_audit_disk.bin
+# --- end ---
+
+# Aider Studio (auto-added)
+REPO_MAP.md
+.aider/
+
+.aider*
+# Kimi project memory
+.kimi-memory/
+
+# Stray ImageMagick Postscript dumps named after stdlib modules.
+# Something on this machine writes ~8-13 MB PostScript files to the repository
+# root using stdlib module names as titles; four were committed by the initial
+# scaffold (~40 MB). The writer has not been identified, so these are ignored
+# by absolute root path to stop them being re-added. They never shadowed the
+# stdlib (verified: json resolves to the stdlib path, sys is a builtin).
+/json
+/sys
+/time
+/uuid
+
+# Stray relative-path tree from another project.
+# A tool invoked with a path like "home/kark/Desktop/<other-project>/..." was
+# run with the repository root as its working directory, so it created that
+# tree *inside* this repo instead of under /home. The files belong to a
+# different codebase and are not part of this project history.
+/home/
+dev_data/
+.projectmanager/
+interface/.env.local
+interface/node_modules/
+interface/dev_data/
+# Local runtime state. scripts/setup_local_tsa.sh creates a timestamp-authority
+# CA here (ca.key, ca.crt, issued certs and serial/index files) for local
+# anchoring tests. The directory is generated per machine and its private key
+# must never enter history.
+/var/
+
+# Docker specific
+.git/
+.gitignore
+.docker/
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml
+
+# Ledger package (already included in Dockerfile)
+packages/anchorum_ledger/
