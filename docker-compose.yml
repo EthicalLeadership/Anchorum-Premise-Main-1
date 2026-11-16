@@ -1,0 +1,49 @@
+# Anchorum-prem: Multi-Phase Execution Plan - Phase 2 docker-compose.yml
+# Deterministic runtime environment for dossier-pipeline-v1-1 (commit: 127615fb53820bd2f6359af59028c41b29b5aa50)
+# Plane 1 (kernel/domain/application/governance): deterministic. No wall-clock.
+
+version: "3.9"
+
+services:
+  anchorum-prem:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: anchorum-prem
+    image: anchorum-prem:${DOCKER_TAG:-latest}
+    environment:
+      - DOCKER_TAG=${DOCKER_TAG:-latest}
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      # Runtime configuration (override via .env file)
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./data/anchorum.db}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DOSSIER_ID=${DOSSIER_ID:-DOSSIER-PIPELINE}
+      - OUTPUT_DIR=${OUTPUT_DIR:-./output}
+      # ProtonMail configuration (optional, for ingest-proton command)
+      - PROTON_EMAIL=${PROTON_EMAIL:-}
+      - PROTON_IMAP_PASSWORD=${PROTON_IMAP_PASSWORD:-}
+      - PROTON_IMAP_HOST=${PROTON_IMAP_HOST:-127.0.0.1}
+      - PROTON_IMAP_PORT=${PROTON_IMAP_PORT:-1143}
+      - PROTON_IMAP_USE_SSL=${PROTON_IMAP_USE_SSL:-false}
+    volumes:
+      # Mount data directory for persistence
+      - ${OUTPUT_DIR:-./output}:/app/output
+      # Mount config directory if present
+      - ./config:/app/config:ro
+      # Optional: hot-reload development mode (uncomment for dev)
+      # - .:/app:ro
+    working_dir: /app
+    command: python -m dossier_pipeline.main --help
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; print('OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - anchorum-network
+
+networks:
+  anchorum-network:
+    driver: bridge
