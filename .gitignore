@@ -103,3 +103,8 @@ dev_data/
 interface/.env.local
 interface/node_modules/
 interface/dev_data/
+# Local runtime state. scripts/setup_local_tsa.sh creates a timestamp-authority
+# CA here (ca.key, ca.crt, issued certs and serial/index files) for local
+# anchoring tests. The directory is generated per machine and its private key
+# must never enter history.
+/var/
