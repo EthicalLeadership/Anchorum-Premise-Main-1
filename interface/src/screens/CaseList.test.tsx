@@ -2,9 +2,16 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { createAdapter } from "../adapter";
+import { translate } from "../i18n";
 import { CaseList } from "./CaseList";
 
 const adapter = createAdapter({ backend: null });
+
+// The catalogue, not a literal. This copy has been re-worded twice already
+// (Case -> Matter), and a test that pins the English prose fails on every
+// renaming while the behaviour it cares about - one link to the new-case
+// route - has not changed at all.
+const createLabel = translate("en", "case.list.empty_action");
 
 describe("CaseList", () => {
   it("renders the fixture case as one row with hold count and create link", async () => {
@@ -13,13 +20,13 @@ describe("CaseList", () => {
     expect(screen.getAllByRole("row")).toHaveLength(2);
     const cells = screen.getAllByRole("cell").map((c) => c.textContent);
     expect(cells[5]).toBe("1");
-    expect(screen.getByRole("link", { name: /create/i }).getAttribute("href")).toBe("#/cases/new");
+    expect(screen.getByRole("link", { name: createLabel }).getAttribute("href")).toBe("#/cases/new");
   });
 
   it("renders the empty state with Create case", async () => {
     const empty = { ...adapter, cases: { ...adapter.cases, list: async () => ({ ok: true as const, value: [] }) } };
     render(<CaseList locale="en" adapter={empty} />);
-    await waitFor(() => screen.getByRole("link", { name: /create/i }));
+    await waitFor(() => screen.getByRole("link", { name: createLabel }));
   });
 
   it("renders permission_limited", () => {
