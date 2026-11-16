@@ -438,5 +438,132 @@ class SignerItselfTests(unittest.TestCase):
                 EvidenceSigner()
 
 
+class VerifyDetectsCustodyTamperTests(unittest.TestCase):
+    """`verify()` must detect custody tampering, not only the per-item check.
+
+    Every other custody-tamper pin in this module asserts through
+    `verify_custody_chain()`, which checks one item on demand. `verify()`
+    covers the whole store and is what actually runs - on every open, every
+    ingest and every custody write - so a regression there would report a
+    tampered chain as intact while every single-item pin stayed green. That
+    is the failure this class exists to make loud.
+
+    `verify()` groups the events it has already loaded by evidence_id instead
+    of re-querying each item, so the multi-item pins are the ones that matter:
+    they fail if grouping ever attributes one item's events to another, drops
+    an item, or multiplies the work per item.
+    """
+
+    def _store_with_events(self, db_path: str, *, label: str = "a"):
+        store = EvidenceStore(db_path)
+        packet = store.ingest(
+            event_type="test",
+            raw_payload={label: 1},
+            normalized_payload={label: 1},
+            metadata={"dossier_id": "d"},
+        )
+        store.add_custody_event(packet.evidence_id, "operator", CustodyAction.INGESTED)
+        store.add_custody_event(packet.evidence_id, "operator", CustodyAction.VERIFIED)
+        return store, packet
+
+    def test_intact_store_reports_no_chain_problems(self):
+        """A false positive here would condemn every store it touched."""
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ, {SECRET_ENV: "tamper-test-secret"}
+        ):
+            store, _ = self._store_with_events(os.path.join(tmp, "evidence.db"))
+            self.addCleanup(store.close)
+            report = store.verify()
+            self.assertTrue(report.custody_chain_ok, report.custody_chain_problems)
+            self.assertEqual(report.custody_chain_problems, [])
+
+    def test_broken_link_is_reported_by_verify(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ, {SECRET_ENV: "tamper-test-secret"}
+        ):
+            store, packet = self._store_with_events(os.path.join(tmp, "evidence.db"))
+            self.addCleanup(store.close)
+            first = store.get_custody_events(packet.evidence_id)[0]
+            store.conn.execute(
+                "DELETE FROM custody_events WHERE custody_id = ?", (first.custody_id,)
+            )
+            store.conn.commit()
+
+            report = store.verify()
+            self.assertFalse(report.custody_chain_ok)
+            self.assertTrue(
+                any(p.startswith("chain_link_broken:") for p in report.custody_chain_problems),
+                report.custody_chain_problems,
+            )
+
+    def test_a_clean_item_contributes_no_problems(self):
+        """Tamper one of two items; the other must stay silent.
+
+        The tampered item is chosen by sorted evidence_id - the order verify()
+        walks - so that a regression which looks at only some of the items
+        fails here every time. Picking by creation order instead would leave
+        this test passing whenever the two happened to sort that way, which is
+        a coin flip because the ids are random.
+        """
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ, {SECRET_ENV: "tamper-test-secret"}
+        ):
+            db_path = os.path.join(tmp, "evidence.db")
+            store, first_packet = self._store_with_events(db_path, label="a")
+            self.addCleanup(store.close)
+            other, second_packet = self._store_with_events(db_path, label="b")
+            self.addCleanup(other.close)
+
+            clean_packet, tampered = sorted(
+                (first_packet, second_packet), key=lambda packet: packet.evidence_id
+            )
+
+            first_event = store.get_custody_events(tampered.evidence_id)[0]
+            store.conn.execute(
+                "DELETE FROM custody_events WHERE custody_id = ?", (first_event.custody_id,)
+            )
+            store.conn.commit()
+
+            self.assertTrue(store.verify_custody_chain(clean_packet.evidence_id)[0])
+            report = store.verify()
+            self.assertFalse(report.custody_chain_ok)
+            self.assertEqual(len(report.custody_chain_problems), 1, report.custody_chain_problems)
+
+    def test_verify_agrees_with_the_per_item_check(self):
+        """The grouped pass and the single-item pass must reach one verdict.
+
+        This is the contract behind grouping the events: same rules, same
+        problems, same order. If the two ever disagree, one of them is lying
+        about a chain and there is no way to tell which from the outside.
+        """
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ, {SECRET_ENV: "tamper-test-secret"}
+        ):
+            db_path = os.path.join(tmp, "evidence.db")
+            store, _ = self._store_with_events(db_path, label="a")
+            self.addCleanup(store.close)
+            other, other_packet = self._store_with_events(db_path, label="b")
+            self.addCleanup(other.close)
+
+            store.conn.execute(
+                "UPDATE custody_events SET actor_id = ? WHERE evidence_id = ?",
+                ("tampered", other_packet.evidence_id),
+            )
+            store.conn.commit()
+
+            report = store.verify()
+            per_item: list[str] = []
+            per_item_ok = True
+            for evidence_id in sorted(
+                {event.evidence_id for event in store.get_custody_events()}
+            ):
+                ok, problems = store.verify_custody_chain(evidence_id)
+                per_item_ok = per_item_ok and ok
+                per_item.extend(problems)
+
+            self.assertEqual(per_item_ok, report.custody_chain_ok)
+            self.assertEqual(per_item, report.custody_chain_problems)
+
+
 if __name__ == "__main__":
     unittest.main()
