@@ -310,3 +310,19 @@ th, td {
     color: #0a0a0a !important;
     border: 1px solid #ccc !important;
 }
+
+/* === FORCE MARBLE WHITE (DEFEAT OLD !IMPORTANT OVERRIDES) === */
+:root {
+  --bg: #F8F9FA !important;
+  --bg-panel: #FFFFFF !important;
+  --text: #1A1A1A !important;
+  --text-muted: #6B7280 !important;
+  --border: #E5E7EB !important;
+  --accent: #1E3A8A !important;
+}
+.shell, .shell__body, .shell__main, body, html {
+  background-color: #F8F9FA !important;
+  color: #1A1A1A !important;
+}
+.rail { background-color: #FFFFFF !important; border-right: 1px solid #E5E7EB !important; }
+.card { background-color: #FFFFFF !important; border: 1px solid #E5E7EB !important; }
