@@ -1,4 +1,4 @@
-# Anchorum-prem: Multi-Phase Execution Plan - Phase 1 Dockerfile (FIXED)
+# Anchorum-prem: Multi-Phase Execution Plan - Phase 1 Dockerfile (FIXED v2)
 # Deterministic build for dossier-pipeline-v1-1 (commit: 127615fb53820bd2f6359af59028c41b29b5aa50)
 # Plane 1 (kernel/domain/application/governance): deterministic. No wall-clock.
 
@@ -37,20 +37,16 @@ COPY pyproject.toml requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir cryptography
 
-# Copy application code (including the ledger package!)
+# Copy application code (excluding .git, __pycache__, etc.)
 COPY --chown=app:app dossier_pipeline/ ./dossier_pipeline/
 COPY --chown=app:app config/ ./config/
 COPY --chown=app:app interface/ ./interface/
 COPY --chown=app:app ci/ ./ci/
-COPY --chown=app:app packages/anchorum_ledger/ ./packages/anchorum_ledger/
 
-# Install the ledger package in editable mode from packages directory
-RUN pip install --no-cache-dir -e /app/packages/anchorum_ledger
-
-USER app
-
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import sys; print('OK')" || \
     python -m dossier_pipeline.main demo
 
+# Default command (can be overridden via docker-compose)
 CMD ["python", "-m", "dossier_pipeline.main", "--help"]
