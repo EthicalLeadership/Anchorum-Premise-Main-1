@@ -1,53 +1,47 @@
 """
-Plane 1 (kernel/domain/application/governance): Key rotation service for Anchorum-prem.
+Plane 1 (kernel/domain/application/governance): Key rotation application service.
 
-Provides key rotation orchestration, predecessor chain verification, and audit
-event emission for trust-anchor key lifecycle management.
-
-Notes on guarantees and current scope:
-- Rotation calls within a single KeyRotationService instance are serialized via
-  an asyncio.Lock; multi-process or distributed coordination must be enforced by
-  the underlying SecretManager or backing store.
-- Event IDs and digests are computed over canonical JSON (sort_keys=True) using a
-  single timestamp captured per event.
-- Cryptographic key-backed signing and multi-event hash chaining are marked as
-  TODOs where not yet backed by a signing key or journal state store.
+Coordinates atomic key rotations, rollbacks, revocations, CAS revision checks,
+and tamper-linked audit event emission (`RotationEvent`).
 """
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
-import json
-import logging
+import uuid
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Protocol
 
 from registry.vault_secret_manager import (
-    KeyVersion,
+    ConcurrentModificationError,
+    KeyStatus,
     RotationState,
     SecretManager,
-    ZarcJournal,
 )
-
-logger = logging.getLogger(__name__)
+from registry.zarc_journal import ZarcJournal
 
 ClockFn = Callable[[], int]
 
 
-class RotationError(Exception):
-    """Base exception for key rotation service failures."""
+class EventBus(Protocol):
+    """Protocol for publishing audit/rotation events."""
+
+    async def publish(self, event: RotationEvent) -> None: ...
 
 
-class AuditEventPublishError(RotationError):
-    """Raised when a rotation audit event cannot be published."""
+class RotationError(RuntimeError):
+    """Raised when a key rotation, rollback, or revocation fails domain invariants."""
 
 
-@dataclass
+class AuditEventPublishError(RuntimeError):
+    """Raised when publishing a `RotationEvent` to the event bus fails."""
+
+
+@dataclass(frozen=True)
 class RotationEvent:
-    """Represents a key rotation audit event."""
+    """Immutable audit event emitted for key lifecycle actions."""
 
-    event_type: str  # "KEY_ROTATION_INITIATED", "KEY_ROTATION_COMPLETED", "KEY_ROTATION_FAILED"
+    event_type: str
     stable_event_id: str
     created_at_ns: int
     previous_event_hash: str
@@ -56,251 +50,243 @@ class RotationEvent:
 
 
 class KeyRotationService:
-    """
-    Service for orchestrating key rotations with predecessor tracking.
-
-    Coordinates key rotation through SecretManager, verifies predecessor chain
-    integrity, and emits structured audit events to an optional event bus.
-    """
+    """Application service orchestrating rotations, rollbacks, revocations, and audit events."""
 
     def __init__(
         self,
         secret_manager: SecretManager,
-        event_bus: Any = None,
+        event_bus: Optional[EventBus] = None,
         clock_ns: Optional[ClockFn] = None,
     ) -> None:
-        self.secret_manager = secret_manager
-        self.event_bus = event_bus
-        self._clock_ns: ClockFn = clock_ns or ZarcJournal.now_ns
-        self._rotation_lock = asyncio.Lock()
+        self._secret_manager = secret_manager
+        self._event_bus = event_bus
+        self._clock_ns: ClockFn = clock_ns if clock_ns is not None else ZarcJournal.now_ns
         self._last_event_hash: str = ""
+
+    def _next_timestamp_ns(self) -> int:
+        return int(self._clock_ns())
+
+    def _build_and_chain_event(
+        self,
+        event_type: str,
+        created_at_ns: int,
+        payload: Dict[str, Any],
+    ) -> RotationEvent:
+        stable_event_id = str(uuid.uuid4())
+        sig_input = f"{event_type}:{stable_event_id}:{created_at_ns}:{self._last_event_hash}".encode(
+            "utf-8"
+        )
+        signature = hashlib.sha256(sig_input).hexdigest()
+        event = RotationEvent(
+            event_type=event_type,
+            stable_event_id=stable_event_id,
+            created_at_ns=created_at_ns,
+            previous_event_hash=self._last_event_hash,
+            signature=signature,
+            payload=payload,
+        )
+        digest = hashlib.sha256(
+            f"{event.stable_event_id}:{event.created_at_ns}:{event.signature}".encode("utf-8")
+        ).hexdigest()
+        self._last_event_hash = digest
+        return event
+
+    async def _emit_event(self, event: RotationEvent) -> None:
+        if self._event_bus is None:
+            return
+        try:
+            await self._event_bus.publish(event)
+        except Exception as exc:
+            raise AuditEventPublishError(f"Failed to publish {event.event_type}") from exc
 
     async def initiate_rotation(
         self,
         new_private_key_ref: str,
         new_public_key: bytes,
+        expected_current_key_id: Optional[str] = None,
+        expected_revision: Optional[int] = None,
     ) -> RotationState:
-        """
-        Initiate a key rotation and record a completion or failure audit event.
-
-        Raises RotationError (or AuditEventPublishError) if rotation or audit
-        publishing fails.
-        """
-        if not new_private_key_ref:
+        if not isinstance(new_private_key_ref, str) or not new_private_key_ref.strip():
             raise ValueError("new_private_key_ref must be a non-empty string")
-        if not new_public_key:
-            raise ValueError("new_public_key must be non-empty bytes")
+        key_bytes = bytes(new_public_key)
+        if not key_bytes:
+            raise ValueError("new_public_key must not be empty")
 
-        async with self._rotation_lock:
-            logger.info("Initiating key rotation for trust anchor")
+        ts = self._next_timestamp_ns()
+        try:
+            state = await self._secret_manager.rotate_keys(
+                new_private_key_ref=new_private_key_ref,
+                new_public_key=key_bytes,
+                expected_current_key_id=expected_current_key_id,
+                expected_revision=expected_revision,
+            )
+        except ConcurrentModificationError as exc:
+            fail_event = self._build_and_chain_event(
+                event_type="KEY_ROTATION_FAILED",
+                created_at_ns=ts,
+                payload={
+                    "timestamp_ns": ts,
+                    "reason": str(exc),
+                    "conflict": True,
+                },
+            )
+            await self._emit_event(fail_event)
+            raise RotationError(str(exc)) from exc
 
-            try:
-                rotation_state = await self.secret_manager.rotate_keys(
-                    new_private_key_ref=new_private_key_ref,
-                    new_public_key=new_public_key,
-                )
+        if state.status != "completed":
+            fail_event = self._build_and_chain_event(
+                event_type="KEY_ROTATION_FAILED",
+                created_at_ns=ts,
+                payload={
+                    "timestamp_ns": ts,
+                    "current_key_id": state.current_key_id,
+                    "new_key_id": state.new_key_id,
+                    "reason": state.error_message or f"Unexpected status: {state.status}",
+                },
+            )
+            await self._emit_event(fail_event)
+            raise RotationError(state.error_message or f"Rotation failed with status {state.status!r}")
 
-                if rotation_state.status != "completed":
-                    error_msg = getattr(rotation_state, "error_message", None) or "unknown error"
-                    logger.error(
-                        "Key rotation failed with status=%s: %s",
-                        rotation_state.status,
-                        error_msg,
-                    )
-                    raise RotationError(f"Rotation failed ({rotation_state.status}): {error_msg}")
+        event = self._build_and_chain_event(
+            event_type="KEY_ROTATION_COMPLETED",
+            created_at_ns=ts,
+            payload={
+                "timestamp_ns": ts,
+                "previous_key_id": state.current_key_id,
+                "new_key_id": state.new_key_id,
+                "predecessor_key_id": state.predecessor_key_id,
+                "revision": state.revision,
+            },
+        )
+        await self._emit_event(event)
+        return state
 
-                current_version = await self.secret_manager.get_current_key_version()
-                predecessor_key_id = (
-                    current_version.predecessor_key_id if current_version is not None else None
-                )
+    async def rollback_to_predecessor(
+        self,
+        key_id: str,
+        expected_revision: Optional[int] = None,
+    ) -> RotationState:
+        if not isinstance(key_id, str) or not key_id.strip():
+            raise ValueError("key_id must be a non-empty string")
 
-                logger.info(
-                    "Key rotation completed: %s -> %s",
-                    rotation_state.current_key_id,
-                    rotation_state.new_key_id,
-                )
+        history = await self._secret_manager.get_key_history()
+        target = next((k for k in history if k.key_id == key_id), None)
+        if target is None:
+            raise LookupError(f"Key version not found: {key_id!r}")
 
-                await self._create_rotation_event(
-                    event_type="KEY_ROTATION_COMPLETED",
-                    current_key_id=rotation_state.current_key_id,
-                    new_key_id=rotation_state.new_key_id,
-                    predecessor_key_id=predecessor_key_id,
-                )
+        if target.predecessor_key_id:
+            pred = next((k for k in history if k.key_id == target.predecessor_key_id), None)
+            if pred is None:
+                raise LookupError(f"Predecessor key not found: {target.predecessor_key_id!r}")
+            if pred.status == KeyStatus.REVOKED:
+                raise RotationError(f"Cannot roll back to revoked predecessor {pred.key_id!r}")
+            grand_pred = pred.predecessor_key_id
+            chain_ok = await self._secret_manager.verify_signature_chain(
+                key_id=pred.key_id,
+                expected_predecessor=grand_pred,
+            )
+            if not chain_ok:
+                raise RotationError(f"Predecessor chain integrity check failed for {pred.key_id!r}")
 
-                return rotation_state
+        ts = self._next_timestamp_ns()
+        try:
+            state = await self._secret_manager.rollback_to_predecessor(
+                key_id=key_id,
+                expected_revision=expected_revision,
+            )
+        except ConcurrentModificationError as exc:
+            raise RotationError(str(exc)) from exc
+        except ValueError as exc:
+            raise RotationError(str(exc)) from exc
 
-            except AuditEventPublishError:
-                raise
-            except Exception as exc:
-                logger.exception("Key rotation failed with error: %s", exc)
-                try:
-                    await self._create_rotation_event(
-                        event_type="KEY_ROTATION_FAILED",
-                        error=str(exc),
-                    )
-                except AuditEventPublishError as audit_exc:
-                    logger.error(
-                        "Failed to publish failure audit event after rotation error: %s",
-                        audit_exc,
-                    )
-                raise
+        event = self._build_and_chain_event(
+            event_type="KEY_ROTATION_ROLLED_BACK",
+            created_at_ns=ts,
+            payload={
+                "timestamp_ns": ts,
+                "rolled_back_from_key_id": key_id,
+                "restored_key_id": state.new_key_id,
+                "predecessor_key_id": state.predecessor_key_id,
+                "revision": state.revision,
+            },
+        )
+        await self._emit_event(event)
+        return state
+
+    async def revoke_key(
+        self,
+        key_id: str,
+        reason: str,
+        expected_revision: Optional[int] = None,
+    ) -> KeyStatus:
+        if not isinstance(key_id, str) or not key_id.strip():
+            raise ValueError("key_id must be a non-empty string")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("reason must be a non-empty string")
+
+        ts = self._next_timestamp_ns()
+        try:
+            revoked = await self._secret_manager.revoke_key(
+                key_id=key_id,
+                reason=reason,
+                expected_revision=expected_revision,
+            )
+        except ConcurrentModificationError as exc:
+            raise RotationError(str(exc)) from exc
+
+        event = self._build_and_chain_event(
+            event_type="KEY_REVOKED",
+            created_at_ns=ts,
+            payload={
+                "timestamp_ns": ts,
+                "key_id": revoked.key_id,
+                "reason": reason,
+                "revision": revoked.revision,
+            },
+        )
+        await self._emit_event(event)
+        return revoked.status
 
     async def verify_key_chain_integrity(
         self,
         key_id: str,
         expected_predecessor: Optional[str],
     ) -> bool:
-        """
-        Verify that a key exists and passes predecessor/signature chain verification.
-
-        Propagates backend errors rather than masking them as a failed verification.
-        """
         if not key_id:
             return False
-
-        current_version = await self.secret_manager.get_current_key_version()
-        if current_version is not None and key_id == current_version.key_id:
-            return await self.secret_manager.verify_signature_chain(
-                key_id=key_id,
-                expected_predecessor=expected_predecessor,
-            )
-
-        history = await self.secret_manager.get_key_history()
-        key_version = next((k for k in history if k.key_id == key_id), None)
-        if key_version is None:
-            logger.warning("Key %s not found in history", key_id)
-            return False
-
-        return await self.secret_manager.verify_signature_chain(
+        return await self._secret_manager.verify_signature_chain(
             key_id=key_id,
             expected_predecessor=expected_predecessor,
         )
 
     async def get_key_history(self) -> List[Dict[str, Any]]:
-        """
-        Return serialized key history entries from SecretManager.
-
-        Propagates backend exceptions so callers can distinguish errors from an empty history.
-        """
-        history = await self.secret_manager.get_key_history()
-        history_list: List[Dict[str, Any]] = []
-
-        for version in history:
-            history_list.append(
-                {
-                    "key_id": version.key_id,
-                    "public_key_hash": hashlib.sha256(version.public_key).hexdigest(),
-                    "created_at_ns": version.created_at_ns,
-                    "predecessor_key_id": version.predecessor_key_id,
-                    "signature_chain_hash": version.signature_chain_hash,
-                }
-            )
-
-        return history_list
-
-    async def rollback_to_predecessor(self, target_key_id: str) -> KeyVersion:
-        """
-        Validate a target key's predecessor chain ahead of rolling back.
-
-        Raises LookupError if the target or predecessor version is missing,
-        RotationError if chain verification fails, or NotImplementedError until
-        predecessor key retrieval and rotation are implemented.
-        """
-        history = await self.secret_manager.get_key_history()
-        target_version = next((k for k in history if k.key_id == target_key_id), None)
-
-        if target_version is None:
-            raise LookupError(f"Target key {target_key_id} not found in history")
-
-        predecessor_id = target_version.predecessor_key_id
-        if predecessor_id is None:
-            raise RotationError(f"Cannot roll back from {target_key_id}: no predecessor_key_id")
-
-        predecessor_version = next((k for k in history if k.key_id == predecessor_id), None)
-        if predecessor_version is None:
-            raise LookupError(f"Predecessor key {predecessor_id} not found in history")
-
-        is_valid = await self.verify_key_chain_integrity(
-            key_id=predecessor_id,
-            expected_predecessor=predecessor_version.predecessor_key_id,
-        )
-        if not is_valid:
-            raise RotationError(f"Predecessor key {predecessor_id} failed chain integrity check")
-
-        # TODO: Retrieve predecessor key reference/material and perform an explicit
-        # rotation back to predecessor_version rather than mutating history in place.
-        raise NotImplementedError(
-            f"Rollback to predecessor {predecessor_id} is not yet implemented"
-        )
-
-    async def _create_rotation_event(
-        self,
-        event_type: str,
-        **kwargs: Any,
-    ) -> Optional[RotationEvent]:
-        """Build, digest, and publish a rotation audit event using a single timestamp."""
-        timestamp_ns = self._clock_ns()
-        payload: Dict[str, Any] = {
-            "event_type": event_type,
-            "timestamp_ns": timestamp_ns,
-            **kwargs,
-        }
-
-        canonical_payload = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        previous_hash = self._last_event_hash
-        event_id = hashlib.sha256(
-            previous_hash.encode("utf-8") + b":" + canonical_payload
-        ).hexdigest()[:16]
-        signature = self._compute_signature(payload, previous_hash=previous_hash)
-
-        event = RotationEvent(
-            event_type=event_type,
-            stable_event_id=event_id,
-            created_at_ns=timestamp_ns,
-            previous_event_hash=previous_hash,
-            signature=signature,
-            payload=payload,
-        )
-
-        if self.event_bus is not None:
-            try:
-                await self.event_bus.publish(event)
-            except Exception as exc:
-                raise AuditEventPublishError(f"Failed to publish {event_type} event: {exc}") from exc
-
-        self._last_event_hash = hashlib.sha256(
-            f"{event.stable_event_id}:{event.created_at_ns}:{event.signature}".encode("utf-8")
-        ).hexdigest()
-
-        return event
-
-    def _compute_signature(self, payload: Dict[str, Any], previous_hash: str = "") -> str:
-        """
-        Compute a deterministic digest for an event payload.
-
-        TODO: Replace with an asymmetric/HMAC signature using the active signing key
-        once key-signing integration is wired into this plane.
-        """
-        envelope = {
-            "previous_event_hash": previous_hash,
-            "payload": payload,
-        }
-        canonical = json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        return hashlib.sha256(canonical).hexdigest()
+        history = await self._secret_manager.get_key_history()
+        return [
+            {
+                "key_id": item.key_id,
+                "predecessor_key_id": item.predecessor_key_id,
+                "created_at_ns": item.created_at_ns,
+                "signature_chain_hash": item.signature_chain_hash,
+                "status": item.status.value,
+                "revision": item.revision,
+                "revoked_at_ns": item.revoked_at_ns,
+                "revocation_reason": item.revocation_reason,
+            }
+            for item in history
+        ]
 
 
 class KeyRotationOrchestrator:
-    """
-    Facade over KeyRotationService returning plain dictionaries for callers/APIs.
-    """
+    """High-level facade returning structured dictionaries for callers/schedulers."""
 
     def __init__(
         self,
         secret_manager: SecretManager,
-        event_bus: Any = None,
+        event_bus: Optional[EventBus] = None,
         clock_ns: Optional[ClockFn] = None,
     ) -> None:
-        self.rotation_service = KeyRotationService(
+        self._secret_manager = secret_manager
+        self._service = KeyRotationService(
             secret_manager=secret_manager,
             event_bus=event_bus,
             clock_ns=clock_ns,
@@ -310,52 +296,88 @@ class KeyRotationOrchestrator:
         self,
         new_private_key_ref: str,
         new_public_key: bytes,
+        expected_current_key_id: Optional[str] = None,
+        expected_revision: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Run a key rotation and return a structured status dictionary."""
         try:
-            rotation_state = await self.rotation_service.initiate_rotation(
+            state = await self._service.initiate_rotation(
                 new_private_key_ref=new_private_key_ref,
                 new_public_key=new_public_key,
+                expected_current_key_id=expected_current_key_id,
+                expected_revision=expected_revision,
             )
-
             return {
                 "status": "success",
-                "current_key_id": rotation_state.current_key_id,
-                "new_key_id": rotation_state.new_key_id,
-                "rotation_completed_at_ns": rotation_state.rotation_completed_at_ns,
-                "key_history": await self.rotation_service.get_key_history(),
+                "current_key_id": state.current_key_id,
+                "new_key_id": state.new_key_id,
+                "predecessor_key_id": state.predecessor_key_id,
+                "revision": state.revision,
             }
-
         except Exception as exc:
-            logger.error("Orchestrator rotate_keys failed: %s", exc)
             return {
                 "status": "failed",
                 "error": str(exc),
             }
 
-    async def verify_chain(
+    async def rollback_to_predecessor(
         self,
         key_id: str,
-        expected_predecessor: Optional[str],
-    ) -> bool:
-        """Verify signature chain integrity for a key."""
-        return await self.rotation_service.verify_key_chain_integrity(
-            key_id=key_id,
-            expected_predecessor=expected_predecessor,
-        )
-
-    async def get_status(self) -> Dict[str, Any]:
-        """Return current key rotation status and history."""
+        expected_revision: Optional[int] = None,
+    ) -> Dict[str, Any]:
         try:
-            history = await self.rotation_service.get_key_history()
+            state = await self._service.rollback_to_predecessor(
+                key_id=key_id,
+                expected_revision=expected_revision,
+            )
             return {
-                "status": "ok",
-                "current_key_id": history[-1]["key_id"] if history else None,
-                "key_count": len(history),
-                "history": history,
+                "status": "success",
+                "rolled_back_from_key_id": key_id,
+                "new_key_id": state.new_key_id,
+                "predecessor_key_id": state.predecessor_key_id,
+                "revision": state.revision,
             }
         except Exception as exc:
-            logger.error("Failed to get rotation status: %s", exc)
+            return {
+                "status": "failed",
+                "error": str(exc),
+            }
+
+    async def revoke_key(
+        self,
+        key_id: str,
+        reason: str,
+        expected_revision: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        try:
+            key_status = await self._service.revoke_key(
+                key_id=key_id,
+                reason=reason,
+                expected_revision=expected_revision,
+            )
+            return {
+                "status": "success",
+                "key_id": key_id,
+                "key_status": key_status.value,
+                "revision": self._secret_manager.revision,
+            }
+        except Exception as exc:
+            return {
+                "status": "failed",
+                "error": str(exc),
+            }
+
+    async def get_status(self) -> Dict[str, Any]:
+        try:
+            current = await self._secret_manager.get_current_key_version()
+            history = await self._secret_manager.get_key_history()
+            return {
+                "status": "ok",
+                "current_key_id": current.key_id if current else None,
+                "current_key_status": current.status.value if current else None,
+                "revision": self._secret_manager.revision,
+                "total_versions": len(history),
+            }
+        except Exception as exc:
             return {
                 "status": "error",
                 "error": str(exc),
