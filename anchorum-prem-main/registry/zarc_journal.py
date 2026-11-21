@@ -1,95 +1,111 @@
 """
-Plane 1 (kernel/domain/application/governance): Monotonic timestamp provider.
+Plane 1 (kernel/domain/application/governance): Monotonic clock and chain journal.
 
-This module provides ZarcJournal.now_ns() for monotonic timestamps without wall-clock dependency.
-Essential for deterministic event ordering and signature chain integrity.
+Provides a side-effect-free monotonic nanosecond clock, deterministic chain
+hash computation, and optional journal history tracking with injectable clocks.
 """
 
-import time
-import logging
-from typing import Optional, Callable
+from __future__ import annotations
 
-logger = logging.getLogger(__name__)
+import hashlib
+import threading
+import time
+from dataclasses import dataclass
+from typing import Callable, ClassVar, List, Optional
+
+ClockFn = Callable[[], int]
+
+
+@dataclass(frozen=True)
+class JournalRecord:
+    """Immutable audit/chain record tracked by ZarcJournal."""
+
+    sequence: int
+    timestamp_ns: int
+    key_id: str
+    predecessor_key_id: Optional[str]
+    chain_hash: str
+    detail: str = ""
 
 
 class ZarcJournal:
     """
-    Provides monotonic timestamping for deterministic event ordering.
-    
-    Uses a combination of:
-    1. System monotonic clock (if available)
-    2. Fallback to high-resolution time with offset tracking
-    3. Event chain hashing for cross-session continuity
+    Monotonic nanosecond clock and chain-hash helper for Anchorum-prem.
+
+    Performs no clock or I/O side effects at module import time.
     """
-    
-    _monotonic_base_ns: Optional[int] = None
-    _offset_ns: int = 0
-    _initialized: bool = False
-    
+
+    _lock: ClassVar[threading.Lock] = threading.Lock()
+    _default_clock: ClassVar[ClockFn] = time.monotonic_ns
+    _last_ns: ClassVar[int] = 0
+
+    def __init__(self, clock_ns: Optional[ClockFn] = None) -> None:
+        self._clock_ns: ClockFn = clock_ns or self._default_clock
+        self._instance_lock = threading.Lock()
+        self._history: List[JournalRecord] = []
+        self._seq: int = 0
+
+    @classmethod
+    def set_default_clock(cls, clock_ns: Optional[ClockFn]) -> None:
+        """Override or reset (when None) the class-level clock provider."""
+        with cls._lock:
+            cls._default_clock = clock_ns if clock_ns is not None else time.monotonic_ns
+            cls._last_ns = 0
+
     @classmethod
     def now_ns(cls) -> int:
-        """
-        Get current monotonic timestamp in nanoseconds.
-        
-        Returns a value that:
-        - Is monotonically increasing within a session
-        - Can be compared across sessions via event chain
-        - Does not depend on wall-clock time
-        """
-        if not cls._initialized:
-            cls._initialize()
-        
-        current_time_ns = time.time_ns()
-        offset = cls._offset_ns
-        
-        # Combine monotonic base with current time, applying offset
-        result = cls._monotonic_base_ns + (current_time_ns - int(time.time())) * 1_000_000_000 + offset
-        
-        return result
-    
-    @classmethod
-    def _initialize(cls) -> None:
-        """Initialize the monotonic clock."""
-        if cls._initialized:
-            return
-        
-        try:
-            # Try to get monotonic time (Python 3.3+)
-            cls._monotonic_base_ns = time.monotonic_ns()
-            cls._offset_ns = 0
-            cls._initialized = True
-            
-            logger.info("ZarcJournal initialized with monotonic clock")
-            
-        except AttributeError:
-            # Fallback: use wall-clock with offset tracking
-            cls._monotonic_base_ns = int(time.time()) * 1_000_000_000
-            cls._offset_ns = 0
-            cls._initialized = True
-            
-            logger.warning("ZarcJournal using wall-clock fallback")
-    
-    @classmethod
-    def set_offset(cls, offset_ns: int) -> None:
-        """Set an offset for cross-session continuity."""
-        if not cls._initialized:
-            cls._initialize()
-        
-        cls._offset_ns = offset_ns
-        logger.info(f"ZarcJournal offset set to {offset_ns} ns")
-    
-    @classmethod
-    def get_monotonic_base(cls) -> Optional[int]:
-        """Get the monotonic base timestamp."""
-        return cls._monotonic_base_ns
-    
-    @classmethod
-    def is_initialized(cls) -> bool:
-        """Check if ZarcJournal has been initialized."""
-        return cls._initialized
+        """Return a strictly non-decreasing nanosecond timestamp."""
+        with cls._lock:
+            raw_ns = int(cls._default_clock())
+            if raw_ns < cls._last_ns:
+                raw_ns = cls._last_ns
+            cls._last_ns = raw_ns
+            return raw_ns
 
+    @staticmethod
+    def compute_chain_hash(
+        predecessor_key_id: Optional[str],
+        public_key: bytes,
+        previous_chain_hash: str = "",
+    ) -> str:
+        """Compute deterministic hash linking predecessor, public key, and prior chain."""
+        pub_hex = public_key.hex()
+        prefix = f"{previous_chain_hash}|" if previous_chain_hash else ""
+        if predecessor_key_id is None:
+            raw = f"{prefix}root|{pub_hex}".encode("utf-8")
+        else:
+            raw = f"{prefix}{predecessor_key_id}:{pub_hex}".encode("utf-8")
+        return hashlib.sha256(raw).hexdigest()
 
-# Initialize on first import
-ZarcJournal.now_ns()
+    def record(
+        self,
+        key_id: str,
+        public_key: bytes,
+        predecessor_key_id: Optional[str] = None,
+        previous_chain_hash: str = "",
+        detail: str = "",
+    ) -> JournalRecord:
+        """Append a chain-linked record to this journal instance."""
+        with self._instance_lock:
+            ts = int(self._clock_ns())
+            self._seq += 1
+            chain_hash = self.compute_chain_hash(
+                predecessor_key_id=predecessor_key_id,
+                public_key=public_key,
+                previous_chain_hash=previous_chain_hash,
+            )
+            entry = JournalRecord(
+                sequence=self._seq,
+                timestamp_ns=ts,
+                key_id=key_id,
+                predecessor_key_id=predecessor_key_id,
+                chain_hash=chain_hash,
+                detail=detail,
+            )
+            self._history.append(entry)
+            return entry
 
-__all__ = ['ZarcJournal', 'now_ns']
+    def get_key_history(self) -> List[JournalRecord]:
+        """Return a shallow copy of recorded journal entries."""
+        with self._instance_lock:
+            return self._history.copy()
